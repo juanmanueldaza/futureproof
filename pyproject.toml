@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Career intelligence system - gather professional data, generate CVs, analyze career alignment"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "GPL-2.0-only"
 dependencies = [
     # Core
     "typer>=0.15",

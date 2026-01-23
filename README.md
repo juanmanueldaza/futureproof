@@ -179,4 +179,4 @@ ruff check . --fix
 
 ## License
 
-MIT
+GPL-2.0
