@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <!-- Google Analytics 4 with Consent Mode v2 (GDPR Compliant) -->
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('consent', 'default', {
+                'ad_storage': 'denied',
+                'ad_user_data': 'denied',
+                'ad_personalization': 'denied',
+                'analytics_storage': 'denied'
+            });
+            gtag('js', new Date());
+            gtag('config', 'G-PV6HF4TEQ7');
+        </script>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-PV6HF4TEQ7"></script>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>
+            FutureProof - Career Intelligence System for AI-Powered CV Generation
+        </title>
+        <meta
+            name="description"
+            content="Aggregate professional data from LinkedIn, GitHub, GitLab, and portfolios. Generate AI-optimized CVs and get strategic career analysis with Gemini AI."
+        />
+        <meta
+            name="keywords"
+            content="career intelligence, CV generator, resume builder, AI career analysis, LinkedIn, GitHub, GitLab, portfolio, LangChain, Gemini AI"
+        />
+
+        <link rel="canonical" href="https://futureproof.daza.ar/" />
+        <meta name="author" content="Juan Manuel Daza" />
+        <meta name="theme-color" content="#0a0a0a" />
+
+        <!-- Open Graph -->
+        <meta
+            property="og:title"
+            content="FutureProof - Career Intelligence System for AI-Powered CV Generation"
+        />
+        <meta
+            property="og:description"
+            content="Know thyself through your data. Aggregate professional data from LinkedIn, GitHub, GitLab, and portfolios. Generate AI-optimized CVs and get strategic career analysis."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://futureproof.daza.ar" />
+        <meta
+            property="og:image"
+            content="https://opengraph.githubassets.com/1/juanmanueldaza/futureproof"
+        />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            content="FutureProof - Career Intelligence System"
+        />
+        <meta
+            name="twitter:description"
+            content="Know thyself through your data. Aggregate professional data, generate AI-optimized CVs, and get strategic career analysis."
+        />
+        <meta
+            name="twitter:image"
+            content="https://opengraph.githubassets.com/1/juanmanueldaza/futureproof"
+        />
+
+        <style>
+            :root {
+                --bg: #0a0a0a;
+                --text: #e5e5e5;
+                --text-muted: #a3a3a3;
+                --accent: #10b981;
+                --accent-hover: #059669;
+                --accent-dim: #065f46;
+                --code-bg: #1a1a1a;
+                --border: #262626;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Oxygen, Ubuntu, sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                line-height: 1.6;
+                min-height: 100vh;
+            }
+
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 2rem 1.5rem;
+            }
+
+            header {
+                text-align: center;
+                padding: 4rem 0 3rem;
+            }
+
+            h1 {
+                font-size: 3rem;
+                font-weight: 700;
+                margin-bottom: 1rem;
+                letter-spacing: -0.02em;
+            }
+
+            h1 span {
+                color: var(--accent);
+            }
+
+            .tagline {
+                font-size: 1.25rem;
+                color: var(--text-muted);
+                max-width: 540px;
+                margin: 0 auto 0.75rem;
+            }
+
+            .motto {
+                font-size: 1rem;
+                color: var(--accent);
+                font-style: italic;
+                margin-bottom: 2rem;
+            }
+
+            .install-box {
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1rem 1.5rem;
+                margin: 2rem auto;
+                max-width: 500px;
+                position: relative;
+            }
+
+            .install-box code {
+                font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+                font-size: 1rem;
+                color: var(--text);
+            }
+
+            .install-box .prompt {
+                color: var(--accent);
+                user-select: none;
+            }
+
+            .buttons {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                flex-wrap: wrap;
+                margin-top: 2rem;
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                text-decoration: none;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+
+            .btn-primary {
+                background: var(--accent);
+                color: white;
+            }
+
+            .btn-primary:hover {
+                background: var(--accent-hover);
+            }
+
+            .btn-secondary {
+                background: transparent;
+                color: var(--text);
+                border: 1px solid var(--border);
+            }
+
+            .btn-secondary:hover {
+                border-color: var(--text-muted);
+            }
+
+            section {
+                padding: 3rem 0;
+                border-top: 1px solid var(--border);
+            }
+
+            h2 {
+                font-size: 1.5rem;
+                margin-bottom: 1.5rem;
+                font-weight: 600;
+            }
+
+            .features {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .feature {
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.5rem;
+            }
+
+            .feature h3 {
+                font-size: 1rem;
+                margin-bottom: 0.5rem;
+                color: var(--text);
+            }
+
+            .feature p {
+                font-size: 0.9rem;
+                color: var(--text-muted);
+            }
+
+            .sources-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 1rem;
+            }
+
+            .source {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                padding: 1rem;
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                text-decoration: none;
+                color: var(--text);
+                transition: border-color 0.2s;
+            }
+
+            .source:hover {
+                border-color: var(--accent);
+            }
+
+            .source-icon {
+                font-size: 1.5rem;
+            }
+
+            .source-name {
+                font-weight: 500;
+            }
+
+            .source-type {
+                font-size: 0.8rem;
+                color: var(--text-muted);
+            }
+
+            .workflow {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .workflow-step {
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.5rem;
+                position: relative;
+            }
+
+            .workflow-step::before {
+                content: attr(data-step);
+                position: absolute;
+                top: -0.75rem;
+                left: 1rem;
+                background: var(--accent);
+                color: white;
+                font-size: 0.75rem;
+                font-weight: 600;
+                padding: 0.25rem 0.75rem;
+                border-radius: 4px;
+            }
+
+            .workflow-step h3 {
+                font-size: 1rem;
+                margin-bottom: 0.5rem;
+                margin-top: 0.5rem;
+            }
+
+            .workflow-step p {
+                font-size: 0.9rem;
+                color: var(--text-muted);
+            }
+
+            .commands {
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                overflow: hidden;
+            }
+
+            .command-item {
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid var(--border);
+                font-family: "SF Mono", Monaco, monospace;
+                font-size: 0.9rem;
+            }
+
+            .command-item:last-child {
+                border-bottom: none;
+            }
+
+            .command-item .cmd {
+                color: var(--text);
+            }
+
+            .command-item .comment {
+                color: var(--text-muted);
+                margin-left: 1rem;
+            }
+
+            .command-item .prompt {
+                color: var(--accent);
+                user-select: none;
+            }
+
+            .output-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+            }
+
+            .output-card {
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.25rem;
+            }
+
+            .output-card h3 {
+                font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+                color: var(--accent);
+            }
+
+            .output-card p {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+            }
+
+            .security-list {
+                list-style: none;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 0.75rem;
+            }
+
+            .security-list li {
+                padding: 0.75rem 1rem;
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                font-size: 0.9rem;
+                color: var(--text-muted);
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .security-list li::before {
+                content: "~";
+                color: var(--accent);
+                font-weight: bold;
+            }
+
+            .ecosystem {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1rem;
+                justify-content: center;
+            }
+
+            .ecosystem-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.75rem 1.25rem;
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                text-decoration: none;
+                color: var(--text);
+                font-size: 0.9rem;
+                transition: border-color 0.2s;
+            }
+
+            .ecosystem-link:hover {
+                border-color: var(--accent);
+            }
+
+            footer {
+                text-align: center;
+                padding: 3rem 0;
+                border-top: 1px solid var(--border);
+                color: var(--text-muted);
+                font-size: 0.9rem;
+            }
+
+            footer a {
+                color: var(--accent);
+                text-decoration: none;
+            }
+
+            footer a:hover {
+                text-decoration: underline;
+            }
+
+            @media (max-width: 600px) {
+                h1 {
+                    font-size: 2rem;
+                }
+
+                .tagline {
+                    font-size: 1rem;
+                }
+
+                .workflow {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .cookie-settings-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; margin-top: 0.5rem; display: block; }
+            .cookie-settings-btn:hover { color: var(--accent); }
+            .cookie-banner { position: fixed; bottom: 0; left: 0; right: 0; background: var(--code-bg); border-top: 1px solid var(--accent); padding: 1.5rem; z-index: 1000; }
+            .cookie-banner[hidden] { display: none; }
+            .cookie-content { max-width: 800px; margin: 0 auto; text-align: center; }
+            .cookie-content p { margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted); }
+            .cookie-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+            .cookie-btn { padding: 0.5rem 1.5rem; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+            .cookie-btn-reject { background: transparent; color: var(--text); }
+            .cookie-btn-reject:hover { border-color: var(--text-muted); }
+            .cookie-btn-accept { background: var(--accent); border-color: var(--accent); color: white; }
+            .cookie-btn-accept:hover { background: var(--accent-hover); }
+        </style>
+
+        <!-- Structured Data -->
+        <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"SoftwareApplication","name":"FutureProof","description":"Career Intelligence System - Aggregate professional data from LinkedIn, GitHub, GitLab, and portfolios. Generate AI-optimized CVs and get strategic career analysis.","url":"https://futureproof.daza.ar","applicationCategory":"DeveloperApplication","operatingSystem":"Cross-platform","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Juan Manuel Daza","url":"https://daza.ar"},"license":"https://opensource.org/licenses/GPL-2.0","codeRepository":"https://github.com/juanmanueldaza/futureproof","softwareVersion":"0.1.0"}
+        </script>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Future<span>Proof</span></h1>
+                <p class="tagline">
+                    Career Intelligence System - Aggregate professional data and generate AI-optimized CVs
+                </p>
+                <p class="motto">Know thyself through your data.</p>
+
+                <div class="install-box">
+                    <code><span class="prompt">$</span> pip install futureproof</code>
+                </div>
+
+                <div class="buttons">
+                    <a
+                        href="https://github.com/juanmanueldaza/futureproof"
+                        class="btn btn-primary"
+                    >
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                            />
+                        </svg>
+                        GitHub
+                    </a>
+                    <a
+                        href="https://pypi.org/project/futureproof/"
+                        class="btn btn-secondary"
+                    >
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M12 0L1.5 6v12L12 24l10.5-6V6L12 0zm0 2.25l7.5 4.5v9l-7.5 4.5-7.5-4.5v-9l7.5-4.5z"
+                            />
+                        </svg>
+                        PyPI
+                    </a>
+                </div>
+            </header>
+
+            <section>
+                <h2>What is FutureProof?</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem">
+                    A Python CLI that aggregates your professional footprint and uses AI to generate strategic career outputs.
+                </p>
+                <div class="features">
+                    <div class="feature">
+                        <h3>Data Aggregation</h3>
+                        <p>
+                            Pull data from LinkedIn, GitHub, GitLab, and portfolio sites into normalized markdown
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <h3>CV Generation</h3>
+                        <p>
+                            Produce ATS-optimized and creative CVs in English and Spanish (MD + PDF)
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <h3>Career Analysis</h3>
+                        <p>
+                            Compare stated goals vs actual behavior. Identify gaps and blind spots
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <h3>Strategic Advice</h3>
+                        <p>
+                            Get actionable recommendations powered by Gemini AI for your target role
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Data Sources</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem">
+                    FutureProof aggregates your professional presence from multiple platforms.
+                </p>
+                <div class="sources-grid">
+                    <a href="https://linkedin2md.daza.ar" class="source" target="_blank">
+                        <span class="source-icon">in</span>
+                        <div>
+                            <div class="source-name">LinkedIn</div>
+                            <div class="source-type">via linkedin2md</div>
+                        </div>
+                    </a>
+                    <a href="https://github2md.daza.ar" class="source" target="_blank">
+                        <span class="source-icon">GH</span>
+                        <div>
+                            <div class="source-name">GitHub</div>
+                            <div class="source-type">via github2md</div>
+                        </div>
+                    </a>
+                    <a href="https://gitlab2md.daza.ar" class="source" target="_blank">
+                        <span class="source-icon">GL</span>
+                        <div>
+                            <div class="source-name">GitLab</div>
+                            <div class="source-type">via gitlab2md</div>
+                        </div>
+                    </a>
+                    <div class="source">
+                        <span class="source-icon">WEB</span>
+                        <div>
+                            <div class="source-name">Portfolio</div>
+                            <div class="source-type">Any website</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Workflow</h2>
+                <div class="workflow">
+                    <div class="workflow-step" data-step="1">
+                        <h3>Gather</h3>
+                        <p>Pull data from all your professional sources into structured markdown</p>
+                    </div>
+                    <div class="workflow-step" data-step="2">
+                        <h3>Analyze</h3>
+                        <p>AI examines your goals, reality, and identifies the gaps between them</p>
+                    </div>
+                    <div class="workflow-step" data-step="3">
+                        <h3>Generate</h3>
+                        <p>Create optimized CVs tailored for ATS systems or creative presentation</p>
+                    </div>
+                    <div class="workflow-step" data-step="4">
+                        <h3>Advise</h3>
+                        <p>Get strategic recommendations for your specific career target</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Quick Start</h2>
+                <div class="commands">
+                    <div class="command-item">
+                        <span class="prompt">$</span> <span class="cmd">pip install futureproof</span>
+                    </div>
+                    <div class="command-item">
+                        <span class="prompt">$</span> <span class="cmd">futureproof gather all</span>
+                        <span class="comment"># Gather from all sources</span>
+                    </div>
+                    <div class="command-item">
+                        <span class="prompt">$</span> <span class="cmd">futureproof analyze full</span>
+                        <span class="comment"># Comprehensive analysis</span>
+                    </div>
+                    <div class="command-item">
+                        <span class="prompt">$</span> <span class="cmd">futureproof generate cv --all</span>
+                        <span class="comment"># Generate all CV versions</span>
+                    </div>
+                    <div class="command-item">
+                        <span class="prompt">$</span> <span class="cmd">futureproof advise --target "AI Engineer"</span>
+                        <span class="comment"># Strategic advice</span>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Output Deliverables</h2>
+                <div class="output-grid">
+                    <div class="output-card">
+                        <h3>ATS CV (EN/ES)</h3>
+                        <p>Clean, keyword-optimized format for applicant tracking systems</p>
+                    </div>
+                    <div class="output-card">
+                        <h3>Creative CV (EN/ES)</h3>
+                        <p>Visually appealing format for direct submissions</p>
+                    </div>
+                    <div class="output-card">
+                        <h3>Career Analysis</h3>
+                        <p>Goals vs reality comparison with gap identification</p>
+                    </div>
+                    <div class="output-card">
+                        <h3>Strategic Advice</h3>
+                        <p>Actionable steps toward your target role</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Privacy & Security</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem">
+                    FutureProof implements security best practices to protect your data.
+                </p>
+                <ul class="security-list">
+                    <li>PII anonymization before external API calls</li>
+                    <li>Prompt injection detection and blocking</li>
+                    <li>SSRF protection for portfolio scraping</li>
+                    <li>Path traversal prevention</li>
+                    <li>Input validation via Pydantic</li>
+                    <li>Secure file permissions (0600)</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>Ecosystem</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem">
+                    FutureProof builds on top of specialized data extraction tools.
+                </p>
+                <div class="ecosystem">
+                    <a href="https://linkedin2md.daza.ar" class="ecosystem-link" target="_blank">
+                        linkedin2md
+                    </a>
+                    <a href="https://github2md.daza.ar" class="ecosystem-link" target="_blank">
+                        github2md
+                    </a>
+                    <a href="https://gitlab2md.daza.ar" class="ecosystem-link" target="_blank">
+                        gitlab2md
+                    </a>
+                </div>
+            </section>
+
+            <footer>
+                <p>
+                    Open source (GPL-2.0) · Built by
+                    <a href="https://github.com/juanmanueldaza">Juan Manuel Daza</a>
+                </p>
+            </footer>
+        </div>
+
+        <!-- Cookie Consent Banner -->
+        <div id="cookie-banner" class="cookie-banner" role="dialog" aria-modal="true" hidden>
+            <div class="cookie-content">
+                <p>We use cookies to analyze site traffic. You can accept or reject analytics cookies.</p>
+                <div class="cookie-buttons">
+                    <button type="button" id="cookie-reject" class="cookie-btn cookie-btn-reject">Reject All</button>
+                    <button type="button" id="cookie-accept" class="cookie-btn cookie-btn-accept">Accept All</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const ConsentManager={STORAGE_KEY:'cookie_consent',init(){const c=this.getConsent();if(c===null)this.showBanner();else this.applyConsent(c);this.bindEvents();},getConsent(){const s=localStorage.getItem(this.STORAGE_KEY);return s===null?null:s==='granted';},setConsent(g){localStorage.setItem(this.STORAGE_KEY,g?'granted':'denied');this.applyConsent(g);this.hideBanner();},applyConsent(g){const s=g?'granted':'denied';if(typeof gtag!=='undefined')gtag('consent','update',{'ad_storage':s,'ad_user_data':s,'ad_personalization':s,'analytics_storage':s});},showBanner(){document.getElementById('cookie-banner').hidden=false;},hideBanner(){document.getElementById('cookie-banner').hidden=true;},bindEvents(){document.getElementById('cookie-accept')?.addEventListener('click',()=>this.setConsent(true));document.getElementById('cookie-reject')?.addEventListener('click',()=>this.setConsent(false));document.getElementById('cookie-settings')?.addEventListener('click',()=>this.showBanner());}};document.addEventListener('DOMContentLoaded',()=>ConsentManager.init());
+        </script>
+    </body>
+</html>
