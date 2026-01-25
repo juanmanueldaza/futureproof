@@ -172,6 +172,16 @@ class MCPGatherer(BaseGatherer):
             except MCPClientError as e:
                 logger.warning("MCP gathering failed, falling back to CLI: %s", e)
                 console.print("  [yellow]MCP unavailable, using CLI fallback[/yellow]")
+            except (asyncio.CancelledError, ConnectionError, TimeoutError, OSError) as e:
+                # Catch connection-level errors that may not be wrapped in MCPClientError
+                logger.warning("MCP connection failed, falling back to CLI: %s", e)
+                console.print("  [yellow]MCP connection failed, using CLI fallback[/yellow]")
+            except Exception as e:
+                # Catch any other unexpected errors during MCP gathering
+                logger.warning("MCP gathering failed unexpectedly, falling back to CLI: %s", e)
+                console.print(
+                    f"  [yellow]MCP error ({type(e).__name__}), using CLI fallback[/yellow]"
+                )
 
         # Fallback to CLI
         if self.fallback_gatherer:
