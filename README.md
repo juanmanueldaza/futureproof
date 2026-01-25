@@ -28,11 +28,38 @@ cp .env.example .env
 
 ### External Tools
 
-The following CLI tools are used for data gathering:
+The following CLI tools are used for data gathering (as fallback):
 
 - **github2md** - Included as dependency (extracts GitHub profile data)
 - **gitlab2md** - Included as dependency (extracts GitLab profile data)
 - **linkedin2md** - Included as dependency (processes LinkedIn data export)
+
+### MCP Integration (Recommended)
+
+FutureProof supports [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers for real-time data access, with automatic fallback to CLI tools if unavailable.
+
+**GitHub MCP Server** (requires Docker):
+```bash
+# Set your GitHub Personal Access Token
+export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_..."
+
+# The MCP server runs in Docker automatically
+futureproof gather github
+```
+
+**GitLab MCP Server** (HTTP transport):
+```bash
+# Set GitLab MCP endpoint and token
+export GITLAB_MCP_URL="https://gitlab.com/api/v4/mcp"
+export GITLAB_MCP_TOKEN="glpat-..."
+
+futureproof gather gitlab
+```
+
+Benefits of MCP over CLI tools:
+- **Real-time data** - No stale cache
+- **Targeted queries** - Fetch only what's needed
+- **Official implementations** - Maintained by GitHub/GitLab
 
 ## Usage
 
@@ -105,6 +132,11 @@ DEFAULT_LANGUAGE=en  # en or es
 LLM_MODEL=gemini-3-flash
 LLM_TEMPERATURE=0.3
 CV_TEMPERATURE=0.2
+
+# MCP Integration (optional - enables real-time data access)
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...  # GitHub MCP (requires Docker)
+GITLAB_MCP_URL=https://gitlab.com/api/v4/mcp
+GITLAB_MCP_TOKEN=glpat-...
 ```
 
 ## Project Structure
@@ -115,13 +147,18 @@ futureproof/
 │   ├── cli.py              # Typer CLI entry point
 │   ├── config.py           # Pydantic settings
 │   ├── agents/             # LangGraph orchestration
-│   ├── gatherers/          # Data collectors
+│   ├── gatherers/          # Data collectors (MCP + CLI fallback)
 │   │   ├── github.py       # GitHub gatherer
 │   │   ├── gitlab.py       # GitLab gatherer
 │   │   ├── linkedin.py     # LinkedIn ZIP processor
 │   │   └── portfolio/      # Portfolio website scraper
 │   ├── generators/         # CV generators
 │   ├── llm/                # LLM provider abstraction
+│   ├── mcp/                # MCP client implementations
+│   │   ├── base.py         # MCPClient ABC & exceptions
+│   │   ├── factory.py      # MCPClientFactory
+│   │   ├── github_client.py # GitHub MCP (stdio/Docker)
+│   │   └── gitlab_client.py # GitLab MCP (HTTP transport)
 │   ├── prompts/            # LLM prompt templates
 │   ├── services/           # Business logic layer
 │   ├── utils/              # Utilities
