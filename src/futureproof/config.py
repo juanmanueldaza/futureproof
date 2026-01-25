@@ -41,6 +41,17 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3
     cv_temperature: float = 0.2  # Lower for more consistent CV output
 
+    # MCP (Model Context Protocol) Configuration
+    # GitHub MCP Server
+    github_mcp_token: str = ""  # Uses GITHUB_PERSONAL_ACCESS_TOKEN if not set
+    github_mcp_use_docker: bool = True
+    github_mcp_image: str = "ghcr.io/github/github-mcp-server"
+    github_mcp_command: str = "github-mcp-server"  # Native binary if not using Docker
+
+    # GitLab MCP Server
+    gitlab_mcp_url: str = ""  # e.g., https://gitlab.com/api/v4/mcp
+    gitlab_mcp_token: str = ""  # GitLab OAuth or personal access token
+
     # Output file names (removes magic strings from code)
     github_output_filename: str = "github_profile.md"
     gitlab_output_filename: str = "gitlab_profile.md"
@@ -86,6 +97,25 @@ class Settings(BaseSettings):
                     "alphanumeric characters, dots, underscores, and hyphens."
                 )
         return groups
+
+    @property
+    def github_mcp_token_resolved(self) -> str:
+        """Get GitHub MCP token, falling back to GITHUB_PERSONAL_ACCESS_TOKEN."""
+        import os
+
+        if self.github_mcp_token:
+            return self.github_mcp_token
+        return os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "")
+
+    @property
+    def has_github_mcp(self) -> bool:
+        """Check if GitHub MCP is configured."""
+        return bool(self.github_mcp_token_resolved)
+
+    @property
+    def has_gitlab_mcp(self) -> bool:
+        """Check if GitLab MCP is configured."""
+        return bool(self.gitlab_mcp_url and self.gitlab_mcp_token)
 
     # Paths (computed from project root)
     @property

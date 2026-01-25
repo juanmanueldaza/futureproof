@@ -20,6 +20,9 @@ dependencies = [
     "gitlab2md>=0.1",
     "httpx>=0.28",
     "beautifulsoup4>=4",
+    # MCP (Model Context Protocol)
+    "mcp>=1.26",
+    "nest-asyncio>=1.6",
     # Generation
     "jinja2>=3",
     "weasyprint>=62",
