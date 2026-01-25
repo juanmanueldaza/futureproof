@@ -219,3 +219,57 @@ class GitHubMCPClient(MCPClient):
                 "perPage": per_page,
             },
         )
+
+    async def search_user_pull_requests(self, username: str, per_page: int = 100) -> MCPToolResult:
+        """Search for pull requests authored by a user.
+
+        Args:
+            username: GitHub username
+            per_page: Number of results
+
+        Returns:
+            MCPToolResult with PR search results
+        """
+        return await self.call_tool(
+            "search_pull_requests",
+            {
+                "query": f"author:{username}",
+                "perPage": per_page,
+            },
+        )
+
+    async def search_user_issues(self, username: str, per_page: int = 100) -> MCPToolResult:
+        """Search for issues authored by a user.
+
+        Args:
+            username: GitHub username
+            per_page: Number of results
+
+        Returns:
+            MCPToolResult with issue search results
+        """
+        return await self.call_tool(
+            "search_issues",
+            {
+                "query": f"author:{username}",
+                "perPage": per_page,
+            },
+        )
+
+    async def search_user_reviews(self, username: str, per_page: int = 100) -> MCPToolResult:
+        """Search for PRs reviewed by a user.
+
+        Args:
+            username: GitHub username
+            per_page: Number of results
+
+        Returns:
+            MCPToolResult with review search results
+        """
+        return await self.call_tool(
+            "search_pull_requests",
+            {
+                "query": f"reviewed-by:{username}",
+                "perPage": per_page,
+            },
+        )
