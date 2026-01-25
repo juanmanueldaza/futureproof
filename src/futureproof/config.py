@@ -53,6 +53,21 @@ class Settings(BaseSettings):
     gitlab_mcp_url: str = ""  # e.g., https://gitlab.com/api/v4/mcp
     gitlab_mcp_token: str = ""  # GitLab OAuth or personal access token
 
+    # Market Intelligence MCP Configuration
+    # Brave Search (2000 free queries/month)
+    brave_api_key: str = ""
+
+    # JobSpy (no auth required, MIT licensed)
+    jobspy_enabled: bool = True
+
+    # Hacker News (no auth required, uses Algolia API)
+    hn_mcp_enabled: bool = True
+
+    # Market data caching (hours)
+    market_cache_hours: int = 24  # Tech trends
+    job_cache_hours: int = 12  # Jobs change faster
+    economic_cache_hours: int = 168  # BLS data (weekly)
+
     # Output file names (removes magic strings from code)
     github_output_filename: str = "github_profile.md"
     gitlab_output_filename: str = "gitlab_profile.md"
@@ -119,6 +134,21 @@ class Settings(BaseSettings):
     def has_gitlab_mcp(self) -> bool:
         """Check if GitLab MCP is configured."""
         return bool(self.gitlab_mcp_url and self.gitlab_mcp_token)
+
+    @property
+    def has_brave_mcp(self) -> bool:
+        """Check if Brave Search MCP is configured."""
+        return bool(self.brave_api_key)
+
+    @property
+    def market_cache_dir(self) -> Path:
+        """Get the market data cache directory."""
+        return self.data_dir / "cache" / "market"
+
+    @property
+    def market_output_dir(self) -> Path:
+        """Get the market data output directory."""
+        return self.processed_dir / "market"
 
     # Paths (computed from project root)
     @property

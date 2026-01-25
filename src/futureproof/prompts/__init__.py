@@ -119,3 +119,134 @@ For each stated goal, assess:
 
 Be honest and constructive. The goal is to help the person understand where \
 they truly stand."""
+
+
+# ============================================================================
+# Market Intelligence Prompts
+# ============================================================================
+
+
+MARKET_FIT_PROMPT = """\
+You are a career market analyst. Compare this professional's profile against \
+current market data to assess their market position.
+
+CAREER DATA:
+{career_data}
+
+MARKET DATA:
+{market_data}
+
+Analyze and provide:
+
+1. **Market Alignment Score (0-100)**
+   - How well do their skills match current market demand?
+   - Are they working with technologies that are growing or declining?
+
+2. **Competitive Position**
+   - Which of their skills are most in-demand right now?
+   - What differentiates them from the average candidate?
+   - How does their experience level compare to market requirements?
+
+3. **Market Opportunities**
+   - Emerging roles that match their profile
+   - Industries actively hiring for their skillset
+   - Geographic markets with strong demand
+
+4. **Salary Positioning**
+   - Based on their skills and experience level
+   - How their tech stack affects earning potential
+   - Premium skills they possess vs skills that would command higher pay
+
+5. **Risk Assessment**
+   - Skills that may become less valuable
+   - Technologies showing declining demand
+   - Market shifts that could affect their position
+
+Provide specific, data-backed insights. Be direct about both strengths and \
+weaknesses relative to the market."""
+
+
+MARKET_SKILL_GAP_PROMPT = """\
+Based on the career profile and current market demand data, identify skill \
+gaps that would improve market competitiveness.
+
+CAREER PROFILE:
+{career_data}
+
+CURRENT MARKET DEMAND:
+{market_data}
+
+Provide:
+
+1. **Critical Gaps**
+   - Skills heavily in demand that are completely missing
+   - Technologies dominating job postings that they don't have
+   - Certifications or credentials the market expects
+
+2. **Growth Opportunities**
+   - Emerging skills worth learning now
+   - Adjacent technologies that build on their existing expertise
+   - Specializations with increasing demand
+
+3. **Quick Wins**
+   - Skills they're close to having (1-2 weeks to learn)
+   - Technologies similar to what they already know
+   - Certifications they could get quickly
+
+4. **Priority Ranking**
+   - Which gaps to address first based on ROI
+   - Time investment vs market impact
+   - What would make the biggest difference in 3-6 months
+
+5. **Learning Roadmap**
+   - Concrete steps for the top 3 priorities
+   - Resources and timeline
+   - How to demonstrate these skills (projects, contributions)
+
+Focus on actionable, market-validated recommendations. Avoid generic advice \
+like "learn more" - be specific about WHAT and WHY based on the market data."""
+
+
+TRENDING_SKILLS_PROMPT = """\
+Analyze current technology trends and recommend skills for career growth.
+
+CURRENT PROFILE:
+{career_data}
+
+MARKET TRENDS:
+{market_data}
+
+Identify:
+
+1. **Rising Technologies** (HIGH PRIORITY)
+   - Technologies showing strong growth in job postings
+   - Skills with increasing salary premiums
+   - Tools gaining adoption across companies
+
+2. **Declining Technologies** (AWARENESS)
+   - Skills with decreasing demand
+   - Technologies being phased out or replaced
+   - Areas to avoid investing time in
+
+3. **Stable Foundations** (MAINTAIN)
+   - Core skills that remain consistently valuable
+   - Fundamentals that transcend specific tools
+   - Technologies with long-term staying power
+
+4. **Adjacent Opportunities**
+   - Trending skills close to their current expertise
+   - Natural extensions of their tech stack
+   - Specializations that leverage existing knowledge
+
+5. **6-12 Month Learning Roadmap**
+   - Month 1-3: Quick wins and immediate needs
+   - Month 4-6: Building depth in growth areas
+   - Month 7-12: Positioning for future trends
+
+6. **Market Sentiment**
+   - Overall health of the tech job market
+   - Hiring trends in their domain
+   - Economic factors affecting opportunities
+
+Be specific with technology names and provide reasoning based on the market \
+data provided."""
