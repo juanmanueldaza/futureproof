@@ -1,5 +1,6 @@
 """GitHub data gatherer with MCP and CLI support."""
 
+import json
 from pathlib import Path
 
 from ..config import settings
@@ -81,13 +82,21 @@ class GitHubGatherer(MCPGatherer):
             # Gather profile
             profile_result = await github_client.get_user_profile()
 
-            # Gather repositories
-            repos_result = await github_client.list_user_repos(user)
+            # Gather repositories (get more to match CLI)
+            repos_result = await github_client.list_user_repos(user, per_page=100)
+
+            # Gather contributions data
+            prs_result = await github_client.search_user_pull_requests(user, per_page=100)
+            issues_result = await github_client.search_user_issues(user, per_page=100)
+            reviews_result = await github_client.search_user_reviews(user, per_page=100)
 
             # Build markdown output
             markdown = self._format_as_markdown(
-                profile_content=profile_result.content,
-                repos_content=repos_result.content,
+                profile_json=profile_result.content,
+                repos_json=repos_result.content,
+                prs_json=prs_result.content,
+                issues_json=issues_result.content,
+                reviews_json=reviews_result.content,
                 username=user,
             )
 
@@ -100,24 +109,136 @@ class GitHubGatherer(MCPGatherer):
 
     def _format_as_markdown(
         self,
-        profile_content: str,
-        repos_content: str,
+        profile_json: str,
+        repos_json: str,
+        prs_json: str,
+        issues_json: str,
+        reviews_json: str,
         username: str,
     ) -> str:
         """Format MCP responses as markdown (matching github2md output format).
 
         Args:
-            profile_content: Profile data from MCP
-            repos_content: Repository data from MCP
+            profile_json: Profile data JSON from MCP
+            repos_json: Repository data JSON from MCP
+            prs_json: Pull requests data JSON from MCP
+            issues_json: Issues data JSON from MCP
+            reviews_json: Code reviews data JSON from MCP
             username: GitHub username
 
         Returns:
-            Formatted markdown string
+            Formatted markdown string matching github2md output
         """
-        parts = [
-            f"# GitHub Profile: {username}\n",
-            profile_content,
-            "\n\n## Repositories\n",
-            repos_content,
-        ]
+        parts = []
+
+        # Parse profile
+        try:
+            profile = json.loads(profile_json)
+            details = profile.get("details", {})
+
+            parts.append(f"# GitHub Profile: {username}\n")
+            if details.get("name"):
+                parts.append(f"**{details['name']}**\n")
+            if details.get("bio"):
+                parts.append(f"> {details['bio']}\n")
+
+            parts.append("\n## Info\n")
+            if details.get("company"):
+                parts.append(f"- **Company:** {details['company']}")
+            if details.get("location"):
+                parts.append(f"- **Location:** {details['location']}")
+            if details.get("created_at"):
+                member_since = details["created_at"][:10]  # YYYY-MM-DD
+                parts.append(f"- **Member since:** {member_since}")
+
+            parts.append("\n## Stats\n")
+            parts.append(f"- **Public Repos:** {details.get('public_repos', 0)}")
+            parts.append(f"- **Followers:** {details.get('followers', 0)}")
+            parts.append(f"- **Following:** {details.get('following', 0)}")
+
+            profile_url = profile.get("profile_url", f"https://github.com/{username}")
+            parts.append(f"\n**Profile:** {profile_url}\n")
+
+        except (json.JSONDecodeError, KeyError):
+            parts.append(f"# GitHub Profile: {username}\n")
+            parts.append(profile_json)
+
+        # Parse repositories
+        parts.append("\n---\n")
+        parts.append("# Repositories\n")
+        try:
+            repos_data = json.loads(repos_json)
+            items = repos_data.get("items", [])
+            total_count = repos_data.get("total_count", len(items))
+
+            # Calculate totals
+            total_stars = sum(r.get("stargazers_count", 0) for r in items)
+            total_forks = sum(r.get("forks_count", 0) for r in items)
+
+            parts.append(f"**Total Repositories:** {total_count}")
+            parts.append(f"**Total Stars:** {total_stars} | **Total Forks:** {total_forks}\n")
+
+            # List repositories with details
+            for repo in items:
+                name = repo.get("name", "Unknown")
+                desc = repo.get("description", "")
+                lang = repo.get("language", "")
+                stars = repo.get("stargazers_count", 0)
+                forks = repo.get("forks_count", 0)
+                url = repo.get("html_url", "")
+                archived = repo.get("archived", False)
+                topics = repo.get("topics", [])
+
+                status = " (archived)" if archived else ""
+                parts.append(f"\n### [{name}]({url}){status}\n")
+                if desc:
+                    parts.append(f"{desc}\n")
+                meta = []
+                if lang:
+                    meta.append(f"**Language:** {lang}")
+                if stars:
+                    meta.append(f"**Stars:** {stars}")
+                if forks:
+                    meta.append(f"**Forks:** {forks}")
+                if meta:
+                    parts.append(" | ".join(meta))
+                if topics:
+                    parts.append(f"\n**Topics:** {', '.join(topics)}")
+
+        except (json.JSONDecodeError, KeyError):
+            parts.append(repos_json)
+
+        # Parse contributions
+        parts.append("\n\n---\n")
+        parts.append("# Contributions\n")
+
+        try:
+            prs_data = json.loads(prs_json)
+            pr_count = prs_data.get("total_count", 0)
+        except (json.JSONDecodeError, KeyError):
+            pr_count = 0
+
+        try:
+            issues_data = json.loads(issues_json)
+            issue_count = issues_data.get("total_count", 0)
+        except (json.JSONDecodeError, KeyError):
+            issue_count = 0
+
+        try:
+            reviews_data = json.loads(reviews_json)
+            review_count = reviews_data.get("total_count", 0)
+        except (json.JSONDecodeError, KeyError):
+            review_count = 0
+
+        parts.append("## Breakdown\n")
+        parts.append(f"- **Pull Requests:** {pr_count}")
+        parts.append(f"- **Issues:** {issue_count}")
+        parts.append(f"- **Code Reviews:** {review_count}")
+
+        # Note: GitHub MCP doesn't provide commit count across all repos easily
+        # The CLI tool calculates this from the contribution graph which isn't exposed via API
+        parts.append(
+            "\n*Note: Commit count requires contribution graph access (not available via API)*"
+        )
+
         return "\n".join(parts)
