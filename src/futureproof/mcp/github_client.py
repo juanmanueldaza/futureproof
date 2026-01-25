@@ -161,9 +161,9 @@ class GitHubMCPClient(MCPClient):
     async def list_user_repos(
         self,
         owner: str | None = None,
-        per_page: int = 100,
+        per_page: int = 30,
     ) -> MCPToolResult:
-        """List repositories for a user.
+        """List repositories for a user using search.
 
         Args:
             owner: Repository owner (username). If None, uses authenticated user.
@@ -172,10 +172,10 @@ class GitHubMCPClient(MCPClient):
         Returns:
             MCPToolResult with repository list
         """
-        args: dict[str, Any] = {"perPage": per_page}
-        if owner:
-            args["owner"] = owner
-        return await self.call_tool("list_repos", args)
+        # Use search_code or search via the repos toolset
+        # The GitHub MCP server uses search_repositories for listing user repos
+        query = f"user:{owner}" if owner else ""
+        return await self.call_tool("search_repositories", {"query": query, "perPage": per_page})
 
     async def get_repo_commits(
         self,

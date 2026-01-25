@@ -43,7 +43,8 @@ class Settings(BaseSettings):
 
     # MCP (Model Context Protocol) Configuration
     # GitHub MCP Server
-    github_mcp_token: str = ""  # Uses GITHUB_PERSONAL_ACCESS_TOKEN if not set
+    github_personal_access_token: str = ""  # Standard GitHub token env var
+    github_mcp_token: str = ""  # Alternative setting name
     github_mcp_use_docker: bool = True
     github_mcp_image: str = "ghcr.io/github/github-mcp-server"
     github_mcp_command: str = "github-mcp-server"  # Native binary if not using Docker
@@ -100,12 +101,14 @@ class Settings(BaseSettings):
 
     @property
     def github_mcp_token_resolved(self) -> str:
-        """Get GitHub MCP token, falling back to GITHUB_PERSONAL_ACCESS_TOKEN."""
-        import os
-
+        """Get GitHub MCP token from various sources."""
+        # Check explicit MCP token setting first
         if self.github_mcp_token:
             return self.github_mcp_token
-        return os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "")
+        # Fall back to standard GitHub token
+        if self.github_personal_access_token:
+            return self.github_personal_access_token
+        return ""
 
     @property
     def has_github_mcp(self) -> bool:
