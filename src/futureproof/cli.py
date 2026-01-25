@@ -33,11 +33,13 @@ gather_app = typer.Typer(help="Gather professional data from various sources")
 generate_app = typer.Typer(help="Generate CVs and reports")
 analyze_app = typer.Typer(help="Analyze career data and alignment")
 advise_app = typer.Typer(help="Get strategic career advice")
+market_app = typer.Typer(help="Market intelligence and trends")
 
 app.add_typer(gather_app, name="gather")
 app.add_typer(generate_app, name="generate")
 app.add_typer(analyze_app, name="analyze")
 app.add_typer(advise_app, name="advise")
+app.add_typer(market_app, name="market")
 
 
 def version_callback(value: bool) -> None:
@@ -324,6 +326,229 @@ def advise_main(
     else:
         console.print("[yellow]Use --target to specify your career goal[/yellow]")
         console.print("Example: futureproof advise --target 'AI Engineer in Europe'")
+
+
+# ============================================================================
+# MARKET COMMANDS - Market intelligence and trends
+# ============================================================================
+
+
+@market_app.command("trends")
+def market_trends(
+    topic: Annotated[
+        str | None,
+        typer.Option("--topic", "-t", help="Technology topic to focus on (e.g., Python, Rust, AI)"),
+    ] = None,
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh", "-r", help="Bypass cache and fetch fresh data"),
+    ] = False,
+) -> None:
+    """Get current technology trends from Hacker News.
+
+    Shows trending discussions and hiring patterns in the tech industry.
+    """
+    import asyncio
+
+    from .gatherers.market import TechTrendsGatherer
+
+    console.print(Panel("[bold]Fetching tech trends...[/bold]", style="blue"))
+
+    gatherer = TechTrendsGatherer()
+
+    try:
+        data = asyncio.run(gatherer.gather_with_cache(refresh=refresh, topic=topic or ""))
+        markdown = gatherer.to_markdown(data)
+        console.print(markdown)
+
+        if not refresh:
+            console.print("\n[dim]Using cached data. Use --refresh to fetch fresh data.[/dim]")
+    except Exception as e:
+        logger.exception("Error fetching trends")
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@market_app.command("jobs")
+def market_jobs(
+    role: Annotated[
+        str,
+        typer.Option("--role", "-r", help="Job role to search for"),
+    ] = "Software Developer",
+    location: Annotated[
+        str,
+        typer.Option("--location", "-l", help="Location (e.g., Berlin, Remote)"),
+    ] = "Remote",
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh", help="Bypass cache and fetch fresh data"),
+    ] = False,
+    include_salary: Annotated[
+        bool,
+        typer.Option("--salary", "-s", help="Include salary data search"),
+    ] = True,
+) -> None:
+    """Search job market data for a specific role and location.
+
+    Aggregates listings from LinkedIn, Indeed, Glassdoor, and ZipRecruiter.
+    """
+    import asyncio
+
+    from .gatherers.market import JobMarketGatherer
+
+    console.print(Panel(f"[bold]Searching jobs: {role} in {location}...[/bold]", style="blue"))
+
+    gatherer = JobMarketGatherer()
+
+    try:
+        data = asyncio.run(
+            gatherer.gather_with_cache(
+                refresh=refresh,
+                role=role,
+                location=location,
+                include_salary=include_salary,
+            )
+        )
+        markdown = gatherer.to_markdown(data)
+        console.print(markdown)
+
+        if not refresh:
+            console.print("\n[dim]Using cached data. Use --refresh to fetch fresh data.[/dim]")
+    except Exception as e:
+        logger.exception("Error searching jobs")
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@market_app.command("fit")
+def market_fit(
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh", "-r", help="Refresh market data before analysis"),
+    ] = False,
+) -> None:
+    """Analyze how your profile aligns with current market demands.
+
+    Compares your skills and experience against trending technologies
+    and job requirements.
+    """
+    import asyncio
+
+    from .gatherers.market import TechTrendsGatherer
+    from .services import CareerService, NoDataError
+
+    console.print(Panel("[bold]Analyzing market fit...[/bold]", style="blue"))
+
+    # First gather market trends
+    console.print("[yellow]Gathering market trends...[/yellow]")
+    trends_gatherer = TechTrendsGatherer()
+    try:
+        market_data = asyncio.run(trends_gatherer.gather_with_cache(refresh=refresh))
+    except Exception as e:
+        console.print(f"[red]Error fetching market data: {e}[/red]")
+        return
+
+    # Then run market fit analysis
+    service = CareerService()
+    try:
+        result = service.analyze("analyze_market", market_data=market_data)
+        if result.success:
+            console.print(result.content)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+    except NoDataError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        console.print("Run 'futureproof gather all' first to collect your career data.")
+
+
+@market_app.command("skills")
+def market_skills(
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh", "-r", help="Refresh market data before analysis"),
+    ] = False,
+) -> None:
+    """Identify skill gaps based on current market demands.
+
+    Shows which skills are trending and which ones you should learn
+    to stay competitive.
+    """
+    import asyncio
+
+    from .gatherers.market import TechTrendsGatherer
+    from .services import CareerService, NoDataError
+
+    console.print(Panel("[bold]Analyzing skill gaps...[/bold]", style="blue"))
+
+    # Gather market trends
+    console.print("[yellow]Gathering market trends...[/yellow]")
+    trends_gatherer = TechTrendsGatherer()
+    try:
+        market_data = asyncio.run(trends_gatherer.gather_with_cache(refresh=refresh))
+    except Exception as e:
+        console.print(f"[red]Error fetching market data: {e}[/red]")
+        return
+
+    # Run skill gap analysis
+    service = CareerService()
+    try:
+        result = service.analyze("analyze_skills", market_data=market_data)
+        if result.success:
+            console.print(result.content)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+    except NoDataError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        console.print("Run 'futureproof gather all' first to collect your career data.")
+
+
+@market_app.command("gather")
+def market_gather(
+    source: Annotated[
+        str,
+        typer.Option("--source", "-s", help="Source to gather from (all, trends, jobs)"),
+    ] = "all",
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh", "-r", help="Bypass cache and fetch fresh data"),
+    ] = False,
+) -> None:
+    """Gather market intelligence data from all sources.
+
+    Collects tech trends, job listings, and hiring patterns.
+    Data is cached based on source-specific TTLs.
+    """
+    import asyncio
+
+    from .gatherers.market import JobMarketGatherer, TechTrendsGatherer
+
+    console.print(Panel("[bold]Gathering market intelligence...[/bold]", style="blue"))
+
+    async def gather_all() -> None:
+        if source in ("all", "trends"):
+            console.print("\n[yellow]Tech Trends (Hacker News)...[/yellow]")
+            try:
+                trends = TechTrendsGatherer()
+                data = await trends.gather_with_cache(refresh=refresh)
+                console.print(
+                    f"  [green]Success[/green] - {len(data.get('trending_stories', []))} stories"
+                )
+            except Exception as e:
+                console.print(f"  [red]Failed: {e}[/red]")
+
+        if source in ("all", "jobs"):
+            console.print("\n[yellow]Job Market (JobSpy)...[/yellow]")
+            try:
+                jobs = JobMarketGatherer()
+                data = await jobs.gather_with_cache(refresh=refresh, role="Software Developer")
+                console.print(
+                    f"  [green]Success[/green] - {len(data.get('job_listings', []))} listings"
+                )
+            except Exception as e:
+                console.print(f"  [red]Failed: {e}[/red]")
+
+    asyncio.run(gather_all())
+
+    console.print("\n[green]Market data gathering complete![/green]")
+    console.print(f"Cache location: {settings.market_cache_dir}")
 
 
 if __name__ == "__main__":

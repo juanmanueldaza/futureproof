@@ -38,7 +38,14 @@ class GenerationError(ServiceError):
     pass
 
 
-AnalysisAction = Literal["analyze_full", "analyze_goals", "analyze_reality", "analyze_gaps"]
+AnalysisAction = Literal[
+    "analyze_full",
+    "analyze_goals",
+    "analyze_reality",
+    "analyze_gaps",
+    "analyze_market",
+    "analyze_skills",
+]
 
 
 @dataclass
@@ -80,11 +87,16 @@ class CareerService:
         """Check if any career data is available."""
         return any(k.endswith("_data") and v for k, v in state.items())
 
-    def analyze(self, action: AnalysisAction) -> AnalysisResult:
+    def analyze(
+        self,
+        action: AnalysisAction,
+        market_data: dict | None = None,
+    ) -> AnalysisResult:
         """Run career analysis.
 
         Args:
             action: Type of analysis to perform
+            market_data: Optional market intelligence data for market-aware analysis
 
         Returns:
             AnalysisResult with content or error
@@ -98,6 +110,13 @@ class CareerService:
             raise NoDataError("No career data found. Run 'futureproof gather all' first.")
 
         state["action"] = action
+
+        # Add market data if provided
+        if market_data:
+            state["job_market"] = market_data.get("job_market", "")
+            state["tech_trends"] = market_data.get("tech_trends", "")
+            state["economic_context"] = market_data.get("economic_context", "")
+
         result = self.graph.invoke(state)
 
         # Map action to result key
@@ -106,6 +125,8 @@ class CareerService:
             "analyze_reality": "reality",
             "analyze_gaps": "gaps",
             "analyze_full": "analysis",
+            "analyze_market": "market_analysis",
+            "analyze_skills": "skill_gaps",
         }.get(action, "analysis")
 
         if "error" in result and result["error"]:

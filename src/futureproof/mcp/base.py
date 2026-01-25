@@ -16,10 +16,11 @@ class MCPToolResult:
     Provides a consistent interface regardless of the underlying MCP server.
     """
 
-    content: str
+    content: Any
     raw_response: Any = None
     tool_name: str = ""
     is_error: bool = False
+    error_message: str = ""
 
 
 class MCPClientError(Exception):
