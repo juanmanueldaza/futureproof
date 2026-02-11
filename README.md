@@ -174,45 +174,37 @@ futureproof market skills
 futureproof market skills --refresh
 ```
 
-**Data Sources:**
-- **Hacker News** - Technology trends and discussions (free, no API key)
-- **Tavily** - Web search for salary data and market research (free, no credit card)
-- **JobSpy** - Job listings from LinkedIn, Indeed, Glassdoor, ZipRecruiter (free)
+**Data Sources (most require no API keys):**
+- **JobSpy** - Aggregates LinkedIn, Indeed, Glassdoor, ZipRecruiter, Google Jobs
+- **Hacker News** - Tech trends and "Who is Hiring?" threads
+- **RemoteOK, Himalayas, Jobicy, WeWorkRemotely, Remotive** - Remote job boards
+- **Dev.to, Stack Overflow** - Tech community trends
+- **Tavily** - Web search for salary data (optional, free key at [tavily.com](https://tavily.com/))
+
+See [docs/SOURCES.md](docs/SOURCES.md) for the full list with setup instructions.
 
 ## Configuration
 
-Create a `.env` file (copy from `.env.example`):
-
 ```bash
-# Required
+cp .env.example .env
+# Add at least one LLM provider key (Gemini is the easiest to start with)
+```
+
+**See [docs/SOURCES.md](docs/SOURCES.md) for the complete setup guide** with instructions for every data source, API key signup links, free tier details, and all environment variables.
+
+**Quick start -- minimum config:**
+```bash
 GEMINI_API_KEY=your_key_here
+```
 
-# Data gathering (defaults shown)
-GITHUB_USERNAME=yourusername
-GITLAB_USERNAME=yourusername
-GITLAB_GROUPS=group1,group2
-PORTFOLIO_URL=https://yoursite.com
-
-# Output preferences
-DEFAULT_LANGUAGE=en  # en or es
-
-# LLM settings (optional)
-LLM_MODEL=gemini-3-flash
-LLM_TEMPERATURE=0.3
-CV_TEMPERATURE=0.2
-
-# MCP Integration (optional - enables real-time data access)
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...  # GitHub MCP (requires Docker)
-GITLAB_MCP_URL=https://gitlab.com/api/v4/mcp
-GITLAB_MCP_TOKEN=glpat-...
-
-# Market Intelligence (optional)
-TAVILY_API_KEY=tvly-...  # For Tavily Search (free at https://tavily.com/)
-
-# Knowledge Base (optional)
-KNOWLEDGE_AUTO_INDEX=true      # Auto-index after gather (default: true)
-KNOWLEDGE_CHUNK_MAX_TOKENS=500 # Max tokens per chunk
-KNOWLEDGE_CHUNK_MIN_TOKENS=50  # Min tokens per chunk
+**Recommended config:**
+```bash
+GEMINI_API_KEY=AIza...                          # LLM + embeddings
+GROQ_API_KEY=gsk_...                            # Fast fallback
+GITHUB_USERNAME=your_username
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data
+PORTFOLIO_URL=https://your-site.com
+TAVILY_API_KEY=tvly-...                         # Market research
 ```
 
 ## Project Structure
@@ -232,7 +224,7 @@ futureproof/
 │   │       ├── job_market_gatherer.py   # Job listings (JobSpy)
 │   │       └── tech_trends_gatherer.py  # Tech trends (HN, Brave)
 │   ├── generators/         # CV generators
-│   ├── llm/                # LLM provider abstraction
+│   ├── llm/                # LLM fallback manager
 │   ├── memory/             # Knowledge storage
 │   │   ├── chunker.py       # Markdown text chunker
 │   │   ├── knowledge.py     # ChromaDB knowledge store (RAG)
@@ -275,7 +267,7 @@ FutureProof implements security best practices:
 
 - **Python 3.13+** with type hints
 - **LangChain + LangGraph** for AI orchestration
-- **Gemini API** (Google) for LLM operations
+- **Multi-provider LLM** (Azure, Gemini, Groq, Cerebras, SambaNova) with automatic fallback
 - **Typer** for CLI
 - **Pydantic** for configuration and validation
 - **httpx** for HTTP requests
