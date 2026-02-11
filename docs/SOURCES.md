@@ -1,0 +1,344 @@
+# Data Sources Setup Guide
+
+FutureProof connects to many data sources. **None are strictly required** -- the system works with whatever you configure and gracefully skips the rest.
+
+**Minimum to get started:** one LLM provider API key (Gemini is the easiest -- free, no credit card).
+
+---
+
+## Table of Contents
+
+- [LLM Providers](#llm-providers)
+- [Career Data Sources](#career-data-sources)
+- [Market Intelligence Sources](#market-intelligence-sources)
+- [Embeddings (Knowledge Base)](#embeddings-knowledge-base)
+- [Quick Reference](#quick-reference)
+
+---
+
+## LLM Providers
+
+FutureProof uses a **fallback chain** -- if one provider hits a rate limit or errors, it automatically tries the next. Configure as many as you want for resilience.
+
+### Google Gemini (default)
+
+The easiest provider to start with. Generous free tier.
+
+| | |
+|---|---|
+| **Free tier** | 1M tokens/day, 15 requests/minute |
+| **Env var** | `GEMINI_API_KEY` |
+| **Get key** | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
+| **Credit card** | No |
+
+```bash
+GEMINI_API_KEY=AIza...
+```
+
+### Groq
+
+Very fast inference. Good as a secondary provider.
+
+| | |
+|---|---|
+| **Free tier** | 100k tokens/day per model |
+| **Env var** | `GROQ_API_KEY` |
+| **Get key** | [console.groq.com/keys](https://console.groq.com/keys) |
+| **Credit card** | No |
+
+```bash
+GROQ_API_KEY=gsk_...
+```
+
+### Azure OpenAI / AI Foundry
+
+Most capable models. $200 free credits on signup.
+
+| | |
+|---|---|
+| **Free tier** | $200 credits (new accounts) |
+| **Env vars** | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_CHAT_DEPLOYMENT`, `AZURE_EMBEDDING_DEPLOYMENT` |
+| **Sign up** | [ai.azure.com](https://ai.azure.com/) |
+| **Credit card** | Yes (but $200 free credits) |
+
+**Setup steps:**
+1. Create an Azure account at [azure.microsoft.com](https://azure.microsoft.com/free/)
+2. Go to [AI Foundry](https://ai.azure.com/) and create a project
+3. Deploy a chat model (e.g., `gpt-4.1`) and an embedding model (e.g., `text-embedding-3-small`)
+4. Copy the endpoint URL and API key from the deployment
+
+```bash
+AZURE_OPENAI_API_KEY=abc123...
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_VERSION=2024-12-01-preview
+AZURE_CHAT_DEPLOYMENT=gpt-4.1
+AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+```
+
+### Cerebras
+
+Extremely fast inference speed.
+
+| | |
+|---|---|
+| **Free tier** | Yes |
+| **Env var** | `CEREBRAS_API_KEY` |
+| **Get key** | [cloud.cerebras.ai](https://cloud.cerebras.ai/) |
+| **Credit card** | No |
+
+```bash
+CEREBRAS_API_KEY=csk-...
+```
+
+### SambaNova
+
+Access to very large models (Llama 405B) for free.
+
+| | |
+|---|---|
+| **Free tier** | Yes |
+| **Env var** | `SAMBANOVA_API_KEY` |
+| **Get key** | [cloud.sambanova.ai/apis](https://cloud.sambanova.ai/apis) |
+| **Credit card** | No |
+
+```bash
+SAMBANOVA_API_KEY=...
+```
+
+---
+
+## Career Data Sources
+
+These are the primary sources for your professional profile.
+
+### GitHub
+
+Gathers your profile, repositories, pull requests, issues, and code reviews.
+
+**Option A: MCP Server (recommended)** -- real-time data via Docker
+
+| | |
+|---|---|
+| **Env var** | `GITHUB_PERSONAL_ACCESS_TOKEN` |
+| **Get token** | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| **Scopes needed** | `repo`, `read:user`, `user:email` |
+| **Requires** | Docker (for MCP server container) |
+
+```bash
+GITHUB_USERNAME=your_username
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
+```
+
+**Option B: CLI fallback** -- uses `github2md` (included as dependency, no token needed for public repos)
+
+```bash
+GITHUB_USERNAME=your_username
+# No token needed for public data
+```
+
+**Docker config (optional):**
+```bash
+GITHUB_MCP_USE_DOCKER=true                              # default
+GITHUB_MCP_IMAGE=ghcr.io/github/github-mcp-server       # default
+```
+
+### GitLab
+
+Gathers merge requests, issues, projects, and group contributions.
+
+**Option A: MCP Server (recommended)** -- real-time data via HTTP transport
+
+| | |
+|---|---|
+| **Env vars** | `GITLAB_MCP_URL`, `GITLAB_MCP_TOKEN` |
+| **Get token** | [gitlab.com/-/user_settings/personal_access_tokens](https://gitlab.com/-/user_settings/personal_access_tokens) |
+| **Scopes needed** | `api`, `read_user` |
+
+```bash
+GITLAB_USERNAME=your_username
+GITLAB_MCP_URL=https://gitlab.com/api/v4/mcp
+GITLAB_MCP_TOKEN=glpat-...
+GITLAB_GROUPS=group1,group2    # comma-separated groups you contributed to
+```
+
+**Option B: CLI fallback** -- uses `gitlab2md` (included as dependency)
+
+```bash
+GITLAB_USERNAME=your_username
+GITLAB_GROUPS=group1,group2
+```
+
+### LinkedIn
+
+Processes your LinkedIn data export (ZIP file).
+
+| | |
+|---|---|
+| **How to get** | [linkedin.com/mypreferences/d/download-my-data](https://www.linkedin.com/mypreferences/d/download-my-data) |
+| **Format** | ZIP file |
+| **Tool** | `linkedin2md` (included as dependency) |
+
+**Steps:**
+1. Go to LinkedIn Settings > Data Privacy > Get a copy of your data
+2. Request your data and wait for the email (can take up to 24 hours)
+3. Download the ZIP file
+4. Run: `futureproof gather linkedin path/to/LinkedInDataExport.zip`
+
+### Portfolio Website
+
+Scrapes and extracts content from your personal website.
+
+| | |
+|---|---|
+| **Env var** | `PORTFOLIO_URL` |
+| **Requires** | A publicly accessible URL |
+
+```bash
+PORTFOLIO_URL=https://your-portfolio.com
+```
+
+The scraper extracts: HTML content, section structure, JSON-LD structured data, and JavaScript-rendered content. SSRF protection prevents scraping private/internal networks.
+
+### CliftonStrengths Assessment
+
+Processes your Gallup CliftonStrengths PDF reports.
+
+| | |
+|---|---|
+| **How to get** | [gallup.com/cliftonstrengths](https://www.gallup.com/cliftonstrengths/) |
+| **Format** | PDF files placed in `data/raw/` |
+| **Requires** | `pdftotext` (from `poppler-utils` package) |
+
+**Supported report types:** Top 5, Top 10, All 34, Action Planning, Leadership Insight, Discovery Development.
+
+```bash
+# Install pdftotext
+sudo apt install poppler-utils    # Debian/Ubuntu
+brew install poppler              # macOS
+
+# Place PDFs in data/raw/ then run
+futureproof gather assessment
+```
+
+---
+
+## Market Intelligence Sources
+
+These provide real-time job market data, tech trends, and salary insights. Most require **no configuration** at all.
+
+### No Auth Required (always available)
+
+These sources work out of the box with zero configuration:
+
+| Source | What it provides | Rate limit |
+|--------|-----------------|------------|
+| **JobSpy** | Jobs from LinkedIn, Indeed, Glassdoor, ZipRecruiter, Google Jobs | No limit |
+| **Hacker News** | Tech trends, "Who is Hiring?" threads, freelancing discussions | 10,000 req/hour |
+| **RemoteOK** | Remote job listings | No limit |
+| **Himalayas** | Remote jobs with salary data | No limit |
+| **Jobicy** | Remote jobs worldwide | No limit |
+| **WeWorkRemotely** | Remote job listings with salary extraction | No limit |
+| **Remotive** | Remote jobs with tags and location data | No limit |
+| **Dev.to** | Trending tech articles by topic | No limit |
+| **Stack Overflow** | Tag popularity, trending questions | 300/day |
+
+To disable specific sources:
+```bash
+JOBSPY_ENABLED=false       # default: true
+HN_MCP_ENABLED=false       # default: true
+```
+
+### Tavily Search (optional, auth required)
+
+Enhances salary research and market analysis with web search.
+
+| | |
+|---|---|
+| **Free tier** | 1,000 queries/month |
+| **Env var** | `TAVILY_API_KEY` |
+| **Get key** | [tavily.com](https://tavily.com/) |
+| **Credit card** | No |
+
+```bash
+TAVILY_API_KEY=tvly-...
+```
+
+---
+
+## Embeddings (Knowledge Base)
+
+The knowledge base uses embeddings for semantic search over your career data. The system auto-selects the best available provider:
+
+| Priority | Provider | Env var | Notes |
+|----------|----------|---------|-------|
+| 1 | Azure OpenAI | `AZURE_OPENAI_API_KEY` + `AZURE_EMBEDDING_DEPLOYMENT` | Best quality, uses your Azure credits |
+| 2 | Google Gemini | `GEMINI_API_KEY` | Good quality, free tier |
+| 3 | ChromaDB default | None | Local sentence-transformers (slower, no API needed) |
+
+No extra configuration needed -- if you have an LLM provider key, embeddings use it automatically.
+
+---
+
+## Quick Reference
+
+### Minimum Setup (one command away)
+
+```bash
+cp .env.example .env
+# Add just one line:
+echo "GEMINI_API_KEY=your_key_here" >> .env
+```
+
+This gives you: LLM chat, CV generation, career analysis, and all no-auth market intelligence sources.
+
+### Recommended Setup
+
+```bash
+# .env
+GEMINI_API_KEY=AIza...                          # LLM + embeddings
+GROQ_API_KEY=gsk_...                            # Fast fallback
+GITHUB_USERNAME=your_username
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data gathering
+PORTFOLIO_URL=https://your-site.com
+TAVILY_API_KEY=tvly-...                         # Enhanced market research
+```
+
+### All Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| **LLM Providers** | | | |
+| `GEMINI_API_KEY` | No | `""` | Google Gemini API key |
+| `GROQ_API_KEY` | No | `""` | Groq API key |
+| `CEREBRAS_API_KEY` | No | `""` | Cerebras API key |
+| `SAMBANOVA_API_KEY` | No | `""` | SambaNova API key |
+| `AZURE_OPENAI_API_KEY` | No | `""` | Azure OpenAI API key |
+| `AZURE_OPENAI_ENDPOINT` | If Azure | `""` | Azure endpoint URL |
+| `AZURE_OPENAI_API_VERSION` | If Azure | `2024-12-01-preview` | Azure API version |
+| `AZURE_CHAT_DEPLOYMENT` | If Azure | `""` | Azure chat model deployment name |
+| `AZURE_EMBEDDING_DEPLOYMENT` | If Azure | `""` | Azure embedding deployment name |
+| **Career Data** | | | |
+| `GITHUB_USERNAME` | No | `""` | GitHub username |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | No | `""` | GitHub PAT for MCP |
+| `GITLAB_USERNAME` | No | `""` | GitLab username |
+| `GITLAB_MCP_URL` | No | `""` | GitLab MCP endpoint |
+| `GITLAB_MCP_TOKEN` | No | `""` | GitLab PAT for MCP |
+| `GITLAB_GROUPS` | No | `""` | Comma-separated GitLab groups |
+| `PORTFOLIO_URL` | No | `""` | Portfolio website URL |
+| `DEFAULT_LANGUAGE` | No | `en` | `en` or `es` |
+| **Market Intelligence** | | | |
+| `TAVILY_API_KEY` | No | `""` | Tavily search API key |
+| `JOBSPY_ENABLED` | No | `true` | Enable JobSpy job aggregation |
+| `HN_MCP_ENABLED` | No | `true` | Enable Hacker News trends |
+| `MARKET_CACHE_HOURS` | No | `24` | Tech trends cache (hours) |
+| `JOB_CACHE_HOURS` | No | `12` | Job listings cache (hours) |
+| `CONTENT_CACHE_HOURS` | No | `12` | Content trends cache (hours) |
+| **Knowledge Base** | | | |
+| `KNOWLEDGE_AUTO_INDEX` | No | `true` | Auto-index after gather |
+| `KNOWLEDGE_CHUNK_MAX_TOKENS` | No | `500` | Max tokens per chunk |
+| `KNOWLEDGE_CHUNK_MIN_TOKENS` | No | `50` | Min tokens per chunk |
+| **LLM Settings** | | | |
+| `LLM_PROVIDER` | No | `gemini` | Default provider (`gemini`, `groq`, `azure`) |
+| `LLM_MODEL` | No | `""` | Override model name |
+| `LLM_TEMPERATURE` | No | `0.3` | General LLM temperature |
+| `CV_TEMPERATURE` | No | `0.2` | CV generation temperature |
