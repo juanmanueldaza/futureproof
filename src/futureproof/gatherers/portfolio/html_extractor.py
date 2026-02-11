@@ -86,12 +86,20 @@ class HTMLExtractor:
 
     def _extract_json_ld(self, soup: BeautifulSoup) -> list[dict]:
         """Extract JSON-LD structured data."""
-        results = []
+        results: list[dict] = []
         for script in soup.find_all("script", type="application/ld+json"):
             try:
                 if script.string:
                     data = json.loads(script.string)
-                    results.append(data)
+                    # Handle @graph arrays and plain arrays
+                    if isinstance(data, list):
+                        results.extend(d for d in data if isinstance(d, dict))
+                    elif isinstance(data, dict):
+                        # Also handle @graph inside a dict
+                        if "@graph" in data and isinstance(data["@graph"], list):
+                            results.extend(d for d in data["@graph"] if isinstance(d, dict))
+                        else:
+                            results.append(data)
             except (json.JSONDecodeError, TypeError) as e:
                 logger.debug("Failed to parse JSON-LD: %s", e)
         return results

@@ -72,6 +72,13 @@ class CareerDataLoader:
         if portfolio_data:
             data["portfolio_data"] = portfolio_data
 
+        # CliftonStrengths Assessment
+        assessment_data = self._load_file(
+            settings.processed_dir / "assessment" / "cliftonstrengths.md"
+        )
+        if assessment_data:
+            data["assessment_data"] = assessment_data
+
         self._cache[context] = data
         return data
 
@@ -200,6 +207,11 @@ def load_career_data_for_cv() -> str:
     if portfolio_file.exists():
         parts.append(f"### Portfolio\n{portfolio_file.read_text()}")
 
+    # CliftonStrengths Assessment
+    assessment_file = settings.processed_dir / "assessment" / "cliftonstrengths.md"
+    if assessment_file.exists():
+        parts.append(f"### CliftonStrengths Assessment\n{assessment_file.read_text()}")
+
     return "\n\n".join(parts) if parts else ""
 
 
@@ -224,6 +236,7 @@ def combine_career_data(
         "github_data": "GitHub Data",
         "gitlab_data": "GitLab Data",
         "portfolio_data": "Portfolio Data",
+        "assessment_data": "CliftonStrengths Assessment",
     }
 
     if include_analysis:

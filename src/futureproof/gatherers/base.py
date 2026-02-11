@@ -1,11 +1,13 @@
 """Base class for data gatherers."""
 
+import asyncio
 import logging
 import subprocess
-from abc import ABC
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from ..utils.async_bridge import run_async_in_sync
 from ..utils.console import console
 
 logger = logging.getLogger(__name__)
@@ -96,3 +98,79 @@ class CLIGatherer(BaseGatherer):
             console.print("  [yellow]No output files generated[/yellow]")
 
         return output_file
+
+
+class MCPGatherer(BaseGatherer):
+    """Base class for gatherers that use MCP servers with CLI fallback.
+
+    Provides async-to-sync bridge and automatic fallback to CLI gatherers
+    when MCP is unavailable or fails.
+    """
+
+    fallback_gatherer: CLIGatherer | None = None
+
+    def _run_async(self, coro: Any) -> Any:
+        """Run async coroutine in sync context.
+
+        Uses the centralized async bridge utility for consistent behavior.
+
+        Args:
+            coro: Async coroutine to run
+
+        Returns:
+            Result of the coroutine
+        """
+        return run_async_in_sync(coro)
+
+    @abstractmethod
+    async def gather_async(self, *args: Any, **kwargs: Any) -> Path:
+        """Async gather implementation.
+
+        Subclasses implement this for MCP-based gathering.
+
+        Returns:
+            Path to the generated output file
+        """
+        pass
+
+    @abstractmethod
+    def _can_use_mcp(self) -> bool:
+        """Check if MCP is available and configured.
+
+        Returns:
+            True if MCP can be used
+        """
+        pass
+
+    def gather(self, *args: Any, **kwargs: Any) -> Path:
+        """Sync gather with MCP and fallback support.
+
+        Priority:
+        1. Try MCP gathering if configured
+        2. Fall back to CLI gatherer if MCP fails or unavailable
+
+        Returns:
+            Path to the generated output file
+        """
+        from ..mcp import MCPClientError
+
+        # Check if MCP is available
+        if self._can_use_mcp():
+            try:
+                return self._run_async(self.gather_async(*args, **kwargs))
+            except MCPClientError as e:
+                console.print(f"  [yellow]⚠ MCP error: {e}[/yellow]")
+                console.print("  [dim]Using CLI fallback...[/dim]")
+            except (asyncio.CancelledError, ConnectionError, TimeoutError, OSError):
+                # Server-side issues (connection reset, timeout, cancelled)
+                console.print("  [yellow]⚠ MCP server unavailable[/yellow]")
+                console.print("  [dim]Using CLI fallback...[/dim]")
+            except Exception as e:
+                console.print(f"  [yellow]⚠ MCP error: {type(e).__name__}: {e}[/yellow]")
+                console.print("  [dim]Using CLI fallback...[/dim]")
+
+        # Fallback to CLI
+        if self.fallback_gatherer:
+            return self.fallback_gatherer.gather(*args, **kwargs)
+
+        raise RuntimeError("No gathering method available (MCP not configured, no CLI fallback)")
