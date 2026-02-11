@@ -4,9 +4,10 @@ Uses Pydantic models for type safety and structured output from LLMs.
 Supports both the new Pydantic-based state and backwards-compatible TypedDict.
 """
 
-import operator
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
@@ -173,7 +174,7 @@ class GenerationState(TypedDict, total=False):
 class MetadataState(TypedDict, total=False):
     """Message accumulation and error tracking."""
 
-    messages: Annotated[list[Any], operator.add]
+    messages: Annotated[list[AnyMessage], add_messages]
     error: str | None
 
 
@@ -191,8 +192,8 @@ class CareerState(TypedDict, total=False):
     Uses TypedDict for LangGraph compatibility while supporting Pydantic
     models for structured output.
 
-    The 'messages' field uses Annotated with operator.add to enable
-    message accumulation across nodes (LangGraph reducer pattern).
+    The 'messages' field uses Annotated with add_messages to enable
+    message accumulation with deduplication across nodes (LangGraph reducer).
     """
 
     # Routing (from RoutingState)
@@ -201,7 +202,7 @@ class CareerState(TypedDict, total=False):
     include_market: bool
 
     # Messages and errors (from MetadataState)
-    messages: Annotated[list[Any], operator.add]
+    messages: Annotated[list[AnyMessage], add_messages]
     error: str | None
 
     # Career data (from CareerDataState)
