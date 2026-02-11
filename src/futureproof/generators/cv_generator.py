@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ..config import settings
-from ..llm import get_llm
+from ..llm.fallback import get_model_with_fallback
 from ..prompts import GENERATE_CV_PROMPT
 from ..utils.console import console
 from ..utils.data_loader import combine_career_data, load_career_data_for_cv
@@ -28,7 +28,7 @@ class CVGenerator:
         format: Literal["ats", "creative"],
     ) -> str:
         """Generate CV content using LLM."""
-        llm = get_llm(temperature=settings.cv_temperature)
+        model, _config = get_model_with_fallback(temperature=settings.cv_temperature)
 
         lang_instruction = {
             "en": "Generate the CV in English.",
@@ -63,8 +63,8 @@ CAREER DATA:
 Generate a complete, professional CV in Markdown format."""
 
         try:
-            response = llm.invoke(prompt)
-            return response.content
+            response = model.invoke(prompt)
+            return str(response.content)
         except Exception:
             # Log full error, show sanitized message to user
             logger.exception("LLM invocation failed")

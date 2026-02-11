@@ -135,65 +135,53 @@ class FallbackLLMManager:
         error_str = str(error).lower()
         return any(indicator in error_str for indicator in self.FALLBACK_ERROR_INDICATORS)
 
-    def _create_model(self, config: ModelConfig) -> BaseChatModel:
-        """Create a LangChain chat model from config."""
-        from pydantic import SecretStr
+    # Provider to init_chat_model model_provider mapping
+    _PROVIDER_MAP: dict[str, str] = {
+        "azure": "azure_openai",
+        "groq": "groq",
+        "gemini": "google_genai",
+        "cerebras": "openai",
+        "sambanova": "openai",
+    }
 
-        api_key = SecretStr(config.get_api_key())
+    # OpenAI-compatible providers that need a custom base_url
+    _BASE_URLS: dict[str, str] = {
+        "cerebras": "https://api.cerebras.ai/v1",
+        "sambanova": "https://api.sambanova.ai/v1",
+    }
+
+    def _create_model(self, config: ModelConfig) -> BaseChatModel:
+        """Create a LangChain chat model from config using init_chat_model."""
+        from langchain.chat_models import init_chat_model
+
+        model_provider = self._PROVIDER_MAP.get(config.provider)
+        if not model_provider:
+            raise ValueError(f"Unknown provider: {config.provider}")
+
+        kwargs: dict[str, Any] = {
+            "temperature": self._temperature,
+            "streaming": True,
+        }
 
         if config.provider == "azure":
-            from langchain_openai import AzureChatOpenAI
-
-            return AzureChatOpenAI(
-                azure_deployment=config.model,
-                azure_endpoint=settings.azure_openai_endpoint,
-                api_key=api_key,
-                api_version=settings.azure_openai_api_version,
-                temperature=self._temperature,
-                streaming=True,
-            )
-        elif config.provider == "groq":
-            from langchain_groq import ChatGroq
-
-            return ChatGroq(
-                model=config.model,
-                api_key=api_key,
-                temperature=self._temperature,
-                streaming=True,
-            )
+            kwargs["azure_deployment"] = config.model
+            kwargs["azure_endpoint"] = settings.azure_openai_endpoint
+            kwargs["api_version"] = settings.azure_openai_api_version
+            kwargs["api_key"] = config.get_api_key()
         elif config.provider == "gemini":
-            from langchain_google_genai import ChatGoogleGenerativeAI
-
-            return ChatGoogleGenerativeAI(
-                model=config.model,
-                google_api_key=config.get_api_key(),  # This one takes str
-                temperature=self._temperature,
-                streaming=True,
-            )
-        elif config.provider == "cerebras":
-            # Cerebras uses OpenAI-compatible API
-            from langchain_openai import ChatOpenAI
-
-            return ChatOpenAI(
-                model=config.model,
-                api_key=api_key,
-                base_url="https://api.cerebras.ai/v1",
-                temperature=self._temperature,
-                streaming=True,
-            )
-        elif config.provider == "sambanova":
-            # SambaNova uses OpenAI-compatible API
-            from langchain_openai import ChatOpenAI
-
-            return ChatOpenAI(
-                model=config.model,
-                api_key=api_key,
-                base_url="https://api.sambanova.ai/v1",
-                temperature=self._temperature,
-                streaming=True,
-            )
+            kwargs["google_api_key"] = config.get_api_key()
         else:
-            raise ValueError(f"Unknown provider: {config.provider}")
+            kwargs["api_key"] = config.get_api_key()
+
+        base_url = self._BASE_URLS.get(config.provider)
+        if base_url:
+            kwargs["base_url"] = base_url
+
+        return init_chat_model(
+            model=config.model,
+            model_provider=model_provider,
+            **kwargs,
+        )
 
     def get_available_models(self) -> list[ModelConfig]:
         """Get list of available models (configured and not failed)."""
@@ -291,13 +279,23 @@ def get_fallback_manager() -> FallbackLLMManager:
     return _fallback_manager
 
 
-def get_model_with_fallback() -> tuple[BaseChatModel, ModelConfig]:
+def get_model_with_fallback(
+    temperature: float | None = None,
+) -> tuple[BaseChatModel, ModelConfig]:
     """Get a model with automatic fallback support.
 
     This is the main entry point for getting an LLM model.
     It automatically handles fallback to alternative models.
 
+    Args:
+        temperature: Optional temperature override. If None, uses the
+            global setting from the shared fallback manager.
+
     Returns:
         Tuple of (model instance, model config)
     """
+    if temperature is not None:
+        # Create a temporary manager with custom temperature
+        manager = FallbackLLMManager(temperature=temperature)
+        return manager.get_model()
     return get_fallback_manager().get_model()

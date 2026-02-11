@@ -10,7 +10,7 @@ Usage:
     from futureproof.memory import get_checkpointer
 
     checkpointer = get_checkpointer()
-    agent = create_react_agent(..., checkpointer=checkpointer)
+    agent = create_agent(..., checkpointer=checkpointer)
 
     # Conversations persist automatically with thread_id
     config = {"configurable": {"thread_id": "main"}}
@@ -22,6 +22,9 @@ from pathlib import Path
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+# Cached singleton to avoid creating new connections on every call
+_checkpointer: SqliteSaver | None = None
+
 
 def get_data_dir() -> Path:
     """Get or create the FutureProof data directory."""
@@ -31,7 +34,7 @@ def get_data_dir() -> Path:
 
 
 def get_checkpointer() -> SqliteSaver:
-    """Get a synchronous SqliteSaver checkpointer.
+    """Get a synchronous SqliteSaver checkpointer (cached singleton).
 
     Returns:
         SqliteSaver instance connected to ~/.futureproof/memory.db
@@ -40,12 +43,26 @@ def get_checkpointer() -> SqliteSaver:
         The SqliteSaver handles thread-safety internally with locks.
         Safe to use from multiple threads (check_same_thread=False).
     """
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+
     import sqlite3
 
     db_path = get_data_dir() / "memory.db"
     # Create connection with check_same_thread=False for multi-threaded use
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    return SqliteSaver(conn)
+    _checkpointer = SqliteSaver(conn)
+    return _checkpointer
+
+
+def reset_checkpointer() -> None:
+    """Reset the cached checkpointer instance.
+
+    Use this for testing or when you need to force a fresh connection.
+    """
+    global _checkpointer
+    _checkpointer = None
 
 
 def get_async_checkpointer_context():
@@ -56,7 +73,7 @@ def get_async_checkpointer_context():
 
     Usage:
         async with get_async_checkpointer_context() as checkpointer:
-            agent = create_react_agent(..., checkpointer=checkpointer)
+            agent = create_agent(..., checkpointer=checkpointer)
             await agent.ainvoke(...)
     """
     db_path = get_data_dir() / "memory.db"

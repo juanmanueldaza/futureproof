@@ -11,11 +11,13 @@ Tools are organized by category:
 - Market Intelligence: job search, tech trends
 """
 
-import asyncio
 import logging
+import uuid
 from typing import Literal
 
+from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
+from langgraph.types import interrupt
 
 from futureproof.memory.profile import CareerGoal, load_profile, save_profile
 
@@ -245,6 +247,16 @@ def gather_all_career_data() -> str:
 
     Use this to refresh all career data at once. This may take a minute.
     """
+    # Human-in-the-loop: confirm before gathering from all sources
+    approved = interrupt(
+        {
+            "question": "Gather data from all configured sources?",
+            "details": "This will fetch from GitHub, GitLab, and Portfolio. May take a minute.",
+        }
+    )
+    if not approved:
+        return "Data gathering cancelled."
+
     try:
         from futureproof.services import GathererService
 
@@ -412,25 +424,8 @@ def get_career_advice(target: str) -> str:
 # =============================================================================
 
 
-def _run_async(coro):
-    """Run an async coroutine from sync context."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're in an async context, create a new thread
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result(timeout=120)
-        else:
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        return asyncio.run(coro)
-
-
 @tool
-def search_jobs(
+async def search_jobs(
     query: str,
     location: str = "remote",
     limit: int = 20,
@@ -448,11 +443,7 @@ def search_jobs(
         from futureproof.gatherers.market import JobMarketGatherer
 
         gatherer = JobMarketGatherer()
-
-        async def _gather():
-            return await gatherer.gather(role=query, location=location, limit=limit)
-
-        data = _run_async(_gather())
+        data = await gatherer.gather(role=query, location=location, limit=limit)
 
         # Convert to readable summary
         jobs = data.get("job_listings", [])
@@ -489,7 +480,7 @@ def search_jobs(
 
 
 @tool
-def get_tech_trends(topic: str = "") -> str:
+async def get_tech_trends(topic: str = "") -> str:
     """Get current technology trends and hiring patterns from Hacker News.
 
     Args:
@@ -501,11 +492,7 @@ def get_tech_trends(topic: str = "") -> str:
         from futureproof.gatherers.market import TechTrendsGatherer
 
         gatherer = TechTrendsGatherer()
-
-        async def _gather():
-            return await gatherer.gather(topic=topic)
-
-        data = _run_async(_gather())
+        data = await gatherer.gather(topic=topic)
 
         # Convert to readable summary
         stories = data.get("trending_stories", [])
@@ -546,7 +533,7 @@ def get_tech_trends(topic: str = "") -> str:
 
 
 @tool
-def get_salary_insights(role: str, location: str = "remote") -> str:
+async def get_salary_insights(role: str, location: str = "remote") -> str:
     """Get salary information for a specific role and location.
 
     Args:
@@ -559,16 +546,12 @@ def get_salary_insights(role: str, location: str = "remote") -> str:
         from futureproof.gatherers.market import JobMarketGatherer
 
         gatherer = JobMarketGatherer()
-
-        async def _gather():
-            return await gatherer.gather(
-                role=role,
-                location=location,
-                include_salary=True,
-                limit=10,
-            )
-
-        data = _run_async(_gather())
+        data = await gatherer.gather(
+            role=role,
+            location=location,
+            include_salary=True,
+            limit=10,
+        )
 
         salary_data = data.get("salary_data", [])
         jobs_with_salary = [j for j in data.get("job_listings", []) if j.get("salary")]
@@ -623,17 +606,28 @@ def generate_cv(
     Use this when the user wants to create or update their CV.
     Returns the path to the generated CV file.
     """
+    # Human-in-the-loop: confirm before generating
+    role_note = f" for '{target_role}'" if target_role else ""
+    lang_name = "English" if language == "en" else "Spanish"
+    approved = interrupt(
+        {
+            "question": f"Generate {format.upper()} CV{role_note} in {lang_name}?",
+            "details": "This will create/overwrite CV files in the output directory.",
+        }
+    )
+    if not approved:
+        return "CV generation cancelled."
+
     try:
         from futureproof.services import GenerationService
 
         service = GenerationService()
         output_path = service.generate_cv(language=language, format=format)
 
-        role_note = f" tailored for '{target_role}'" if target_role else ""
         return (
             f"CV generated successfully{role_note}!\n\n"
             f"**Format:** {format.upper()}\n"
-            f"**Language:** {'English' if language == 'en' else 'Spanish'}\n"
+            f"**Language:** {lang_name}\n"
             f"**Output:** {output_path}\n\n"
             "The CV has been saved. You can review and edit it as needed."
         )
@@ -796,7 +790,12 @@ def get_knowledge_stats() -> str:
 
 
 @tool
-def remember_decision(decision: str, context: str, outcome: str = "") -> str:
+def remember_decision(
+    decision: str,
+    context: str,
+    outcome: str = "",
+    runtime: ToolRuntime = None,  # type: ignore[assignment]
+) -> str:
     """Store a career decision in long-term memory.
 
     Args:
@@ -808,6 +807,23 @@ def remember_decision(decision: str, context: str, outcome: str = "") -> str:
     remembered across sessions, such as rejecting a job offer, choosing a
     technology stack, or setting a career direction.
     """
+    memory_id = str(uuid.uuid4())
+    text = f"{decision}. Context: {context}"
+    if outcome:
+        text += f". Outcome: {outcome}"
+
+    # Write to LangGraph InMemoryStore (cross-thread runtime access)
+    if runtime and runtime.store:
+        try:
+            runtime.store.put(
+                ("default", "decisions"),
+                memory_id,
+                {"text": text, "type": "decision", "outcome": outcome},
+            )
+        except Exception:
+            logger.debug("InMemoryStore write failed (non-critical)", exc_info=True)
+
+    # Write to ChromaDB (persistent storage)
     try:
         from futureproof.memory.episodic import get_episodic_store
         from futureproof.memory.episodic import remember_decision as create_decision
@@ -815,19 +831,23 @@ def remember_decision(decision: str, context: str, outcome: str = "") -> str:
         store = get_episodic_store()
         memory = create_decision(decision, context, outcome)
         store.remember(memory)
-
-        return f"Remembered: '{decision}'. I'll be able to recall this in future conversations."
-
     except ImportError:
         logger.warning("ChromaDB not available - episodic memory disabled")
-        return "Note: Long-term memory is not available (ChromaDB not installed)."
     except Exception as e:
-        logger.exception("Error storing decision")
+        logger.exception("Error storing decision to ChromaDB")
         return f"Could not store decision: {e}"
+
+    return f"Remembered: '{decision}'. I'll be able to recall this in future conversations."
 
 
 @tool
-def remember_job_application(company: str, role: str, status: str, notes: str = "") -> str:
+def remember_job_application(
+    company: str,
+    role: str,
+    status: str,
+    notes: str = "",
+    runtime: ToolRuntime = None,  # type: ignore[assignment]
+) -> str:
     """Record a job application in long-term memory.
 
     Args:
@@ -838,24 +858,50 @@ def remember_job_application(company: str, role: str, status: str, notes: str = 
 
     Use this to track job applications across sessions.
     """
+    memory_id = str(uuid.uuid4())
+    text = f"Applied to {company} for {role}. Status: {status}"
+    if notes:
+        text += f". {notes}"
+
+    # Write to LangGraph InMemoryStore
+    if runtime and runtime.store:
+        try:
+            runtime.store.put(
+                ("default", "applications"),
+                memory_id,
+                {
+                    "text": text,
+                    "type": "application",
+                    "company": company,
+                    "role": role,
+                    "status": status,
+                },
+            )
+        except Exception:
+            logger.debug("InMemoryStore write failed (non-critical)", exc_info=True)
+
+    # Write to ChromaDB (persistent storage)
     try:
         from futureproof.memory.episodic import get_episodic_store, remember_application
 
         store = get_episodic_store()
         memory = remember_application(company, role, status, notes)
         store.remember(memory)
-
-        return f"Recorded application to {company} for {role} (status: {status})."
-
     except ImportError:
-        return "Note: Long-term memory is not available (ChromaDB not installed)."
+        logger.warning("ChromaDB not available")
     except Exception as e:
-        logger.exception("Error storing application")
+        logger.exception("Error storing application to ChromaDB")
         return f"Could not store application: {e}"
+
+    return f"Recorded application to {company} for {role} (status: {status})."
 
 
 @tool
-def recall_memories(query: str, limit: int = 5) -> str:
+def recall_memories(
+    query: str,
+    limit: int = 5,
+    runtime: ToolRuntime = None,  # type: ignore[assignment]
+) -> str:
     """Search long-term memory for relevant past experiences.
 
     Args:
@@ -865,30 +911,46 @@ def recall_memories(query: str, limit: int = 5) -> str:
     Use this to recall past decisions, job applications, or conversations
     that are relevant to the current discussion.
     """
+    result_parts: list[str] = []
+
+    # Search ChromaDB (persistent, primary source)
     try:
         from futureproof.memory.episodic import get_episodic_store
 
         store = get_episodic_store()
         memories = store.recall(query, limit=limit)
 
-        if not memories:
-            return "No relevant memories found."
-
-        result_parts = [f"Found {len(memories)} relevant memories:"]
-        for mem in memories:
-            date_str = mem.timestamp.strftime("%Y-%m-%d")
-            result_parts.append(f"\n**[{mem.memory_type.value}] {date_str}**")
-            result_parts.append(f"  {mem.content}")
-            if mem.context:
-                result_parts.append(f"  Context: {mem.context}")
-
-        return "\n".join(result_parts)
+        if memories:
+            result_parts.append(f"Found {len(memories)} relevant memories:")
+            for mem in memories:
+                date_str = mem.timestamp.strftime("%Y-%m-%d")
+                result_parts.append(f"\n**[{mem.memory_type.value}] {date_str}**")
+                result_parts.append(f"  {mem.content}")
+                if mem.context:
+                    result_parts.append(f"  Context: {mem.context}")
 
     except ImportError:
-        return "Note: Long-term memory is not available (ChromaDB not installed)."
-    except Exception as e:
-        logger.exception("Error recalling memories")
-        return f"Could not search memories: {e}"
+        logger.debug("ChromaDB not available")
+    except Exception:
+        logger.exception("Error recalling from ChromaDB")
+
+    # Also search InMemoryStore for recent session memories
+    if runtime and runtime.store:
+        try:
+            for namespace in [("default", "decisions"), ("default", "applications")]:
+                items = runtime.store.search(namespace, query=query, limit=limit)
+                for item in items:
+                    text = item.value.get("text", "")
+                    mem_type = item.value.get("type", "memory")
+                    if text and text not in "\n".join(result_parts):
+                        result_parts.append(f"\n**[{mem_type}]** {text}")
+        except Exception:
+            logger.debug("InMemoryStore search failed (non-critical)", exc_info=True)
+
+    if not result_parts:
+        return "No relevant memories found."
+
+    return "\n".join(result_parts)
 
 
 @tool
@@ -925,41 +987,42 @@ def get_memory_stats() -> str:
 # =============================================================================
 
 
-def get_career_tools() -> list:
-    """Get all career intelligence tools for the agent.
+def get_research_tools() -> list:
+    """Get tools for the research sub-agent.
 
-    Returns:
-        List of tool functions to bind to the agent.
+    Includes data gathering, knowledge search, and market intelligence.
     """
     return [
-        # Profile Management
+        gather_github_data,
+        gather_gitlab_data,
+        gather_portfolio_data,
+        gather_all_career_data,
+        get_stored_career_data,
+        search_career_knowledge,
+        get_knowledge_stats,
+        search_jobs,
+        get_tech_trends,
+        get_salary_insights,
+    ]
+
+
+def get_supervisor_tools() -> list:
+    """Get tools for the supervisor agent.
+
+    Includes profile management, analysis, generation, and memory.
+    """
+    return [
         get_user_profile,
         update_user_goal,
         update_user_skills,
         set_target_roles,
         update_user_name,
         update_current_role,
-        # Data Gathering
-        gather_github_data,
-        gather_gitlab_data,
-        gather_portfolio_data,
-        gather_all_career_data,
-        get_stored_career_data,
-        # Analysis
         analyze_skill_gaps,
         analyze_career_alignment,
         get_career_advice,
-        # Market Intelligence
-        search_jobs,
-        get_tech_trends,
-        get_salary_insights,
-        # Generation
         generate_cv,
         generate_cv_draft,
-        # Knowledge Base (RAG)
-        search_career_knowledge,
-        get_knowledge_stats,
-        # Episodic Memory
         remember_decision,
         remember_job_application,
         recall_memories,

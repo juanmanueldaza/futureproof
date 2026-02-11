@@ -5,16 +5,21 @@ Provides both sync and async chat loops for different use cases.
 """
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 
-from futureproof.agents.career_agent import create_career_agent, get_agent_config
+from futureproof.agents.career_agent import (
+    create_career_agent,
+    get_agent_config,
+    reset_career_agent,
+)
 from futureproof.chat.ui import (
     display_error,
     display_goals,
@@ -69,6 +74,82 @@ def handle_command(command: str) -> bool:
 
     console.print(f"[yellow]Unknown command: {cmd}. Type /help for available commands.[/yellow]")
     return False
+
+
+def _stream_response(
+    agent: Any,
+    input_message: Any,
+    config: dict[str, Any],
+    verbose: bool,
+    console: Console,
+    session: PromptSession,  # type: ignore[type-arg]
+) -> tuple[str, set[str]]:
+    """Stream agent response, handling interrupts for human-in-the-loop.
+
+    Returns:
+        Tuple of (full_response_text, shown_tool_names)
+    """
+    full_response = ""
+    shown_tools: set[str] = set()
+
+    with Live(Markdown(""), console=console, refresh_per_second=10) as live:
+        for chunk, metadata in agent.stream(
+            input_message,
+            cast(RunnableConfig, config),
+            stream_mode="messages",
+        ):
+            # Show tool calls in verbose mode
+            tool_calls = getattr(chunk, "tool_calls", None)
+            if verbose and tool_calls:
+                for tool_call in tool_calls:
+                    tool_name = tool_call.get("name", "unknown")
+                    if tool_name not in shown_tools:
+                        shown_tools.add(tool_name)
+                        live.stop()
+                        console.print(f"[dim]🔧 Using tool: {tool_name}[/dim]")
+                        live.start()
+
+            # Only accumulate AI message content, not tool messages
+            chunk_type = getattr(chunk, "type", None)
+            if chunk_type == "tool":
+                continue
+
+            if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
+                content = chunk.content  # type: ignore[union-attr]
+                # Handle Gemini's structured content format
+                if isinstance(content, list):
+                    content = "".join(
+                        block.get("text", "") if isinstance(block, dict) else str(block)
+                        for block in content
+                    )
+                full_response += content
+                live.update(Markdown(full_response))
+
+    console.print()  # Blank line after response
+
+    # Check for human-in-the-loop interrupts
+    state = agent.get_state(cast(RunnableConfig, config))
+    if state.interrupts:
+        interrupt_data = state.interrupts[0].value
+        question = interrupt_data.get("question", "Proceed?")
+        details = interrupt_data.get("details", "")
+
+        console.print(f"[yellow bold]{question}[/yellow bold]")
+        if details:
+            console.print(f"[dim]{details}[/dim]")
+
+        answer = session.prompt("[Y/n]: ").strip().lower()
+        approved = answer in ("", "y", "yes")
+
+        # Resume the graph with the user's decision
+        resume_response, resume_tools = _stream_response(
+            agent, Command(resume=approved), config, verbose, console, session
+        )
+        if resume_response:
+            full_response += resume_response
+        shown_tools |= resume_tools
+
+    return full_response, shown_tools
 
 
 def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
@@ -127,45 +208,9 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
             max_retries = 8  # Support full fallback chain
             for attempt in range(max_retries):
                 try:
-                    with Live(Markdown(""), console=console, refresh_per_second=10) as live:
-                        for chunk, metadata in agent.stream(
-                            input_message,
-                            cast(RunnableConfig, config),
-                            stream_mode="messages",
-                        ):
-                            # Show tool calls in verbose mode
-                            tool_calls = getattr(chunk, "tool_calls", None)
-                            if verbose and tool_calls:
-                                for tool_call in tool_calls:
-                                    tool_name = tool_call.get("name", "unknown")
-                                    if tool_name not in shown_tools:
-                                        shown_tools.add(tool_name)
-                                        live.stop()
-                                        console.print(f"[dim]🔧 Using tool: {tool_name}[/dim]")
-                                        live.start()
-
-                            # Only accumulate AI message content, not tool messages
-                            # Tool messages have type "tool" and should be skipped
-                            chunk_type = getattr(chunk, "type", None)
-                            if chunk_type == "tool":
-                                continue
-
-                            # chunk can be AIMessageChunk or str depending on stream mode
-                            if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
-                                content = chunk.content  # type: ignore[union-attr]
-                                # Handle Gemini's structured content format
-                                if isinstance(content, list):
-                                    # Extract text from structured content blocks
-                                    content = "".join(
-                                        block.get("text", "")
-                                        if isinstance(block, dict)
-                                        else str(block)
-                                        for block in content
-                                    )
-                                full_response += content
-                                live.update(Markdown(full_response))
-
-                    console.print()  # Blank line after response
+                    full_response, shown_tools = _stream_response(
+                        agent, input_message, config, verbose, console, session
+                    )
                     break  # Success, exit retry loop
 
                 except Exception as e:
@@ -180,9 +225,8 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
                             f"[yellow]Model unavailable, switching to: {next_model}[/yellow]"
                         )
                         # Recreate agent with new model
+                        reset_career_agent()
                         agent = create_career_agent()
-                        full_response = ""
-                        shown_tools.clear()
                         continue
                     else:
                         display_error(f"Agent error: {e}")

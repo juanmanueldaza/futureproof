@@ -1,6 +1,5 @@
 """MCP client factory.
 
-Follows the same factory pattern as LLMFactory for consistency.
 OCP-compliant: availability checking uses configuration dict instead of if-chain.
 """
 
@@ -49,7 +48,6 @@ MCPServerType = Literal[
 class MCPClientFactory:
     """Factory for creating MCP clients.
 
-    Mirrors the LLMFactory pattern for consistency across the codebase.
     Supports both career data sources (GitHub, GitLab) and market intelligence
     sources (Hacker News, Brave Search, JobSpy).
 

@@ -23,11 +23,12 @@ src/futureproof/
 │   ├── portfolio/   # Decomposed portfolio gatherer (SRP)
 │   └── market/      # Market intelligence gatherers
 ├── generators/      # CV generation
-├── llm/             # LLM provider abstraction (DIP)
+├── llm/             # LLM fallback manager with init_chat_model()
 ├── memory/          # Knowledge and memory storage
 │   ├── chunker.py   # Markdown text chunker
 │   ├── knowledge.py # ChromaDB knowledge store (RAG)
-│   └── episodic.py  # Episodic memory store
+│   ├── episodic.py  # Episodic memory store
+│   └── store.py     # LangGraph InMemoryStore (runtime semantic search)
 ├── mcp/             # MCP client implementations
 ├── prompts/         # AI prompt templates
 ├── services/        # Business logic layer
@@ -62,10 +63,24 @@ futureproof generate cv
 This codebase follows SOLID, DRY, KISS, and YAGNI principles:
 
 - **SRP**: Each class has a single responsibility (e.g., PortfolioGatherer split into Fetcher, HTMLExtractor, JSExtractor, MarkdownWriter)
-- **OCP**: LLM providers are extensible via registry pattern without modifying existing code
-- **DIP**: High-level modules depend on abstractions (LLMProvider ABC)
+- **OCP**: MCP clients extensible via registry pattern; LLM providers configured declaratively in `FallbackLLMManager`
+- **DIP**: High-level modules depend on `FallbackLLMManager` abstraction with `init_chat_model()` universal factory
 - **DRY**: Service layer eliminates CLI command duplication; CareerDataLoader consolidates data loading
 - **ISP**: CareerState split into focused TypedDicts (GatherInput, AnalyzeInput, etc.)
+
+## Agent Architecture
+
+The chat agent uses a **multi-agent supervisor pattern** built on LangGraph:
+
+- **Supervisor agent**: Handles profile management, analysis, CV generation, and memory tools. Routes to research agent when data gathering or market intelligence is needed.
+- **Research agent**: Handles data gathering (GitHub, GitLab, portfolio), knowledge search, and market intelligence (jobs, trends, salaries).
+- **Handoff tools**: `transfer_to_research` and `transfer_to_supervisor` use `Command(goto=..., graph=Command.PARENT)` for inter-agent routing.
+- **Human-in-the-loop**: `interrupt()` on `generate_cv` and `gather_all_career_data` for user confirmation.
+- **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages).
+- **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent).
+- **State**: `add_messages` reducer from `langgraph.graph.message` for message deduplication by ID.
+- **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for parallel gatherer execution.
+- **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — supports Azure, Groq, Gemini, Cerebras, SambaNova.
 
 ## Security
 
@@ -129,9 +144,9 @@ The codebase implements security best practices:
 
 Settings are loaded from environment variables via Pydantic:
 
-- `GEMINI_API_KEY` - Required for LLM operations
-- `LLM_PROVIDER` - Provider type (default: "gemini")
-- `LLM_MODEL` - Model name (default: "gemini-3-flash")
+- `GEMINI_API_KEY` - For Gemini LLM and embeddings
+- `AZURE_OPENAI_API_KEY` - For Azure OpenAI (top priority in fallback chain)
+- `GROQ_API_KEY` - For Groq LLM
 - `GITHUB_USERNAME`, `GITLAB_USERNAME` - For data gathering
 - `GITLAB_GROUPS` - Comma-separated GitLab groups (validated for safe characters)
 - `PORTFOLIO_URL` - Portfolio website URL
