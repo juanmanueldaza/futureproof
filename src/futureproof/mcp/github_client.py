@@ -57,6 +57,9 @@ class GitHubMCPClient(MCPClient):
                     "-e",
                     "GITHUB_PERSONAL_ACCESS_TOKEN",
                     settings.github_mcp_image,
+                    "stdio",
+                    "--log-file",
+                    "/dev/null",  # Suppress server logs
                 ],
                 env={"GITHUB_PERSONAL_ACCESS_TOKEN": token},
             )

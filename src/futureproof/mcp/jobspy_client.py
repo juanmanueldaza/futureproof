@@ -4,6 +4,7 @@ Uses JobSpy to aggregate jobs from LinkedIn, Indeed, Glassdoor, ZipRecruiter.
 MIT licensed, no authentication required.
 """
 
+import hashlib
 import json
 from typing import Any
 
@@ -141,20 +142,32 @@ class JobSpyMCPClient(MCPClient):
                 # Clean up the results
                 cleaned_jobs = []
                 for job in jobs:
+                    # Handle NaN values from pandas (they come as float)
+                    desc = job.get("description")
+                    if desc is None or (isinstance(desc, float) and str(desc) == "nan"):
+                        desc = ""
+                    else:
+                        desc = str(desc)[:500]
+
+                    # Generate unique ID from site + job_url
+                    job_url = job.get("job_url", "") or ""
+                    site = job.get("site", "") or ""
+                    unique_str = f"{site}:{job_url}"
+                    job_id = hashlib.md5(unique_str.encode()).hexdigest()[:12]
+
                     cleaned_jobs.append(
                         {
-                            "title": job.get("title", ""),
-                            "company": job.get("company", ""),
-                            "location": job.get("location", ""),
-                            "job_url": job.get("job_url", ""),
-                            "site": job.get("site", ""),
-                            "date_posted": str(job.get("date_posted", "")),
+                            "id": job_id,
+                            "title": job.get("title", "") or "",
+                            "company": job.get("company", "") or "",
+                            "location": job.get("location", "") or "",
+                            "job_url": job.get("job_url", "") or "",
+                            "site": job.get("site", "") or "",
+                            "date_posted": str(job.get("date_posted", "") or ""),
                             "salary_min": job.get("min_amount"),
                             "salary_max": job.get("max_amount"),
-                            "salary_currency": job.get("currency", ""),
-                            "description": job.get("description", "")[:500]
-                            if job.get("description")
-                            else "",
+                            "salary_currency": job.get("currency", "") or "",
+                            "description": desc,
                         }
                     )
 

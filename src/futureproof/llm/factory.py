@@ -6,10 +6,12 @@ Centralizes provider instantiation and configuration.
 from typing import Literal
 
 from ..config import settings
+from .azure import AzureOpenAIProvider
 from .base import LLMProvider
 from .gemini import GeminiProvider
+from .groq import GroqProvider
 
-ProviderType = Literal["gemini"]
+ProviderType = Literal["gemini", "groq", "azure"]
 
 
 class LLMFactory:
@@ -22,7 +24,9 @@ class LLMFactory:
     """
 
     PROVIDERS: dict[str, type[LLMProvider]] = {
+        "azure": AzureOpenAIProvider,
         "gemini": GeminiProvider,
+        "groq": GroqProvider,
     }
 
     @classmethod

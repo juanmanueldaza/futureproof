@@ -18,10 +18,17 @@ FutureProof is a career intelligence CLI tool that gathers professional data fro
 ```
 src/futureproof/
 ├── agents/          # LangGraph orchestration and state management
+├── chat/            # Interactive chat interface
 ├── gatherers/       # Data collection from external sources
-│   └── portfolio/   # Decomposed portfolio gatherer (SRP)
+│   ├── portfolio/   # Decomposed portfolio gatherer (SRP)
+│   └── market/      # Market intelligence gatherers
 ├── generators/      # CV generation
 ├── llm/             # LLM provider abstraction (DIP)
+├── memory/          # Knowledge and memory storage
+│   ├── chunker.py   # Markdown text chunker
+│   ├── knowledge.py # ChromaDB knowledge store (RAG)
+│   └── episodic.py  # Episodic memory store
+├── mcp/             # MCP client implementations
 ├── prompts/         # AI prompt templates
 ├── services/        # Business logic layer
 ├── utils/           # Shared utilities (logging, data loading, security)
@@ -150,3 +157,71 @@ HTTP client with security features:
 - SSL verification enabled
 - Redirect limiting (max 5)
 - Request timeout (30 seconds)
+
+## Knowledge Base Architecture
+
+The knowledge base provides RAG (Retrieval Augmented Generation) for career data:
+
+- **Location**: `src/futureproof/memory/knowledge.py`
+- **Chunking**: `src/futureproof/memory/chunker.py`
+- **Service**: `src/futureproof/services/knowledge_service.py`
+- **Storage**: ChromaDB collection `career_knowledge` (separate from episodic memory)
+
+### Data Flow
+1. Gatherer collects data → `data/processed/{source}/`
+2. Auto-index (if enabled) → chunks markdown by `##` headers
+3. Agent searches → `search_career_knowledge()` tool
+4. Relevant chunks returned → used in response generation
+
+### Key Classes
+
+**`MarkdownChunker`** (`memory/chunker.py`):
+- Splits markdown by `##` headers while preserving context
+- Configurable max/min token limits (default: 500/50)
+- Tracks section hierarchy for metadata
+
+**`CareerKnowledgeStore`** (`memory/knowledge.py`):
+- ChromaDB wrapper for career data vectors
+- Supports filtering by source (github, gitlab, linkedin, portfolio, assessment)
+- Methods: `index_markdown_file()`, `search()`, `clear_source()`, `get_stats()`
+
+**`KnowledgeService`** (`services/knowledge_service.py`):
+- Orchestrates indexing and search operations
+- Maps source names to file paths in `data/processed/`
+- Methods: `index_source()`, `index_all()`, `search()`, `get_stats()`
+
+### Agent Tools
+
+Two tools available to the career agent (`agents/tools.py`):
+
+```python
+@tool
+def search_career_knowledge(query: str, sources: list[str] | None = None, limit: int = 5) -> str:
+    """Search the career knowledge base for relevant information."""
+
+@tool
+def get_knowledge_stats() -> str:
+    """Get statistics about the career knowledge base."""
+```
+
+### Auto-Indexing
+
+After each gather operation, the `GathererService` automatically indexes the source if `KNOWLEDGE_AUTO_INDEX=true` (default). Market intelligence data (ephemeral JSON with TTL) is NOT indexed.
+
+### Configuration
+
+```bash
+KNOWLEDGE_AUTO_INDEX=true       # Auto-index after gather (default: true)
+KNOWLEDGE_CHUNK_MAX_TOKENS=500  # Max tokens per chunk
+KNOWLEDGE_CHUNK_MIN_TOKENS=50   # Min tokens per chunk
+```
+
+### CLI Commands
+
+```bash
+futureproof index [SOURCE]      # Index all or specific source
+futureproof knowledge stats     # Show knowledge base stats
+futureproof knowledge search    # Search knowledge base
+futureproof knowledge clear     # Clear indexed data
+futureproof chat --verbose      # Show tool usage during chat
+```

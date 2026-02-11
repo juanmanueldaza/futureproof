@@ -7,14 +7,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import nest_asyncio
-
+from ..utils.async_bridge import run_async_in_sync
 from ..utils.console import console
 
 logger = logging.getLogger(__name__)
-
-# Apply nest_asyncio to allow nested event loops (needed for sync-to-async bridge in CLI)
-nest_asyncio.apply()
 
 # Subprocess timeout in seconds (5 minutes)
 SUBPROCESS_TIMEOUT = 300
@@ -116,7 +112,7 @@ class MCPGatherer(BaseGatherer):
     def _run_async(self, coro: Any) -> Any:
         """Run async coroutine in sync context.
 
-        Uses nest_asyncio to handle nested event loops safely.
+        Uses the centralized async bridge utility for consistent behavior.
 
         Args:
             coro: Async coroutine to run
@@ -124,13 +120,7 @@ class MCPGatherer(BaseGatherer):
         Returns:
             Result of the coroutine
         """
-        try:
-            loop = asyncio.get_running_loop()
-            # If we're in an async context, run in the existing loop
-            return loop.run_until_complete(coro)
-        except RuntimeError:
-            # No event loop running - create one
-            return asyncio.run(coro)
+        return run_async_in_sync(coro)
 
     @abstractmethod
     async def gather_async(self, *args: Any, **kwargs: Any) -> Path:
@@ -167,21 +157,17 @@ class MCPGatherer(BaseGatherer):
         # Check if MCP is available
         if self._can_use_mcp():
             try:
-                console.print("  [dim]Using MCP server...[/dim]")
                 return self._run_async(self.gather_async(*args, **kwargs))
             except MCPClientError as e:
-                logger.warning("MCP gathering failed, falling back to CLI: %s", e)
-                console.print("  [yellow]MCP unavailable, using CLI fallback[/yellow]")
-            except (asyncio.CancelledError, ConnectionError, TimeoutError, OSError) as e:
-                # Catch connection-level errors that may not be wrapped in MCPClientError
-                logger.warning("MCP connection failed, falling back to CLI: %s", e)
-                console.print("  [yellow]MCP connection failed, using CLI fallback[/yellow]")
+                console.print(f"  [yellow]⚠ MCP error: {e}[/yellow]")
+                console.print("  [dim]Using CLI fallback...[/dim]")
+            except (asyncio.CancelledError, ConnectionError, TimeoutError, OSError):
+                # Server-side issues (connection reset, timeout, cancelled)
+                console.print("  [yellow]⚠ MCP server unavailable[/yellow]")
+                console.print("  [dim]Using CLI fallback...[/dim]")
             except Exception as e:
-                # Catch any other unexpected errors during MCP gathering
-                logger.warning("MCP gathering failed unexpectedly, falling back to CLI: %s", e)
-                console.print(
-                    f"  [yellow]MCP error ({type(e).__name__}), using CLI fallback[/yellow]"
-                )
+                console.print(f"  [yellow]⚠ MCP error: {type(e).__name__}: {e}[/yellow]")
+                console.print("  [dim]Using CLI fallback...[/dim]")
 
         # Fallback to CLI
         if self.fallback_gatherer:

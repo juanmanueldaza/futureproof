@@ -5,6 +5,11 @@ This module implements a REAL StateGraph (not that mock bullshit) with:
 - Conditional routing based on state
 - Tool calling for dynamic data enrichment
 - Structured output via Pydantic models
+
+SRP-compliant: Node functions use extracted helpers for:
+- Data preparation (helpers/data_pipeline.py)
+- LLM invocation (helpers/llm_invoker.py)
+- Result key mapping (helpers/result_mapper.py)
 """
 
 from typing import Any, Literal
@@ -12,9 +17,8 @@ from typing import Any, Literal
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from ..llm import get_llm
-from ..utils.data_loader import combine_career_data
-from ..utils.security import anonymize_career_data
+from ..prompts import get_prompt_builder
+from .helpers import advice_pipeline, default_invoker, default_pipeline, get_result_key
 from .state import CareerState
 
 # ============================================================================
@@ -85,39 +89,29 @@ def analyze_node(state: CareerState) -> dict[str, Any]:
     - analyze_goals: Extract stated goals
     - analyze_reality: Analyze actual activities
     - analyze_gaps: Compare goals vs reality
+
+    Uses extracted helpers for SRP compliance:
+    - default_pipeline: Data preparation and anonymization
+    - default_invoker: LLM invocation with error handling
+    - get_result_key: Action-to-result-key mapping
     """
-    llm = get_llm()
+    prompt_builder = get_prompt_builder()
 
-    # Combine all available career data
-    combined_data = combine_career_data(dict(state))
-
-    if not combined_data:
+    # Prepare data using pipeline (combines and anonymizes)
+    career_data = default_pipeline.prepare(dict(state))
+    if not career_data:
         return {"error": "No data available for analysis. Run 'gather' first."}
-
-    # Anonymize PII before sending to external LLM
-    combined_data = anonymize_career_data(combined_data, preserve_professional_emails=True)
 
     # Add market context if available and requested
     if state.get("include_market"):
-        market_context = _build_market_context(state)
-        if market_context:
-            combined_data = f"{combined_data}\n\n## Market Context\n{market_context}"
+        career_data = prompt_builder.enrich_with_market_context(career_data, dict(state))
 
     # Determine analysis type and build prompt
     action = state.get("action", "analyze_full")
-    prompt = _build_analysis_prompt(action, combined_data)
+    prompt = prompt_builder.build_analysis_prompt(action, career_data)
 
-    try:
-        response = llm.invoke(prompt)
-        result_key = {
-            "analyze_goals": "goals",
-            "analyze_reality": "reality",
-            "analyze_gaps": "gaps",
-        }.get(action, "analysis")
-
-        return {result_key: response.content}
-    except Exception as e:
-        return {"error": f"Analysis failed: {e}"}
+    # Invoke LLM and return result
+    return default_invoker.invoke(prompt, get_result_key(action), "Analysis")
 
 
 def analyze_market_node(state: CareerState) -> dict[str, Any]:
@@ -127,51 +121,28 @@ def analyze_market_node(state: CareerState) -> dict[str, Any]:
     - analyze_market_fit: Profile vs market alignment
     - analyze_skill_gaps: Skills needed for competitiveness
     - analyze_trends: Technology trend analysis
+
+    Uses extracted helpers for SRP compliance.
     """
-    from ..prompts import (
-        MARKET_FIT_PROMPT,
-        MARKET_SKILL_GAP_PROMPT,
-        TRENDING_SKILLS_PROMPT,
-    )
+    prompt_builder = get_prompt_builder()
 
-    llm = get_llm()
-
-    # Combine career data
-    career_data = combine_career_data(dict(state))
+    # Prepare career data using pipeline
+    career_data = default_pipeline.prepare(dict(state))
     if not career_data:
         return {"error": "No career data available. Run 'gather all' first."}
 
     # Build market context
-    market_context = _build_market_context(state)
+    market_context = prompt_builder.build_market_context(dict(state))
     if not market_context:
         return {"error": "No market data available. Run 'market gather' first."}
 
-    # Anonymize career data
-    career_data = anonymize_career_data(career_data, preserve_professional_emails=True)
-
     action = state.get("action", "analyze_market_fit")
 
-    # Select prompt based on action
-    prompts = {
-        "analyze_market_fit": MARKET_FIT_PROMPT,
-        "analyze_skill_gaps": MARKET_SKILL_GAP_PROMPT,
-        "analyze_trends": TRENDING_SKILLS_PROMPT,
-    }
+    # Build prompt using PromptBuilder
+    prompt = prompt_builder.build_market_analysis_prompt(action, career_data, market_context)
 
-    prompt_template = prompts.get(action, MARKET_FIT_PROMPT)
-    prompt = prompt_template.format(career_data=career_data, market_data=market_context)
-
-    try:
-        response = llm.invoke(prompt)
-        result_key = {
-            "analyze_market_fit": "market_fit",
-            "analyze_skill_gaps": "skill_gaps",
-            "analyze_trends": "trending_skills",
-        }.get(action, "market_fit")
-
-        return {result_key: response.content}
-    except Exception as e:
-        return {"error": f"Market analysis failed: {e}"}
+    # Invoke LLM and return result
+    return default_invoker.invoke(prompt, get_result_key(action, "market_fit"), "Market analysis")
 
 
 def generate_node(state: CareerState) -> dict[str, Any]:
@@ -188,40 +159,30 @@ def generate_node(state: CareerState) -> dict[str, Any]:
 
 
 def advise_node(state: CareerState) -> dict[str, Any]:
-    """Provide strategic career advice."""
-    from ..prompts import STRATEGIC_ADVICE_PROMPT
+    """Provide strategic career advice.
 
-    llm = get_llm()
+    Uses extracted helpers for SRP compliance:
+    - advice_pipeline: Data preparation with analysis included
+    - default_invoker: LLM invocation with error handling
+    """
+    prompt_builder = get_prompt_builder()
     target = state.get("target") or "career growth"
 
-    # Combine career data with analysis if available
-    combined_data = combine_career_data(dict(state), include_analysis=True)
-    if not combined_data:
-        combined_data = "No data available."
+    # Prepare career data with analysis using advice pipeline
+    career_data = advice_pipeline.prepare(dict(state))
+    if not career_data:
+        career_data = "No data available."
 
-    # Add market context if requested
+    # Build market context if requested
+    market_context = None
     if state.get("include_market"):
-        market_context = _build_market_context(state)
-        if market_context:
-            combined_data = f"{combined_data}\n\n## Market Context\n{market_context}"
+        market_context = prompt_builder.build_market_context(dict(state))
 
-    # Anonymize PII
-    combined_data = anonymize_career_data(combined_data, preserve_professional_emails=True)
+    # Build prompt using PromptBuilder
+    prompt = prompt_builder.build_advice_prompt(target, career_data, market_context)
 
-    prompt = f"""{STRATEGIC_ADVICE_PROMPT}
-
-TARGET GOAL: {target}
-
-CAREER DATA:
-{combined_data}
-
-Provide strategic, actionable advice for achieving the target goal."""
-
-    try:
-        response = llm.invoke(prompt)
-        return {"advice": response.content}
-    except Exception as e:
-        return {"error": f"Advice generation failed: {e}"}
+    # Invoke LLM and return result
+    return default_invoker.invoke(prompt, "advice", "Advice generation")
 
 
 # ============================================================================
@@ -231,16 +192,11 @@ Provide strategic, actionable advice for achieving the target goal."""
 
 def route_by_action(
     state: CareerState,
-) -> Literal[
-    "gather_career",
-    "gather_market",
-    "analyze",
-    "analyze_market",
-    "generate",
-    "advise",
-    "end",
-]:
-    """Route to appropriate node based on action in state."""
+) -> str:
+    """Route to appropriate node based on action in state.
+
+    Returns node name or END constant for termination.
+    """
     action = state.get("action", "")
 
     if action == "gather" or action == "gather_all":
@@ -249,7 +205,13 @@ def route_by_action(
     if action == "gather_market":
         return "gather_market"
 
-    if action in ("analyze_market_fit", "analyze_skill_gaps", "analyze_trends"):
+    if action in (
+        "analyze_market",
+        "analyze_market_fit",
+        "analyze_skill_gaps",
+        "analyze_skills",
+        "analyze_trends",
+    ):
         return "analyze_market"
 
     if action.startswith("analyze"):
@@ -261,7 +223,7 @@ def route_by_action(
     if action == "advise":
         return "advise"
 
-    return "end"
+    return END
 
 
 def should_continue_to_market(state: CareerState) -> Literal["gather_market", "end"]:
@@ -269,81 +231,6 @@ def should_continue_to_market(state: CareerState) -> Literal["gather_market", "e
     if state.get("include_market"):
         return "gather_market"
     return "end"
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-
-def _build_analysis_prompt(action: str, combined_data: str) -> str:
-    """Build the appropriate analysis prompt based on action type."""
-    from ..prompts import ANALYZE_CAREER_PROMPT
-
-    if action == "analyze_goals":
-        return f"""Based on the following career data, extract and list all STATED career goals,
-aspirations, and targets mentioned. Look for:
-- Headlines and taglines that indicate desired roles
-- About sections mentioning goals
-- Any explicit career objectives
-
-{combined_data}
-
-Provide a clear, bulleted list of stated career goals."""
-
-    elif action == "analyze_reality":
-        return f"""Based on the following career data, analyze what this person is ACTUALLY doing.
-Look at:
-- Technologies and languages used in repositories
-- Types of projects built
-- Activity patterns
-- Skills demonstrated vs claimed
-
-{combined_data}
-
-Provide an honest assessment of actual activities and demonstrated skills."""
-
-    elif action == "analyze_gaps":
-        return f"""Based on the following career data, identify GAPS between:
-1. What this person SAYS they want (stated goals, headline, aspirations)
-2. What they're ACTUALLY doing (projects, languages, activity)
-
-{combined_data}
-
-Provide:
-1. A list of stated goals
-2. A summary of actual activities
-3. Specific gaps identified
-4. An alignment score (0-100)
-5. Actionable recommendations to close the gaps"""
-
-    else:  # analyze_full
-        return f"""{ANALYZE_CAREER_PROMPT}
-
-{combined_data}"""
-
-
-def _build_market_context(state: CareerState) -> str:
-    """Build market context string from state."""
-    parts = []
-
-    job_market = state.get("job_market")
-    if job_market:
-        parts.append(f"### Job Market Data\n{job_market}")
-
-    tech_trends = state.get("tech_trends")
-    if tech_trends:
-        parts.append(f"### Technology Trends\n{tech_trends}")
-
-    economic_context = state.get("economic_context")
-    if economic_context:
-        parts.append(f"### Economic Context\n{economic_context}")
-
-    salary_data = state.get("salary_data")
-    if salary_data:
-        parts.append(f"### Salary Data\n{salary_data}")
-
-    return "\n\n".join(parts)
 
 
 # ============================================================================
@@ -386,34 +273,3 @@ def create_graph() -> CompiledStateGraph[CareerState]:
 
     # Compile and return
     return builder.compile()  # type: ignore[return-value]
-
-
-# ============================================================================
-# Backwards Compatibility
-# ============================================================================
-
-
-class _LegacyGraphWrapper:
-    """Wrapper to maintain backwards compatibility with old interface.
-
-    The old code expected create_graph() to return an object with invoke().
-    The new StateGraph.compile() returns a CompiledGraph which also has invoke().
-    This wrapper ensures the interface stays the same.
-    """
-
-    def __init__(self) -> None:
-        self._graph: CompiledStateGraph[CareerState] = create_graph()
-
-    def invoke(self, state: CareerState) -> dict[str, Any]:
-        """Execute the graph and return updated state."""
-        result = self._graph.invoke(state)
-        return dict(result)
-
-
-def get_graph() -> _LegacyGraphWrapper:
-    """Get a graph instance with backwards-compatible interface.
-
-    Use this for the existing CLI code that expects the old interface.
-    For new code, use create_graph() directly.
-    """
-    return _LegacyGraphWrapper()

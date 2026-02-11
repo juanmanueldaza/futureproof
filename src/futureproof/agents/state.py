@@ -112,45 +112,47 @@ class MarketData(BaseModel):
     tech_trends: str = Field(default="", description="Technology trends (HN, GitHub)")
     economic_context: str = Field(default="", description="Economic indicators (BLS)")
     salary_data: str = Field(default="", description="Salary/compensation data")
-    last_updated: str = Field(default="", description="When market data was last refreshed")
 
 
 # ============================================================================
 # LangGraph State (TypedDict for graph compatibility)
 # ============================================================================
 
+# Focused state slices following Interface Segregation Principle (ISP)
+# Each slice groups related fields for a single concern
 
-class CareerState(TypedDict, total=False):
-    """State for LangGraph execution.
 
-    Uses TypedDict for LangGraph compatibility while supporting Pydantic
-    models for structured output.
+class RoutingState(TypedDict, total=False):
+    """Routing and control flow state."""
 
-    The 'messages' field uses Annotated with operator.add to enable
-    message accumulation across nodes (LangGraph reducer pattern).
-    """
-
-    # Action routing
     action: str  # What to do: gather, analyze, generate, advise, market_*
     target: str | None  # Target role for advice
+    include_market: bool  # Include market data in analysis
 
-    # Message accumulation for tool-calling agents
-    messages: Annotated[list[Any], operator.add]
 
-    # Career data from gatherers
+class CareerDataState(TypedDict, total=False):
+    """Raw career data from gatherers."""
+
     linkedin_data: str | None
     github_data: str | None
     gitlab_data: str | None
     portfolio_data: str | None
+    assessment_data: str | None  # CliftonStrengths assessment
 
-    # Market intelligence data
+
+class MarketDataState(TypedDict, total=False):
+    """Market intelligence data from external sources."""
+
     market_data: MarketData | None
     job_market: str | None
     tech_trends: str | None
     economic_context: str | None
     salary_data: str | None
 
-    # Analysis results (can be str or structured Pydantic model)
+
+class AnalysisResultState(TypedDict, total=False):
+    """Analysis outputs from LLM processing."""
+
     analysis: str | CareerAnalysisResult | None
     goals: str | None
     reality: str | None
@@ -159,18 +161,76 @@ class CareerState(TypedDict, total=False):
     skill_gaps: SkillGapAnalysis | None
     trending_skills: TechTrendsAnalysis | None
 
-    # Generation results
+
+class GenerationState(TypedDict, total=False):
+    """CV and content generation outputs."""
+
     cv_en: str | None
     cv_es: str | None
-
-    # Advice results
     advice: str | None
 
-    # Error tracking
+
+class MetadataState(TypedDict, total=False):
+    """Message accumulation and error tracking."""
+
+    messages: Annotated[list[Any], operator.add]
     error: str | None
 
-    # Include market data in analysis
+
+class CareerState(TypedDict, total=False):
+    """Complete state for LangGraph execution.
+
+    Composed of focused state slices following ISP:
+    - RoutingState: action routing and control flow
+    - CareerDataState: raw career data from gatherers
+    - MarketDataState: market intelligence data
+    - AnalysisResultState: LLM analysis outputs
+    - GenerationState: CV and content generation outputs
+    - MetadataState: messages and error tracking
+
+    Uses TypedDict for LangGraph compatibility while supporting Pydantic
+    models for structured output.
+
+    The 'messages' field uses Annotated with operator.add to enable
+    message accumulation across nodes (LangGraph reducer pattern).
+    """
+
+    # Routing (from RoutingState)
+    action: str
+    target: str | None
     include_market: bool
+
+    # Messages and errors (from MetadataState)
+    messages: Annotated[list[Any], operator.add]
+    error: str | None
+
+    # Career data (from CareerDataState)
+    linkedin_data: str | None
+    github_data: str | None
+    gitlab_data: str | None
+    portfolio_data: str | None
+    assessment_data: str | None
+
+    # Market data (from MarketDataState)
+    market_data: MarketData | None
+    job_market: str | None
+    tech_trends: str | None
+    economic_context: str | None
+    salary_data: str | None
+
+    # Analysis results (from AnalysisResultState)
+    analysis: str | CareerAnalysisResult | None
+    goals: str | None
+    reality: str | None
+    gaps: str | None
+    market_fit: MarketFitAnalysis | None
+    skill_gaps: SkillGapAnalysis | None
+    trending_skills: TechTrendsAnalysis | None
+
+    # Generation results (from GenerationState)
+    cv_en: str | None
+    cv_es: str | None
+    advice: str | None
 
 
 # ============================================================================
@@ -181,10 +241,11 @@ class CareerState(TypedDict, total=False):
 class GatherInput(TypedDict, total=False):
     """Input for gather operations."""
 
-    source: Literal["github", "gitlab", "linkedin", "portfolio", "all"]
+    source: Literal["github", "gitlab", "linkedin", "portfolio", "assessment", "all"]
     username: str | None
     url: str | None
     zip_path: str | None
+    assessment_dir: str | None  # Directory containing CliftonStrengths PDFs
 
 
 class AnalyzeInput(TypedDict, total=False):

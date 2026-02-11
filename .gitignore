@@ -90,3 +90,4 @@ logs/
 
 # LinkedIn exports (may contain PII)
 *.zip
+data/cache/

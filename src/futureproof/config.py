@@ -20,8 +20,18 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # API Keys
-    gemini_api_key: str = ""
+    # API Keys (all providers have free tiers)
+    gemini_api_key: str = ""  # https://aistudio.google.com/apikey
+    groq_api_key: str = ""  # https://console.groq.com/keys
+    cerebras_api_key: str = ""  # https://cloud.cerebras.ai/
+    sambanova_api_key: str = ""  # https://cloud.sambanova.ai/
+
+    # Azure OpenAI / AI Foundry
+    azure_openai_api_key: str = ""  # https://ai.azure.com/
+    azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com/
+    azure_openai_api_version: str = "2024-12-01-preview"
+    azure_chat_deployment: str = ""  # e.g. "gpt-4.1"
+    azure_embedding_deployment: str = ""  # e.g. "text-embedding-3-small"
 
     # User profiles
     github_username: str = "juanmanueldaza"
@@ -36,7 +46,7 @@ class Settings(BaseSettings):
     default_language: Literal["en", "es"] = "en"
 
     # LLM Configuration
-    llm_provider: Literal["gemini"] = "gemini"
+    llm_provider: Literal["gemini", "groq", "azure"] = "gemini"
     llm_model: str = ""  # Empty = use provider default
     llm_temperature: float = 0.3
     cv_temperature: float = 0.2  # Lower for more consistent CV output
@@ -54,8 +64,9 @@ class Settings(BaseSettings):
     gitlab_mcp_token: str = ""  # GitLab OAuth or personal access token
 
     # Market Intelligence MCP Configuration
-    # Brave Search (2000 free queries/month)
-    brave_api_key: str = ""
+    # Tavily Search (1000 free queries/month, no credit card)
+    # Get your key at: https://tavily.com/
+    tavily_api_key: str = ""
 
     # JobSpy (no auth required, MIT licensed)
     jobspy_enabled: bool = True
@@ -66,7 +77,12 @@ class Settings(BaseSettings):
     # Market data caching (hours)
     market_cache_hours: int = 24  # Tech trends
     job_cache_hours: int = 12  # Jobs change faster
-    economic_cache_hours: int = 168  # BLS data (weekly)
+    content_cache_hours: int = 12  # Dev.to/SO content trends
+
+    # Knowledge Base Configuration (RAG)
+    knowledge_auto_index: bool = True  # Auto-index after gather
+    knowledge_chunk_max_tokens: int = 500  # Max tokens per chunk
+    knowledge_chunk_min_tokens: int = 50  # Min tokens per chunk (merge if smaller)
 
     # Output file names (removes magic strings from code)
     github_output_filename: str = "github_profile.md"
@@ -136,9 +152,14 @@ class Settings(BaseSettings):
         return bool(self.gitlab_mcp_url and self.gitlab_mcp_token)
 
     @property
-    def has_brave_mcp(self) -> bool:
-        """Check if Brave Search MCP is configured."""
-        return bool(self.brave_api_key)
+    def has_azure(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return bool(self.azure_openai_api_key and self.azure_openai_endpoint)
+
+    @property
+    def has_tavily_mcp(self) -> bool:
+        """Check if Tavily Search MCP is configured."""
+        return bool(self.tavily_api_key)
 
     @property
     def market_cache_dir(self) -> Path:

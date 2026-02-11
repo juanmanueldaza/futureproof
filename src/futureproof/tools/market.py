@@ -15,30 +15,15 @@ Usage:
     response = llm_with_tools.invoke("What Python jobs are available in Berlin?")
 """
 
-import asyncio
 import logging
-from typing import Any
 
 from langchain_core.tools import tool
 
 from ..config import settings
 from ..mcp.factory import MCPClientFactory
+from ..utils.async_bridge import run_async_in_sync
 
 logger = logging.getLogger(__name__)
-
-
-def _run_async(coro: Any) -> Any:
-    """Run async coroutine in sync context."""
-    try:
-        asyncio.get_running_loop()
-        # If we're already in an async context, run in thread pool
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            return pool.submit(asyncio.run, coro).result()
-    except RuntimeError:
-        # No running loop, safe to use asyncio.run
-        return asyncio.run(coro)
 
 
 @tool
@@ -66,7 +51,7 @@ def search_jobs(
 
     try:
         client = MCPClientFactory.create("jobspy")
-        result = _run_async(
+        result = run_async_in_sync(
             client.call_tool(
                 "search_jobs",
                 {
@@ -128,7 +113,7 @@ def get_tech_trends(topic: str = "programming") -> str:
 
     try:
         client = MCPClientFactory.create("hn")
-        result = _run_async(
+        result = run_async_in_sync(
             client.call_tool(
                 "search_stories",
                 {
@@ -170,7 +155,7 @@ def search_salary_data(
     """Search for salary information for a specific role and location.
 
     Use this tool when you need salary benchmarks or compensation data
-    for career advice. Uses Brave Search to find recent salary reports.
+    for career advice. Uses Tavily Search to find recent salary reports.
 
     Args:
         role: Job title to search salary for (e.g., "Senior Python Developer")
@@ -179,23 +164,23 @@ def search_salary_data(
     Returns:
         Salary information and ranges from various sources
     """
-    if not MCPClientFactory.is_available("brave"):
+    if not MCPClientFactory.is_available("tavily"):
         # Fallback message with general guidance
         return (
-            f"Brave Search API not configured. To get salary data for '{role}' in '{location}', "
+            f"Tavily Search API not configured. To get salary data for '{role}' in '{location}', "
             "consider checking: Glassdoor, Levels.fyi, LinkedIn Salary Insights, "
             "or PayScale for current market rates."
         )
 
     try:
-        client = MCPClientFactory.create("brave")
+        client = MCPClientFactory.create("tavily")
         query = f"{role} salary {location} 2024 2025"
-        result = _run_async(
+        result = run_async_in_sync(
             client.call_tool(
-                "web_search",
+                "search",
                 {
                     "query": query,
-                    "count": 10,
+                    "max_results": 10,
                 },
             )
         )
@@ -213,7 +198,7 @@ def search_salary_data(
 
         for item in results[:8]:
             title = item.get("title", "Unknown")
-            snippet = item.get("description", item.get("snippet", ""))
+            snippet = item.get("content", item.get("snippet", ""))
             url = item.get("url", "")
             output_lines.append(f"### {title}")
             if snippet:
@@ -249,7 +234,7 @@ def search_hiring_trends(months_back: int = 3) -> str:
 
     try:
         client = MCPClientFactory.create("hn")
-        result = _run_async(
+        result = run_async_in_sync(
             client.call_tool(
                 "get_hiring_trends",
                 {
@@ -324,8 +309,8 @@ def get_available_tools() -> list:
         available.append(get_tech_trends)
         available.append(search_hiring_trends)
 
-    # Brave Search tools
-    if settings.has_brave_mcp:
+    # Tavily Search tools
+    if settings.has_tavily_mcp:
         available.append(search_salary_data)
 
     return available

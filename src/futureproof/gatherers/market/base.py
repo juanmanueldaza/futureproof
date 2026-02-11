@@ -1,17 +1,21 @@
 """Base class for market intelligence gatherers.
 
 Provides TTL-based caching to avoid hammering APIs and improve performance.
+Also provides helpers to reduce code duplication when gathering from
+multiple MCP sources.
 """
 
 import hashlib
 import json
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from ...config import settings
+from ...mcp.factory import MCPClientFactory, MCPServerType
 
 logger = logging.getLogger(__name__)
 
@@ -183,3 +187,67 @@ class MarketGatherer(ABC):
             except OSError:
                 pass
         return deleted
+
+    async def _gather_from_source(
+        self,
+        source_name: MCPServerType,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        results: dict[str, Any],
+        extractor: Callable[[dict[str, Any]], list[dict[str, Any]]] | None = None,
+        result_key: str = "job_listings",
+        source_label: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Generic method to gather from any MCP source.
+
+        This helper eliminates the repeated try/except pattern across
+        multiple source gathering blocks. (DRY fix)
+
+        Args:
+            source_name: MCP source name (e.g., "jobspy", "remoteok")
+            tool_name: Tool to call on the MCP client
+            tool_args: Arguments to pass to the tool
+            results: Results dict to update with errors
+            extractor: Optional function to extract items from response.
+                       Default extracts response.get("jobs", [])
+            result_key: Key in results to extend with extracted items
+            source_label: Optional human-readable label for logging
+
+        Returns:
+            List of extracted items (empty if source unavailable or errored)
+        """
+        label = source_label or source_name.capitalize()
+
+        if not MCPClientFactory.is_available(source_name):
+            logger.debug(f"{label} MCP not available, skipping")
+            return []
+
+        try:
+            logger.info(f"{label}: Gathering data...")
+            client = MCPClientFactory.create(source_name)
+            async with client:
+                result = await client.call_tool(tool_name, tool_args)
+
+                if not result.is_error:
+                    content = result.content or "{}"
+                    parsed = json.loads(content) if isinstance(content, str) else content
+
+                    # Extract items using provided extractor or default
+                    if extractor is not None:
+                        items = extractor(parsed)
+                    elif isinstance(parsed, dict):
+                        items = parsed.get("jobs", [])
+                    else:
+                        items = parsed if isinstance(parsed, list) else []
+
+                    logger.info(f"{label}: Found {len(items)} items")
+                    return items
+                else:
+                    logger.warning(f"{label}: {result.error_message}")
+                    results["errors"].append(f"{label}: {result.error_message}")
+                    return []
+
+        except Exception as e:
+            logger.exception(f"Error gathering from {label}")
+            results["errors"].append(f"{label} error: {e}")
+            return []

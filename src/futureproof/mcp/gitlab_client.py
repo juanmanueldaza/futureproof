@@ -3,7 +3,9 @@
 Uses streamable HTTP transport to communicate with the GitLab MCP server.
 """
 
+import asyncio
 import logging
+import warnings
 from typing import Any
 
 from mcp import types
@@ -14,6 +16,9 @@ from ..config import settings
 from .base import MCPClient, MCPConnectionError, MCPToolError, MCPToolResult
 
 logger = logging.getLogger(__name__)
+
+# Connection timeout for GitLab MCP (seconds)
+GITLAB_MCP_TIMEOUT = 30
 
 
 class GitLabMCPClient(MCPClient):
@@ -32,6 +37,32 @@ class GitLabMCPClient(MCPClient):
         self._read_stream: Any = None
         self._write_stream: Any = None
 
+    async def _cleanup_http_context(self, http_context: Any, entered: bool = True) -> None:
+        """Safely cleanup HTTP context, suppressing sniffio errors.
+
+        The streamablehttp_client async generator can fail during cleanup
+        when running in a sync-to-async bridged context because sniffio
+        can't detect the async library during garbage collection.
+
+        Args:
+            http_context: The async context manager to clean up
+            entered: True if __aenter__ completed, False if it was interrupted
+        """
+        if http_context is None:
+            return
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ResourceWarning)
+            try:
+                if entered:
+                    await http_context.__aexit__(None, None, None)
+                else:
+                    # If __aenter__ was interrupted, close the generator directly
+                    await http_context.aclose()
+            except Exception:
+                # Cleanup errors are expected in edge cases - ignore silently
+                pass
+
     async def connect(self) -> None:
         """Connect to GitLab MCP server via HTTP."""
         if self._session is not None:
@@ -47,27 +78,65 @@ class GitLabMCPClient(MCPClient):
                 "GitLab MCP token not configured. Set GITLAB_MCP_TOKEN environment variable."
             )
 
+        http_context_entered = False
+        session_entered = False
+        http_context = None
+        session = None
         try:
-            # Use streamable HTTP transport for GitLab
-            self._http_context = streamablehttp_client(
+            # Use streamable HTTP transport for GitLab with timeout
+            http_context = streamablehttp_client(
                 settings.gitlab_mcp_url,
                 headers={"Authorization": f"Bearer {settings.gitlab_mcp_token}"},
             )
-            # streamablehttp_client returns (read, write, session_id)
-            self._read_stream, self._write_stream, _ = await self._http_context.__aenter__()
 
-            session = ClientSession(self._read_stream, self._write_stream)
+            # Apply timeout to connection
+            try:
+                read_stream, write_stream, _ = await asyncio.wait_for(
+                    http_context.__aenter__(),
+                    timeout=GITLAB_MCP_TIMEOUT,
+                )
+            except (TimeoutError, asyncio.CancelledError) as e:
+                # Connection was interrupted - close generator before it gets GC'd
+                await self._cleanup_http_context(http_context, entered=False)
+                if isinstance(e, TimeoutError):
+                    raise MCPConnectionError(
+                        f"GitLab MCP connection timed out after {GITLAB_MCP_TIMEOUT}s"
+                    )
+                raise  # Re-raise CancelledError
+            http_context_entered = True
+
+            session = ClientSession(read_stream, write_stream)
             await session.__aenter__()
+            session_entered = True
             await session.initialize()
+
+            # Only assign to instance after successful initialization
+            self._http_context = http_context
+            self._read_stream = read_stream
+            self._write_stream = write_stream
             self._session = session
 
             logger.info("Connected to GitLab MCP server")
 
         except MCPConnectionError:
-            await self.disconnect()
+            # Clean up local references before re-raising
+            if session_entered and session is not None:
+                try:
+                    await session.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            if http_context is not None:
+                await self._cleanup_http_context(http_context, entered=http_context_entered)
             raise
         except Exception as e:
-            await self.disconnect()
+            # Clean up local references before re-raising
+            if session_entered and session is not None:
+                try:
+                    await session.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            if http_context is not None:
+                await self._cleanup_http_context(http_context, entered=http_context_entered)
             raise MCPConnectionError(f"Failed to connect to GitLab MCP server: {e}") from e
 
     async def disconnect(self) -> None:
@@ -80,10 +149,7 @@ class GitLabMCPClient(MCPClient):
             self._session = None
 
         if self._http_context is not None:
-            try:
-                await self._http_context.__aexit__(None, None, None)
-            except Exception:
-                pass
+            await self._cleanup_http_context(self._http_context)
             self._http_context = None
 
         self._read_stream = None

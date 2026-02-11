@@ -1,91 +1,88 @@
-"""Career intelligence service - business logic layer.
+"""Career intelligence service - unified facade.
 
-This module extracts business logic from the CLI, enabling:
-- Unit testing without CLI
-- Reuse from other interfaces (API, GUI)
-- Clear separation of concerns
+This module provides a unified interface to career intelligence operations
+while delegating to focused sub-services internally.
+
+SRP-compliant: CareerService is now a facade that:
+- Maintains backward compatibility with existing CLI
+- Delegates to focused sub-services (GathererService, AnalysisService, GenerationService)
+- Supports dependency injection for testing
 """
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from ..agents import CareerState, create_graph
-from ..utils.data_loader import load_career_data
+from .analysis_service import AnalysisAction, AnalysisResult, AnalysisService
+from .exceptions import AnalysisError, GenerationError, NoDataError, ServiceError
+from .gatherer_service import GathererService
+from .generation_service import GenerationService
 
+if TYPE_CHECKING:
+    from ..agents import CareerState
+    from ..gatherers.base import BaseGatherer
 
-class ServiceError(Exception):
-    """Base exception for service errors."""
-
-    pass
-
-
-class NoDataError(ServiceError):
-    """Raised when no career data is available."""
-
-    pass
-
-
-class AnalysisError(ServiceError):
-    """Raised when analysis fails."""
-
-    pass
-
-
-class GenerationError(ServiceError):
-    """Raised when CV generation fails."""
-
-    pass
-
-
-AnalysisAction = Literal[
-    "analyze_full",
-    "analyze_goals",
-    "analyze_reality",
-    "analyze_gaps",
-    "analyze_market",
-    "analyze_skills",
+# Re-export for backward compatibility
+__all__ = [
+    "AnalysisAction",
+    "AnalysisError",
+    "AnalysisResult",
+    "CareerService",
+    "GenerationError",
+    "NoDataError",
+    "ServiceError",
 ]
 
 
-@dataclass
-class AnalysisResult:
-    """Result of a career analysis."""
-
-    action: str
-    content: str
-    error: str | None = None
-
-    @property
-    def success(self) -> bool:
-        """Check if analysis was successful."""
-        return self.error is None
-
-
 class CareerService:
-    """Service layer for career intelligence operations.
+    """Unified facade for career intelligence operations.
 
-    Encapsulates all business logic, making CLI a thin wrapper.
+    Maintains backward compatibility with existing CLI while
+    delegating to focused sub-services internally.
+
+    SRP: This class now only coordinates between services.
+    Each service has a single responsibility:
+    - GathererService: Data collection
+    - AnalysisService: Career analysis and advice
+    - GenerationService: CV generation
+
+    Supports dependency injection for testing:
+        # Default usage (creates services internally)
+        service = CareerService()
+
+        # With injected gatherers (for testing)
+        service = CareerService(gatherers={"github": mock_gatherer})
     """
 
-    def __init__(self) -> None:
-        self._graph = None
+    def __init__(
+        self,
+        gatherers: dict[str, "BaseGatherer"] | None = None,
+    ) -> None:
+        """Initialize CareerService.
+
+        Args:
+            gatherers: Optional dict mapping source names to gatherer instances.
+                      Passed to GathererService for dependency injection.
+        """
+        self._gatherer_service = GathererService(gatherers=gatherers)
+        self._analysis_service = AnalysisService()
+        self._generation_service = GenerationService()
+
+    # =========================================================================
+    # Analysis Service Delegation
+    # =========================================================================
 
     @property
     def graph(self):
         """Lazy-load graph to avoid import overhead."""
-        if self._graph is None:
-            self._graph = create_graph()
-        return self._graph
+        return self._analysis_service.graph
 
-    def load_data(self) -> CareerState:
+    def load_data(self) -> "CareerState":
         """Load all processed career data."""
-        data = load_career_data()
-        return CareerState(**data)  # type: ignore[typeddict-item]
+        return self._analysis_service.load_data()
 
-    def has_data(self, state: CareerState) -> bool:
+    def has_data(self, state: "CareerState") -> bool:
         """Check if any career data is available."""
-        return any(k.endswith("_data") and v for k, v in state.items())
+        return self._analysis_service.has_data(state)
 
     def analyze(
         self,
@@ -104,38 +101,25 @@ class CareerService:
         Raises:
             NoDataError: If no career data is available
         """
-        state = self.load_data()
+        return self._analysis_service.analyze(action, market_data)
 
-        if not self.has_data(state):
-            raise NoDataError("No career data found. Run 'futureproof gather all' first.")
+    def get_advice(self, target: str) -> str:
+        """Get strategic career advice for a target goal.
 
-        state["action"] = action
+        Args:
+            target: Target role or career goal
 
-        # Add market data if provided
-        if market_data:
-            state["job_market"] = market_data.get("job_market", "")
-            state["tech_trends"] = market_data.get("tech_trends", "")
-            state["economic_context"] = market_data.get("economic_context", "")
+        Returns:
+            Strategic advice text
 
-        result = self.graph.invoke(state)
+        Raises:
+            AnalysisError: If advice generation fails
+        """
+        return self._analysis_service.get_advice(target)
 
-        # Map action to result key
-        result_key = {
-            "analyze_goals": "goals",
-            "analyze_reality": "reality",
-            "analyze_gaps": "gaps",
-            "analyze_full": "analysis",
-            "analyze_market": "market_analysis",
-            "analyze_skills": "skill_gaps",
-        }.get(action, "analysis")
-
-        if "error" in result and result["error"]:
-            return AnalysisResult(action=action, content="", error=result["error"])
-
-        return AnalysisResult(
-            action=action,
-            content=result.get(result_key, "Analysis complete"),
-        )
+    # =========================================================================
+    # Gatherer Service Delegation
+    # =========================================================================
 
     def gather_all(self) -> dict[str, bool]:
         """Gather data from all sources.
@@ -143,24 +127,7 @@ class CareerService:
         Returns:
             Dict mapping source names to success status
         """
-        from ..gatherers import GitHubGatherer, GitLabGatherer, PortfolioGatherer
-
-        results: dict[str, bool] = {}
-
-        gatherers = [
-            ("github", GitHubGatherer()),
-            ("gitlab", GitLabGatherer()),
-            ("portfolio", PortfolioGatherer()),
-        ]
-
-        for name, gatherer in gatherers:
-            try:
-                gatherer.gather()
-                results[name] = True
-            except Exception:
-                results[name] = False
-
-        return results
+        return self._gatherer_service.gather_all()
 
     def gather_github(self, username: str | None = None) -> Path:
         """Gather data from GitHub.
@@ -171,10 +138,7 @@ class CareerService:
         Returns:
             Path to generated file
         """
-        from ..gatherers import GitHubGatherer
-
-        gatherer = GitHubGatherer()
-        return gatherer.gather(username)
+        return self._gatherer_service.gather_github(username)
 
     def gather_gitlab(self, username: str | None = None) -> Path:
         """Gather data from GitLab.
@@ -185,10 +149,7 @@ class CareerService:
         Returns:
             Path to generated file
         """
-        from ..gatherers import GitLabGatherer
-
-        gatherer = GitLabGatherer()
-        return gatherer.gather(username)
+        return self._gatherer_service.gather_gitlab(username)
 
     def gather_portfolio(self, url: str | None = None) -> Path:
         """Gather data from portfolio website.
@@ -199,10 +160,7 @@ class CareerService:
         Returns:
             Path to generated file
         """
-        from ..gatherers import PortfolioGatherer
-
-        gatherer = PortfolioGatherer()
-        return gatherer.gather(url)
+        return self._gatherer_service.gather_portfolio(url)
 
     def gather_linkedin(self, zip_path: Path, output_dir: Path | None = None) -> Path:
         """Gather data from LinkedIn export.
@@ -214,10 +172,22 @@ class CareerService:
         Returns:
             Path to generated file
         """
-        from ..gatherers import LinkedInGatherer
+        return self._gatherer_service.gather_linkedin(zip_path, output_dir)
 
-        gatherer = LinkedInGatherer()
-        return gatherer.gather(zip_path, output_dir)
+    def gather_assessment(self, input_dir: Path | None = None) -> Path:
+        """Gather CliftonStrengths assessment data from PDFs.
+
+        Args:
+            input_dir: Directory containing Gallup PDF files (defaults to data/raw)
+
+        Returns:
+            Path to generated markdown file
+        """
+        return self._gatherer_service.gather_assessment(input_dir)
+
+    # =========================================================================
+    # Generation Service Delegation
+    # =========================================================================
 
     def generate_cv(
         self,
@@ -236,14 +206,7 @@ class CareerService:
         Raises:
             GenerationError: If generation fails
         """
-        from ..generators import CVGenerator
-
-        try:
-            generator = CVGenerator()
-            output_path = generator.generate(language=language, format=format)
-            return output_path
-        except Exception as e:
-            raise GenerationError(f"CV generation failed: {e}") from e
+        return self._generation_service.generate_cv(language, format)
 
     def generate_all_cvs(self) -> list[Path]:
         """Generate all CV variants (all languages and formats).
@@ -251,43 +214,4 @@ class CareerService:
         Returns:
             List of paths to generated files
         """
-        from ..generators import CVGenerator
-
-        generator = CVGenerator()
-        paths: list[Path] = []
-
-        for language in ("en", "es"):
-            for cv_format in ("ats", "creative"):
-                try:
-                    path = generator.generate(
-                        language=language,  # type: ignore[arg-type]
-                        format=cv_format,  # type: ignore[arg-type]
-                    )
-                    paths.append(path)
-                except Exception:
-                    pass  # Continue with other variants
-
-        return paths
-
-    def get_advice(self, target: str) -> str:
-        """Get strategic career advice for a target goal.
-
-        Args:
-            target: Target role or career goal
-
-        Returns:
-            Strategic advice text
-
-        Raises:
-            AnalysisError: If advice generation fails
-        """
-        state = self.load_data()
-        state["action"] = "advise"
-        state["target"] = target
-
-        result = self.graph.invoke(state)
-
-        if "error" in result and result["error"]:
-            raise AnalysisError(result["error"])
-
-        return result.get("advice", "Advice generated")
+        return self._generation_service.generate_all_cvs()
