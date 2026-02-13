@@ -1,94 +1,96 @@
 # FutureProof
 
-**Career Intelligence System** - Know thyself through your data.
+Career intelligence system that gathers your professional data, analyzes your career trajectory, and generates optimized CVs — all through a conversational AI agent.
 
-A conversational AI agent that aggregates professional data from LinkedIn, GitHub, GitLab, and your personal portfolio, then uses AI to generate optimized CVs, provide career analysis, and surface market intelligence — all through an interactive chat interface.
+## Description
 
-## Features
+FutureProof aggregates data from LinkedIn, GitHub, GitLab, portfolio websites, and CliftonStrengths assessments into a searchable knowledge base. It uses AI to identify skill gaps, assess market fit, track tech trends, and generate ATS-optimized CVs. Everything happens through an interactive chat interface powered by a single LangChain agent with 32 specialized tools.
 
-- **Interactive Chat Agent** - Conversational interface powered by a single AI agent with 32 specialized tools
-- **Data Gathering** - Pull professional data from GitHub, GitLab, LinkedIn, portfolio sites, and CliftonStrengths
-- **CV Generation** - Produce ATS-optimized CVs in English and Spanish (with human-in-the-loop confirmation)
-- **Career Analysis** - Compare stated goals vs actual behavior, identify gaps, assess market fit
-- **Market Intelligence** - Real-time job market data, tech trends, salary insights, and skill demand analysis
-- **Knowledge Base** - RAG-powered semantic search over your career data
-- **Privacy Protection** - PII anonymization before sending data to external LLMs
+### Key capabilities
+
+- **Data gathering** from GitHub, GitLab, LinkedIn exports, portfolio sites, and CliftonStrengths PDFs
+- **Knowledge base** with RAG-powered semantic search over all your career data
+- **Career analysis** — skill gaps, career alignment, market fit, strategic advice
+- **Market intelligence** — job search across 7+ boards, tech trends from Hacker News, salary insights
+- **CV generation** in English/Spanish, ATS or creative format (Markdown + PDF)
+- **Episodic memory** — remembers your decisions, job applications, and preferences across sessions
+- **Privacy protection** — PII anonymization before sending data to external LLMs
 
 ## Installation
 
 ```bash
-# Clone and enter directory
 cd futureproof
-
-# Install with uv
 uv sync
 
-# Copy and configure environment
 cp .env.example .env
 # Edit .env with your API keys
 ```
 
-### External Tools
+### Prerequisites
 
-- **github2md** - CLI fallback when GitHub MCP server is unavailable
-- **gitlab2md** - CLI fallback when GitLab MCP server is unavailable
-- **linkedin2md** - Processes LinkedIn data export ZIP files
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/) package manager
 
-### MCP Integration (Recommended)
+### External tools (optional)
 
-FutureProof supports [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers for real-time data access, with automatic fallback to CLI tools if unavailable.
+These CLI tools provide fallback when MCP servers are unavailable:
 
-**GitHub MCP Server** (requires Docker):
-```bash
-export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_..."
-```
-
-**GitLab MCP Server** (HTTP transport):
-```bash
-export GITLAB_MCP_URL="https://gitlab.com/api/v4/mcp"
-export GITLAB_MCP_TOKEN="glpat-..."
-```
+- [github2md](https://github.com/juanmanueldaza/github2md) — GitHub profile to markdown
+- [gitlab2md](https://github.com/juanmanueldaza/gitlab2md) — GitLab profile to markdown
+- [linkedin2md](https://github.com/juanmanueldaza/linkedin2md) — LinkedIn export ZIP to markdown
 
 ## Usage
 
-### Chat (Primary Interface)
+### Interactive chat
 
 ```bash
-# Start interactive chat session
-futureproof chat
-
-# Show tool usage and agent reasoning
-futureproof chat --verbose
-
-# Quick one-off question
-futureproof ask "What are my top skills?"
-futureproof ask "Analyze my gaps for ML Engineer role"
-
-# Manage conversation memory
-futureproof memory --threads
-futureproof memory --clear
+futureproof chat                    # Start chat session
+futureproof chat --verbose          # Show tool usage
+futureproof chat --thread work      # Use a named thread
 ```
 
-Everything is accessible through the chat agent. Just ask:
+### Quick questions
 
-- **"Gather my GitHub data"** - Fetches your GitHub profile and repos
-- **"Import my LinkedIn export"** - Processes a LinkedIn ZIP from data/raw/
-- **"Gather all my data"** - Auto-detects and gathers from all configured sources
-- **"Index my career data"** - Creates searchable embeddings in the knowledge base
-- **"Search my knowledge base for Python projects"** - Semantic search over gathered data
-- **"Analyze my skill gaps for ML Engineer"** - AI-powered gap analysis
-- **"How do I fit the current job market?"** - Market fit analysis against trends
-- **"Search for remote Python developer jobs"** - Job market search
-- **"What are the latest tech trends?"** - Trending technologies from Hacker News
-- **"Generate my CV in ATS format"** - Creates an optimized CV (with confirmation)
+```bash
+futureproof ask "What are my top skills?"
+futureproof ask "Analyze my gaps for ML Engineer"
+```
 
-### Data Sources Setup
+### Memory management
 
-Place data exports in `data/raw/` for auto-detection:
+```bash
+futureproof memory --threads        # List conversation threads
+futureproof memory --clear          # Clear all history
+```
+
+### What you can ask
+
+**Data gathering:**
+- "Gather my GitHub data"
+- "Import my LinkedIn export"
+- "Gather all my data" (auto-detects configured sources)
+
+**Knowledge & analysis:**
+- "Search my knowledge base for Python projects"
+- "Analyze my skill gaps for Staff Engineer"
+- "How do I fit the current job market?"
+
+**Market intelligence:**
+- "Search for remote Python developer jobs"
+- "What are the latest tech trends?"
+- "Get salary insights for ML Engineer"
+
+**CV generation:**
+- "Generate my CV in ATS format"
+- "Generate a CV draft for DevOps Engineer"
+
+### Data sources setup
+
+Place data exports in `data/raw/`:
 - **LinkedIn**: Download your data export ZIP from LinkedIn Settings > Data Privacy
-- **CliftonStrengths**: Download Gallup PDF reports
+- **CliftonStrengths**: Download Gallup PDF reports (Top 5, All 34, etc.)
 
-Configure environment variables for live data sources:
+Configure environment variables for live sources:
 ```bash
 GITHUB_USERNAME=your_username
 GITLAB_USERNAME=your_username
@@ -99,104 +101,101 @@ See [docs/SOURCES.md](docs/SOURCES.md) for the complete setup guide.
 
 ## Configuration
 
+Copy `.env.example` and set your keys:
+
 ```bash
 cp .env.example .env
 ```
 
-**Quick start (minimum config):**
+**Minimum (one key is enough):**
 ```bash
-GEMINI_API_KEY=your_key_here
+GEMINI_API_KEY=AIza...
 ```
 
-**Recommended config:**
+**Recommended:**
 ```bash
 GEMINI_API_KEY=AIza...                          # LLM + embeddings
 GROQ_API_KEY=gsk_...                            # Fast fallback
 GITHUB_USERNAME=your_username
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data via MCP
 PORTFOLIO_URL=https://your-site.com
 TAVILY_API_KEY=tvly-...                         # Market research
 ```
 
-## Project Structure
+The LLM fallback chain tries models in order: Azure GPT-4.1 → Groq Llama 3.3 → Gemini 2.5 Flash → Cerebras → SambaNova. Configure any provider and it works.
+
+## Project structure
 
 ```
-futureproof/
-├── src/futureproof/
-│   ├── cli.py              # Typer CLI (chat, ask, memory)
-│   ├── config.py           # Pydantic settings
-│   ├── agents/             # Single agent with tool modules
-│   │   ├── career_agent.py # Single agent with create_agent()
-│   │   ├── helpers/        # Orchestrator support
-│   │   └── tools/          # Agent tool modules
-│   │       ├── profile.py      # User profile management
-│   │       ├── gathering.py    # Data collection tools
-│   │       ├── analysis.py     # Career analysis tools
-│   │       ├── market.py       # Market intelligence tools
-│   │       ├── generation.py   # CV generation tools
-│   │       ├── knowledge.py    # RAG search & indexing tools
-│   │       └── memory.py       # Episodic memory tools
-│   ├── chat/               # Chat client (streaming, HITL)
-│   ├── gatherers/          # Data collectors (MCP + CLI fallback)
-│   │   ├── github.py       # GitHub gatherer
-│   │   ├── gitlab.py       # GitLab gatherer
-│   │   ├── linkedin.py     # LinkedIn ZIP processor
-│   │   ├── cliftonstrengths.py  # CliftonStrengths PDF processor
-│   │   ├── portfolio/      # Portfolio website scraper
-│   │   └── market/         # Market intelligence gatherers
-│   ├── generators/         # CV generators
-│   ├── llm/                # LLM fallback manager
-│   ├── memory/             # Knowledge & memory storage
-│   ├── mcp/                # MCP client implementations
-│   ├── prompts/            # LLM prompt templates
-│   ├── services/           # Business logic layer
-│   └── utils/              # Utilities (security, data loading)
-├── data/
-│   ├── raw/                # Raw data exports (LinkedIn ZIPs, Gallup PDFs)
-│   ├── processed/          # Processed markdown files
-│   └── output/             # Generated CVs
-└── tests/                  # Unit tests
+src/futureproof/
+├── cli.py                  # Typer CLI (chat, ask, memory)
+├── config.py               # Pydantic settings from env vars
+├── agents/
+│   ├── career_agent.py     # Single agent with create_agent()
+│   ├── orchestrator.py     # LangGraph Functional API for analysis workflows
+│   ├── state.py            # TypedDict state definitions
+│   ├── helpers/            # Orchestrator support (data pipeline, LLM invoker)
+│   └── tools/              # 32 agent tools organized by domain
+│       ├── profile.py      # User profile management (6 tools)
+│       ├── gathering.py    # Data collection (7 tools)
+│       ├── knowledge.py    # RAG search & indexing (4 tools)
+│       ├── analysis.py     # Career analysis (3 tools)
+│       ├── market.py       # Market intelligence (6 tools)
+│       ├── generation.py   # CV generation (2 tools)
+│       └── memory.py       # Episodic memory (4 tools)
+├── chat/                   # Streaming chat client with HITL support
+├── gatherers/
+│   ├── github.py           # GitHub via MCP or github2md CLI
+│   ├── gitlab.py           # GitLab via MCP or gitlab2md CLI
+│   ├── linkedin.py         # LinkedIn ZIP via linkedin2md CLI
+│   ├── cliftonstrengths.py # CliftonStrengths PDF parser
+│   ├── portfolio/          # Website scraper (fetcher, HTML/JS extractors)
+│   └── market/             # Job market, tech trends, content trends
+├── generators/             # CV generation (Markdown + PDF via WeasyPrint)
+├── llm/                    # FallbackLLMManager with init_chat_model()
+├── memory/
+│   ├── store.py            # LangGraph InMemoryStore (runtime semantic search)
+│   ├── knowledge.py        # ChromaDB knowledge store (RAG)
+│   ├── episodic.py         # ChromaDB episodic memory
+│   ├── chunker.py          # Markdown chunker for indexing
+│   ├── embeddings.py       # Gemini/Azure embedding functions
+│   ├── checkpointer.py     # SQLite conversation persistence
+│   └── profile.py          # User profile (YAML)
+├── mcp/                    # 13 MCP clients (GitHub, GitLab, HN, Tavily, job boards)
+├── prompts/                # LLM prompt templates
+├── services/               # Business logic layer
+└── utils/                  # Security, data loading, logging
 ```
 
-## Security Features
+## Security
 
-- **Prompt Injection Protection** - User inputs screened for injection attempts before LLM calls
-- **PII Anonymization** - Personal data redacted before sending to external APIs
-- **SSRF Protection** - Portfolio scraper blocks requests to private IP ranges
-- **Path Traversal Protection** - File operations validated to prevent directory escape
-- **Command Injection Protection** - External tools invoked safely without shell expansion
-- **Secure File Permissions** - Sensitive output files created with owner-only permissions (0600)
-
-## Tech Stack
-
-- **Python 3.13+** with type hints
-- **LangChain + LangGraph** for AI orchestration
-- **Multi-provider LLM** (Azure, Gemini, Groq, Cerebras, SambaNova) with automatic fallback
-- **Typer** for CLI
-- **Pydantic** for configuration
-- **httpx** for HTTP requests
-- **BeautifulSoup4** for HTML parsing
-- **WeasyPrint** for PDF generation
-- **ChromaDB** for vector storage (knowledge base)
-- **pytest** for testing
-- **uv** for package management
+- **Prompt injection protection** — user inputs screened for 13 injection patterns
+- **PII anonymization** — emails, phones, addresses redacted before external LLM calls
+- **SSRF protection** — portfolio scraper blocks private IP ranges
+- **Path traversal protection** — file operations validated within base directory
+- **Command injection protection** — external tools invoked without shell expansion
+- **Secure file permissions** — sensitive files created with 0600 permissions
 
 ## Development
 
 ```bash
-# Run tests
-pytest tests/ -q
-
-# Type checking
-pyright src/futureproof
-
-# Linting
-ruff check .
-
-# Fix lint issues
-ruff check . --fix
+pytest tests/ -q              # Run tests
+pyright src/futureproof       # Type checking
+ruff check .                  # Lint
+ruff check . --fix            # Auto-fix lint issues
 ```
+
+## Tech stack
+
+- **Python 3.13+** with type hints
+- **LangChain + LangGraph** — agent orchestration, `create_agent()`, `SummarizationMiddleware`
+- **ChromaDB** — vector storage for knowledge base and episodic memory
+- **Pydantic** — settings management
+- **Typer + Rich** — CLI and terminal UI
+- **httpx** — async HTTP client
+- **WeasyPrint** — PDF generation
+- **uv** — package management
 
 ## License
 
-GPL-2.0
+[GPL-2.0](LICENSE)
