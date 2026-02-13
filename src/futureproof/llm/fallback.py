@@ -150,16 +150,23 @@ class FallbackLLMManager:
         "sambanova": "https://api.sambanova.ai/v1",
     }
 
-    def _create_model(self, config: ModelConfig) -> BaseChatModel:
-        """Create a LangChain chat model from config using init_chat_model."""
+    def _create_model(self, config: ModelConfig, temperature: float | None = None) -> BaseChatModel:
+        """Create a LangChain chat model from config using init_chat_model.
+
+        Args:
+            config: Model configuration to instantiate
+            temperature: Optional per-call temperature override. If None,
+                uses the manager's default temperature.
+        """
         from langchain.chat_models import init_chat_model
 
         model_provider = self._PROVIDER_MAP.get(config.provider)
         if not model_provider:
             raise ValueError(f"Unknown provider: {config.provider}")
 
+        effective_temperature = temperature if temperature is not None else self._temperature
         kwargs: dict[str, Any] = {
-            "temperature": self._temperature,
+            "temperature": effective_temperature,
             "streaming": True,
         }
 
@@ -191,8 +198,12 @@ class FallbackLLMManager:
             if config.is_available() and self._model_key(config) not in self._failed_models
         ]
 
-    def get_model(self) -> tuple[BaseChatModel, ModelConfig]:
+    def get_model(self, temperature: float | None = None) -> tuple[BaseChatModel, ModelConfig]:
         """Get the best available model.
+
+        Args:
+            temperature: Optional per-call temperature override. If None,
+                uses the manager's default temperature.
 
         Returns:
             Tuple of (model instance, model config)
@@ -218,7 +229,7 @@ class FallbackLLMManager:
         self._current_model = config
 
         logger.info(f"Using model: {config.description}")
-        return self._create_model(config), config
+        return self._create_model(config, temperature=temperature), config
 
     def mark_failed(self, config: ModelConfig | None = None) -> None:
         """Mark a model as failed (e.g., due to rate limiting).
@@ -287,15 +298,14 @@ def get_model_with_fallback(
     This is the main entry point for getting an LLM model.
     It automatically handles fallback to alternative models.
 
+    Always uses the global fallback manager so that failure tracking
+    state (rate-limited providers, etc.) is preserved across calls.
+
     Args:
-        temperature: Optional temperature override. If None, uses the
-            global setting from the shared fallback manager.
+        temperature: Optional per-call temperature override. If None, uses the
+            manager's default temperature from config.
 
     Returns:
         Tuple of (model instance, model config)
     """
-    if temperature is not None:
-        # Create a temporary manager with custom temperature
-        manager = FallbackLLMManager(temperature=temperature)
-        return manager.get_model()
-    return get_fallback_manager().get_model()
+    return get_fallback_manager().get_model(temperature=temperature)

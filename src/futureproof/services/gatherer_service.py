@@ -4,6 +4,7 @@ Single responsibility: Manage and execute data gathering from external sources.
 Supports dependency injection for testing.
 """
 
+import importlib
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,6 +16,16 @@ if TYPE_CHECKING:
     from .knowledge_service import KnowledgeService
 
 logger = logging.getLogger(__name__)
+
+# Registry mapping gatherer names to (module_path, class_name).
+# To add a new gatherer, add an entry here — no code changes needed elsewhere.
+_GATHERER_REGISTRY: dict[str, tuple[str, str]] = {
+    "github": ("futureproof.gatherers", "GitHubGatherer"),
+    "gitlab": ("futureproof.gatherers", "GitLabGatherer"),
+    "portfolio": ("futureproof.gatherers", "PortfolioGatherer"),
+    "linkedin": ("futureproof.gatherers", "LinkedInGatherer"),
+    "assessment": ("futureproof.gatherers.cliftonstrengths", "CliftonStrengthsGatherer"),
+}
 
 
 class GathererService:
@@ -50,7 +61,7 @@ class GathererService:
     def _get_gatherer(self, name: str) -> "BaseGatherer":
         """Get or create a gatherer by name.
 
-        Uses injected gatherer if available, otherwise creates default.
+        Uses injected gatherer if available, otherwise creates from registry.
 
         Args:
             name: Gatherer name (github, gitlab, portfolio, linkedin, assessment)
@@ -64,29 +75,14 @@ class GathererService:
         if name in self._gatherers:
             return self._gatherers[name]
 
-        # Create default gatherers lazily
-        if name == "github":
-            from ..gatherers import GitHubGatherer
-
-            return GitHubGatherer()
-        elif name == "gitlab":
-            from ..gatherers import GitLabGatherer
-
-            return GitLabGatherer()
-        elif name == "portfolio":
-            from ..gatherers import PortfolioGatherer
-
-            return PortfolioGatherer()
-        elif name == "linkedin":
-            from ..gatherers import LinkedInGatherer
-
-            return LinkedInGatherer()
-        elif name == "assessment":
-            from ..gatherers.cliftonstrengths import CliftonStrengthsGatherer
-
-            return CliftonStrengthsGatherer()
-        else:
+        entry = _GATHERER_REGISTRY.get(name)
+        if entry is None:
             raise ValueError(f"Unknown gatherer: {name}")
+
+        module_path, class_name = entry
+        module = importlib.import_module(module_path)
+        gatherer_cls = getattr(module, class_name)
+        return gatherer_cls()
 
     def _get_knowledge_service(self) -> "KnowledgeService":
         """Get or create the knowledge service."""

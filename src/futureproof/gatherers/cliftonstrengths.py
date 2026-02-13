@@ -84,6 +84,7 @@ class StrengthInsight:
     why_succeed: str = ""
     action_items: list[str] = field(default_factory=list)
     blind_spots: list[str] = field(default_factory=list)
+    sounds_like_quotes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -219,12 +220,18 @@ class CliftonStrengthsGatherer(BaseGatherer):
             data.name = name_match.group(1).strip()
             data.date = name_match.group(2).strip()
 
-        # Parse based on report type
-        if "ALL_34" in filename:
+        # Parse based on report type (specific types before generic TOP_10)
+        if report_type == "all_34":
             self._parse_all_34(text, data)
-        elif "TOP_5" in filename or "SF_TOP" in filename:
+        elif report_type == "top_5":
             self._parse_top_5(text, data)
-        elif "TOP_10" in filename:
+        elif report_type == "action_planning":
+            self._parse_action_planning(text, data)
+        elif report_type == "leadership":
+            self._parse_leadership_insight(text, data)
+        elif report_type == "discovery":
+            self._parse_discovery_development(text, data)
+        elif report_type == "top_10":
             self._parse_top_10(text, data)
 
     def _get_report_type(self, filename: str) -> str:
@@ -233,14 +240,15 @@ class CliftonStrengthsGatherer(BaseGatherer):
             return "all_34"
         elif "SF_TOP_5" in filename or "TOP_5" in filename.replace("TOP_10", ""):
             return "top_5"
-        elif "TOP_10" in filename:
-            return "top_10"
+        # Specific TOP_10 variants must be checked BEFORE generic TOP_10
         elif "ACTION_PLANNING" in filename:
             return "action_planning"
         elif "LEADERSHIP" in filename:
             return "leadership"
         elif "DISCOVERY" in filename:
             return "discovery"
+        elif "TOP_10" in filename:
+            return "top_10"
         return "unknown"
 
     def _parse_all_34(self, text: str, data: CliftonStrengthsData) -> None:
@@ -338,6 +346,329 @@ class CliftonStrengthsGatherer(BaseGatherer):
 
         data.top_10.sort(key=lambda x: x.rank)
         self._parse_strength_details(text, data)
+
+    # -----------------------------------------------------------------
+    # Action Planning / Leadership / Discovery parsers
+    # -----------------------------------------------------------------
+
+    def _ensure_top_10(self, text: str, data: CliftonStrengthsData) -> None:
+        """Populate top_10 from a ranked list in text if not already done."""
+        if data.top_10:
+            return
+        strength_pattern = r"(\d{1,2})\.\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)"
+        matches = re.findall(strength_pattern, text)
+        seen: set[int] = set()
+        for rank_str, name in matches:
+            rank = int(rank_str)
+            name = name.strip()
+            if name in STRENGTH_TO_DOMAIN and rank not in seen and rank <= 10:
+                seen.add(rank)
+                data.top_10.append(
+                    StrengthInsight(
+                        rank=rank,
+                        name=name,
+                        domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
+                    )
+                )
+        data.top_10.sort(key=lambda x: x.rank)
+        if not data.top_5 and len(data.top_10) >= 5:
+            data.top_5 = list(data.top_10[:5])
+
+    def _split_personalized_insights(self, text: str) -> list[str]:
+        """Split personalized insights text into individual paragraphs.
+
+        Each paragraph typically starts with one of these openers:
+        "Chances are good that", "Driven by your talents", etc.
+        """
+        openers = [
+            r"Chances are good that",
+            r"Driven by your talents",
+            r"Because of your strengths",
+            r"It's very likely that",
+            r"Instinctively",
+            r"By nature",
+        ]
+        pattern = r"(?=" + "|".join(openers) + r")"
+        parts = re.split(pattern, text)
+        return [p.strip() for p in parts if p.strip() and len(p.strip()) > 30]
+
+    def _clean_copyright(self, text: str) -> str:
+        """Remove copyright lines and page numbers from extracted PDF text."""
+        text = re.sub(
+            r"\d*\s*\n?\s*StrengthsFinder.*?reserved\.\s*\n?",
+            " ",
+            text,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        text = re.sub(r"101360652.*?\n", " ", text)
+        text = re.sub(r"®", "", text)
+        return text
+
+    def _parse_action_planning(self, text: str, data: CliftonStrengthsData) -> None:
+        """Parse Action Planning Top 10 report.
+
+        Extracts three types of unique content:
+        - Section I: Personalized Strengths Insights (unique_insights)
+        - Section II: 10 Ideas for Action per strength (action_items)
+        - Section III: "Sounds Like This" quotes (sounds_like_quotes)
+        """
+        self._ensure_top_10(text, data)
+        self._parse_ap_personalized_insights(text, data)
+        self._parse_ap_ideas_for_action(text, data)
+        self._parse_ap_sounds_like(text, data)
+
+    def _parse_ap_personalized_insights(
+        self,
+        text: str,
+        data: CliftonStrengthsData,
+    ) -> None:
+        """Parse Section I — personalized insights for each strength."""
+        section_i = re.search(r"Section I:\s*Awareness", text)
+        section_ii = re.search(r"Section II:\s*Application", text)
+        if not section_i:
+            return
+
+        start = section_i.end()
+        end = section_ii.start() if section_ii else len(text)
+        section_text = self._clean_copyright(text[start:end])
+
+        for insight in data.top_10:
+            # Find this strength's personalized insights block
+            pattern = re.compile(
+                rf"{re.escape(insight.name)}\s*\n.*?"
+                r"YOUR PERSONALIZED STRENGTHS INSIGHTS",
+                re.DOTALL | re.IGNORECASE,
+            )
+            match = pattern.search(section_text)
+            if not match:
+                continue
+
+            # Extract from after "What makes you stand out?" to next "QUESTIONS"
+            block_start = match.end()
+            # Skip the "What makes you stand out?" header if present
+            standout = re.search(
+                r"What makes you stand out\?",
+                section_text[block_start:],
+            )
+            if standout and standout.start() < 50:
+                block_start += standout.end()
+
+            questions_pos = section_text.find("QUESTIONS", block_start)
+            if questions_pos == -1:
+                questions_pos = len(section_text)
+
+            raw = section_text[block_start:questions_pos]
+            paragraphs = self._split_personalized_insights(raw)
+            if paragraphs:
+                insight.unique_insights = [self._clean_text(p) for p in paragraphs]
+
+    def _parse_ap_ideas_for_action(
+        self,
+        text: str,
+        data: CliftonStrengthsData,
+    ) -> None:
+        """Parse Section II — 10 Ideas for Action per strength."""
+        section_ii = re.search(r"Section II:\s*Application", text)
+        section_iii = re.search(r"Section III:\s*Achievement", text)
+        if not section_ii:
+            return
+
+        start = section_ii.end()
+        end = section_iii.start() if section_iii else len(text)
+        section_text = self._clean_copyright(text[start:end])
+
+        for insight in data.top_10:
+            # Find "StrengthName\nIDEAS FOR ACTION"
+            pattern = re.compile(
+                rf"(?:^|\n)\s*{re.escape(insight.name)}\s*\n\s*IDEAS FOR ACTION",
+                re.IGNORECASE,
+            )
+            match = pattern.search(section_text)
+            if not match:
+                continue
+
+            # Extract from after "IDEAS FOR ACTION" to next "QUESTIONS"
+            ideas_start = section_text.find("IDEAS FOR ACTION", match.start())
+            ideas_start = section_text.find("\n", ideas_start) + 1
+
+            questions_pos = section_text.find("QUESTIONS", ideas_start)
+            if questions_pos == -1:
+                questions_pos = len(section_text)
+
+            raw = section_text[ideas_start:questions_pos]
+
+            # Split into individual action items by paragraph breaks
+            items = [
+                self._clean_text(item)
+                for item in re.split(r"\n\s*\n", raw)
+                if item.strip() and len(item.strip()) > 30
+            ]
+
+            # Replace existing (3 from ALL_34) with the richer set
+            if items:
+                insight.action_items = items
+
+    def _parse_ap_sounds_like(
+        self,
+        text: str,
+        data: CliftonStrengthsData,
+    ) -> None:
+        """Parse Section III — 'Sounds Like This' real quotes per strength."""
+        section_iii = re.search(r"Section III:\s*Achievement", text)
+        if not section_iii:
+            return
+
+        section_text = self._clean_copyright(text[section_iii.end() :])
+
+        for insight in data.top_10:
+            # Find "[STRENGTH] SOUNDS LIKE THIS:"
+            pattern = re.compile(
+                rf"{re.escape(insight.name.upper())}\s+SOUNDS LIKE THIS:",
+                re.IGNORECASE,
+            )
+            match = pattern.search(section_text)
+            if not match:
+                continue
+
+            # Find end: next "SOUNDS LIKE THIS:" or "QUESTIONS" or end
+            remaining = section_text[match.end() :]
+            next_marker = re.search(
+                r"[A-Z][A-Z-]+\s+SOUNDS LIKE THIS:|QUESTIONS",
+                remaining,
+            )
+            raw = remaining[: next_marker.start()] if next_marker else remaining
+
+            # Split into individual quotes by attribution pattern:
+            # "FirstName L., title:"
+            quote_splits = re.split(
+                r"(?=\n[A-Z][a-z]+\s+[A-Z]\.?,\s+)",
+                raw,
+            )
+            quotes = []
+            for part in quote_splits:
+                cleaned = self._clean_text(part)
+                if cleaned and len(cleaned) > 40:
+                    quotes.append(cleaned)
+
+            if quotes:
+                insight.sounds_like_quotes = quotes
+
+    def _parse_leadership_insight(
+        self,
+        text: str,
+        data: CliftonStrengthsData,
+    ) -> None:
+        """Parse Leadership Insight report (fallback for personalized insights).
+
+        Only extracts if Action Planning hasn't already populated unique_insights.
+        """
+        self._ensure_top_10(text, data)
+
+        # Skip if insights already populated by Action Planning
+        if any(s.unique_insights for s in data.top_10):
+            logger.debug(
+                "Personalized insights already populated, skipping Leadership Insight",
+            )
+            return
+
+        # Find "Your Personalized Strengths Insights" header
+        header = re.search(r"Your Personalized Strengths Insights", text)
+        if not header:
+            return
+
+        section_text = self._clean_copyright(text[header.end() :])
+
+        for i, insight in enumerate(data.top_10):
+            # Headers are "STRENGTH ®" (uppercase)
+            pattern = re.compile(
+                rf"{re.escape(insight.name.upper())}\s+",
+                re.IGNORECASE,
+            )
+            match = pattern.search(section_text)
+            if not match:
+                continue
+
+            # Find end: next strength header or COPYRIGHT STANDARDS
+            end_pos = len(section_text)
+            if i + 1 < len(data.top_10):
+                next_pattern = re.compile(
+                    rf"{re.escape(data.top_10[i + 1].name.upper())}\s+",
+                    re.IGNORECASE,
+                )
+                next_match = next_pattern.search(section_text[match.end() :])
+                if next_match:
+                    end_pos = match.end() + next_match.start()
+
+            copyright_pos = section_text.find("COPYRIGHT STANDARDS", match.end())
+            if copyright_pos != -1 and copyright_pos < end_pos:
+                end_pos = copyright_pos
+
+            raw = section_text[match.end() : end_pos]
+            paragraphs = self._split_personalized_insights(raw)
+            if paragraphs:
+                insight.unique_insights = [self._clean_text(p) for p in paragraphs]
+
+    def _parse_discovery_development(
+        self,
+        text: str,
+        data: CliftonStrengthsData,
+    ) -> None:
+        """Parse Discovery Development report (fallback for action items, top 5 only).
+
+        Only extracts if Action Planning hasn't already populated rich action items.
+        """
+        # Ensure top_5 exists
+        if not data.top_5:
+            # Extract from "StrengthName ®" headers
+            strength_pattern = r"(\w+(?:-\w+)?)\s+®"
+            matches = re.findall(strength_pattern, text)
+            seen: set[str] = set()
+            rank = 1
+            for name in matches:
+                name = name.strip()
+                if name in STRENGTH_TO_DOMAIN and name not in seen and rank <= 5:
+                    seen.add(name)
+                    data.top_5.append(
+                        StrengthInsight(
+                            rank=rank,
+                            name=name,
+                            domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
+                        )
+                    )
+                    rank += 1
+
+        # Skip if action items already rich (from Action Planning)
+        if any(len(s.action_items) > 5 for s in data.top_5):
+            logger.debug(
+                "Rich action items already populated, skipping Discovery Development",
+            )
+            return
+
+        section_text = self._clean_copyright(text)
+
+        for insight in data.top_5:
+            # Find "ACTION ITEMS" after strength name
+            pattern = re.compile(
+                rf"{re.escape(insight.name)}\s+.*?ACTION ITEMS\s*\n",
+                re.DOTALL | re.IGNORECASE,
+            )
+            match = pattern.search(section_text)
+            if not match:
+                continue
+
+            # Find end: next "StrengthName ®" header or end of text
+            remaining = section_text[match.end() :]
+            next_strength = re.search(r"\n\s*\w+(?:-\w+)?\s+®", remaining)
+            raw = remaining[: next_strength.start()] if next_strength else remaining
+
+            items = [
+                self._clean_text(item)
+                for item in re.split(r"\n\s*\n", raw)
+                if item.strip() and len(item.strip()) > 30
+            ]
+
+            if items:
+                insight.action_items = items
 
     def _parse_strength_details(self, text: str, data: CliftonStrengthsData) -> None:
         """Parse detailed insights for each strength from text."""
@@ -492,6 +823,49 @@ class CliftonStrengthsGatherer(BaseGatherer):
                 for item in insight.blind_spots[:2]:  # Limit to top 2
                     lines.append(f"- {item}")
                 lines.append("")
+
+        # Personalized talent patterns (from Action Planning / Leadership Insight)
+        all_strengths = data.top_10 if data.top_10 else data.top_5
+        has_personalized = any(s.unique_insights for s in all_strengths)
+        if has_personalized:
+            lines.append("## Personalized Talent Patterns\n")
+            lines.append(
+                "Your specific talent manifestations based on your unique"
+                " CliftonStrengths combination:\n"
+            )
+            for insight in all_strengths:
+                if insight.unique_insights:
+                    lines.append(
+                        f"### {insight.rank}. {insight.name} -- What Makes You Stand Out\n"
+                    )
+                    for paragraph in insight.unique_insights:
+                        lines.append(f"{paragraph}\n")
+
+        # Extended Ideas for Action (from Action Planning / Discovery Development)
+        has_extended = any(len(s.action_items) > 3 for s in all_strengths)
+        if has_extended:
+            lines.append("## Extended Ideas for Action\n")
+            lines.append("Comprehensive action items for developing each strength:\n")
+            for insight in all_strengths:
+                if len(insight.action_items) > 3:
+                    lines.append(f"### {insight.rank}. {insight.name}\n")
+                    for i, item in enumerate(insight.action_items, 1):
+                        lines.append(f"{i}. {item}")
+                    lines.append("")
+
+        # Strengths in Practice — real-world quotes (from Action Planning)
+        has_quotes = any(s.sounds_like_quotes for s in all_strengths)
+        if has_quotes:
+            lines.append("## Strengths in Practice\n")
+            lines.append(
+                "Real quotes from people who share your top themes,"
+                " showing how these strengths manifest:\n"
+            )
+            for insight in all_strengths:
+                if insight.sounds_like_quotes:
+                    lines.append(f"### {insight.rank}. {insight.name}\n")
+                    for quote in insight.sounds_like_quotes:
+                        lines.append(f"> {quote}\n")
 
         # Top 10 (6-10 only)
         if data.top_10 and len(data.top_10) > 5:

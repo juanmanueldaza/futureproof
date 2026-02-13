@@ -4,9 +4,11 @@ Combines prompt-toolkit for input handling with Rich for output display.
 Provides both sync and async chat loops for different use cases.
 """
 
+import re
 from pathlib import Path
 from typing import Any, cast
 
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from prompt_toolkit import PromptSession
@@ -31,6 +33,98 @@ from futureproof.llm.fallback import get_fallback_manager
 from futureproof.memory.checkpointer import get_data_dir
 
 console = Console()
+
+# Known section headers from SummarizationMiddleware output.
+# The LLM sometimes echoes these verbatim at the start of a response.
+_SUMMARY_SECTIONS = (
+    "session intent",
+    "summary",
+    "artifacts",
+    "next steps",
+    "key context",
+)
+
+# Detects period immediately followed by a capital letter (no space) — a sign
+# that the LLM concatenated summary content with the real response.
+# Matches ".I " (pronoun), ".The", ".However", etc.
+_CONCAT_RE = re.compile(r"\.([A-Z](?:[a-z]| ))")
+
+
+def _is_summary_echo(text: str) -> bool:
+    """Detect if text starts with a SummarizationMiddleware echo.
+
+    Matches two patterns:
+    1. "Here is a summary of the conversation..." preamble
+    2. Direct section headers like "SESSION INTENT" at the start
+    """
+    lower = text.lower().lstrip()
+    # Pattern 1: explicit summary preamble
+    if lower.startswith(("here is a summary", "here's a summary", "summary of the conversation")):
+        return True
+    # Pattern 2: starts with a known summary section header
+    first_line = lower.split("\n", 1)[0].strip().strip("#*").strip()
+    return first_line in _SUMMARY_SECTIONS
+
+
+def _strip_summary_echo(text: str) -> str:
+    """Remove an echoed conversation summary from the start of a response.
+
+    When SummarizationMiddleware compresses history, the LLM sometimes echoes
+    the injected summary verbatim before giving its real answer. This function
+    detects that pattern and returns only the real answer portion.
+
+    Returns the cleaned text, or empty string if the entire text so far is
+    still part of the summary (caller should skip the display update).
+    """
+    if not _is_summary_echo(text):
+        return text
+
+    # Find the position just after the last summary section header in the text.
+    # Section headers appear as standalone lines like "SESSION INTENT", "SUMMARY",
+    # "NEXT STEPS", etc. (possibly with markdown formatting).
+    last_header_end = 0
+    for section in _SUMMARY_SECTIONS:
+        pattern = re.compile(
+            r"^[#*\s]*" + re.escape(section) + r"[*\s]*$",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        for match in pattern.finditer(text):
+            if match.end() > last_header_end:
+                last_header_end = match.end()
+
+    if last_header_end == 0:
+        return text
+
+    # Content after the last section header — this contains the section body
+    # and potentially the real response concatenated to it.
+    remaining = text[last_header_end:]
+
+    # Check for period-capital concatenation (e.g., "...for each.I can't debug...")
+    # This happens when the LLM glues the last summary bullet to the real response.
+    concat_match = _CONCAT_RE.search(remaining)
+    if concat_match:
+        return remaining[concat_match.start() + 1 :]
+
+    # Look for a double-newline boundary: the first paragraph block is section
+    # content, subsequent blocks that aren't section headers are the real response.
+    blocks = remaining.split("\n\n")
+    found_content = False
+    for i, block in enumerate(blocks):
+        if not block.strip():
+            continue
+        if not found_content:
+            found_content = True
+            continue
+        # If this block is another summary section header, skip it and its content
+        header_text = block.strip().lower().strip("#*").strip()
+        if header_text in _SUMMARY_SECTIONS:
+            found_content = False  # next non-empty block is this section's content
+            continue
+        # Real response
+        return "\n\n".join(blocks[i:])
+
+    # Everything parsed so far is still summary
+    return ""
 
 
 def get_history_path() -> Path:
@@ -91,40 +185,87 @@ def _stream_response(
     """
     full_response = ""
     shown_tools: set[str] = set()
+    last_node = ""
+    current_msg_id: str | None = None
+    current_msg_buf = ""
 
-    with Live(Markdown(""), console=console, refresh_per_second=10) as live:
-        for chunk, metadata in agent.stream(
+    def _verbose_print(chunk, metadata) -> bool:
+        """Print verbose tool/node info. Returns True if chunk was consumed."""
+        nonlocal last_node
+        node = metadata.get("langgraph_node", "")
+        if node and node != last_node:
+            console.print(f"[dim]@ {node}[/dim]")
+            last_node = node
+        tool_calls = getattr(chunk, "tool_calls", None)
+        if tool_calls:
+            for tc in tool_calls:
+                name = tc.get("name", "unknown")
+                if name not in shown_tools:
+                    shown_tools.add(name)
+                    args = tc.get("args", {})
+                    args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if args else ""
+                    console.print(f"[dim]> {name}({args_str})[/dim]")
+        if getattr(chunk, "type", None) == "tool":
+            tool_content = getattr(chunk, "content", "")
+            tool_name = getattr(chunk, "name", "tool")
+            if tool_content:
+                preview = (tool_content[:150] + "...") if len(tool_content) > 150 else tool_content
+                console.print(f"[dim]< {tool_name}: {preview}[/dim]")
+            return True
+        return False
+
+    def _accumulate(chunk) -> str:
+        """Extract content from chunk, track per-message buffer."""
+        nonlocal current_msg_id, current_msg_buf, full_response
+        if not (hasattr(chunk, "content") and chunk.content):  # type: ignore[union-attr]
+            return ""
+        content = chunk.content  # type: ignore[union-attr]
+        if isinstance(content, list):
+            content = "".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            )
+        chunk_id = getattr(chunk, "id", None)
+        if chunk_id and chunk_id != current_msg_id:
+            current_msg_id = chunk_id
+            current_msg_buf = ""
+        full_response += content
+        current_msg_buf += content
+        return content
+
+    def _stream_iter():
+        return agent.stream(
             input_message,
             cast(RunnableConfig, config),
             stream_mode="messages",
-        ):
-            # Show tool calls in verbose mode
-            tool_calls = getattr(chunk, "tool_calls", None)
-            if verbose and tool_calls:
-                for tool_call in tool_calls:
-                    tool_name = tool_call.get("name", "unknown")
-                    if tool_name not in shown_tools:
-                        shown_tools.add(tool_name)
-                        live.stop()
-                        console.print(f"[dim]🔧 Using tool: {tool_name}[/dim]")
-                        live.start()
+        )
 
-            # Only accumulate AI message content, not tool messages
-            chunk_type = getattr(chunk, "type", None)
-            if chunk_type == "tool":
+    if verbose:
+        # Verbose mode: print tool info directly, no Live widget.
+        # This avoids the flicker/duplication caused by Live re-rendering
+        # its content every time live.console.print() is called.
+        for chunk, metadata in _stream_iter():
+            if _verbose_print(chunk, metadata):
                 continue
+            _accumulate(chunk)
+        # Render only the final AI response once
+        display_text = _strip_summary_echo(current_msg_buf)
+        if display_text:
+            console.print()
+            console.print(Markdown(display_text))
+    else:
+        # Non-verbose: stream with Live in-place rendering.
+        with Live(Markdown(""), console=console, refresh_per_second=10) as live:
+            for chunk, metadata in _stream_iter():
+                if getattr(chunk, "type", None) == "tool":
+                    continue
+                if _accumulate(chunk):
+                    display_text = _strip_summary_echo(current_msg_buf)
+                    if display_text:
+                        live.update(Markdown(display_text))
 
-            if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
-                content = chunk.content  # type: ignore[union-attr]
-                # Handle Gemini's structured content format
-                if isinstance(content, list):
-                    content = "".join(
-                        block.get("text", "") if isinstance(block, dict) else str(block)
-                        for block in content
-                    )
-                full_response += content
-                live.update(Markdown(full_response))
-
+    # Use the cleaned version as the final response
+    full_response = _strip_summary_echo(full_response) or full_response
     console.print()  # Blank line after response
 
     # Check for human-in-the-loop interrupts
@@ -198,7 +339,7 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
             # Send to agent and stream response
             console.print()  # Blank line before response
 
-            input_message = {"messages": [{"role": "user", "content": user_input}]}
+            input_message = {"messages": [HumanMessage(content=user_input)]}
 
             # Collect full response for markdown rendering
             full_response = ""
@@ -295,9 +436,11 @@ async def run_chat_async(thread_id: str = "main") -> None:
             # Send to agent and stream response
             console.print()
 
-            input_message = {"messages": [{"role": "user", "content": user_input}]}
+            input_message: Any = {"messages": [HumanMessage(content=user_input)]}
 
             full_response = ""
+            current_msg_id: str | None = None
+            current_msg_buf = ""
 
             try:
                 with Live(Markdown(""), console=console, refresh_per_second=10) as live:
@@ -306,7 +449,9 @@ async def run_chat_async(thread_id: str = "main") -> None:
                         cast(RunnableConfig, config),
                         stream_mode="messages",
                     ):
-                        # chunk can be AIMessageChunk or str depending on stream mode
+                        # Skip tool message chunks
+                        if getattr(chunk, "type", None) == "tool":
+                            continue
                         if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
                             content = chunk.content  # type: ignore[union-attr]
                             # Handle Gemini's structured content format
@@ -315,8 +460,16 @@ async def run_chat_async(thread_id: str = "main") -> None:
                                     block.get("text", "") if isinstance(block, dict) else str(block)
                                     for block in content
                                 )
+                            # Only display the latest AI message
+                            chunk_id = getattr(chunk, "id", None)
+                            if chunk_id and chunk_id != current_msg_id:
+                                current_msg_id = chunk_id
+                                current_msg_buf = ""
                             full_response += content
-                            live.update(Markdown(full_response))
+                            current_msg_buf += content
+                            display_text = _strip_summary_echo(current_msg_buf)
+                            if display_text:
+                                live.update(Markdown(display_text))
 
                 console.print()
 
@@ -346,9 +499,11 @@ def ask(question: str, thread_id: str = "main") -> str:
     agent = create_career_agent()
     config = get_agent_config(thread_id=thread_id)
 
-    input_message = {"messages": [{"role": "user", "content": question}]}
+    input_message: Any = {"messages": [HumanMessage(content=question)]}
 
     full_response = ""
+    current_msg_id: str | None = None
+    current_msg_buf = ""
 
     with Live(Markdown(""), console=console, refresh_per_second=10) as live:
         for chunk, metadata in agent.stream(
@@ -356,7 +511,8 @@ def ask(question: str, thread_id: str = "main") -> str:
             cast(RunnableConfig, config),
             stream_mode="messages",
         ):
-            # chunk can be AIMessageChunk or str depending on stream mode
+            if getattr(chunk, "type", None) == "tool":
+                continue
             if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
                 content = chunk.content  # type: ignore[union-attr]
                 # Handle Gemini's structured content format
@@ -365,8 +521,15 @@ def ask(question: str, thread_id: str = "main") -> str:
                         block.get("text", "") if isinstance(block, dict) else str(block)
                         for block in content
                     )
+                chunk_id = getattr(chunk, "id", None)
+                if chunk_id and chunk_id != current_msg_id:
+                    current_msg_id = chunk_id
+                    current_msg_buf = ""
                 full_response += content
-                live.update(Markdown(full_response))
+                current_msg_buf += content
+                display_text = _strip_summary_echo(current_msg_buf)
+                if display_text:
+                    live.update(Markdown(display_text))
 
     console.print()
-    return full_response
+    return _strip_summary_echo(full_response) or full_response

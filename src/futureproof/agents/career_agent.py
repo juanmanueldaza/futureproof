@@ -1,11 +1,11 @@
-"""Career Intelligence Agent using multi-agent supervisor pattern.
+"""Career Intelligence Agent.
 
-This module implements a multi-agent architecture with:
-- A Supervisor agent that handles profile, analysis, generation, and memory
-- A Research agent that handles data gathering, knowledge search, and market intelligence
-- Handoff tools for seamless transfer between agents
-- SummarizationMiddleware for automatic context management
-- InMemoryStore for cross-thread episodic memory
+Single agent with all career intelligence tools — profile management,
+analysis, CV generation, data gathering, knowledge search, market
+intelligence, memory, and daemon control.
+
+Uses LangChain's create_agent() with SummarizationMiddleware for automatic
+context management and InMemoryStore for cross-thread episodic memory.
 
 Usage:
     from futureproof.agents.career_agent import create_career_agent, get_agent_config
@@ -19,18 +19,14 @@ Usage:
 """
 
 import logging
-from typing import Any, Literal, NotRequired, cast
+from typing import Any, cast
 
-from langchain.agents import AgentState, create_agent
+from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware
-from langchain.messages import AIMessage, ToolMessage
-from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command
 
-from futureproof.agents.tools import get_research_tools, get_supervisor_tools
+from futureproof.agents.tools import get_all_tools
 from futureproof.llm.fallback import get_model_with_fallback
 from futureproof.memory.checkpointer import get_checkpointer
 from futureproof.memory.profile import load_profile
@@ -43,114 +39,117 @@ _cached_agent = None
 
 
 # =============================================================================
-# System Prompts
+# System Prompt
 # =============================================================================
 
-SUPERVISOR_PROMPT = """You are FutureProof, an intelligent career advisor and team supervisor.
+SYSTEM_PROMPT = """You are FutureProof, an intelligent career advisor.
 
 ## Your Role
 You help users navigate their career by:
 - Managing their profile (skills, goals, target roles)
-- Analyzing skill gaps and career alignment
+- Gathering career data from GitHub, GitLab, portfolio sites, LinkedIn, and assessments
+- Searching and managing a career knowledge base
+- Analyzing skill gaps, career alignment, and market positioning
 - Generating tailored CVs
+- Searching job markets, tech trends, and salary data
 - Providing strategic career advice
 - Remembering decisions and preferences
 
 ## User Profile
 {user_profile}
 
-## Team
-You have a Research agent that handles data gathering and job market research.
-Use `transfer_to_research` when the user needs:
-- Fresh data from GitHub, GitLab, or portfolio sites
-- Job market searches or salary information
-- Tech trends and hiring patterns
-- Knowledge base searches about the user's background
+## Your Tools
+
+### Profile Management
+- `get_user_profile` — View current profile
+- `update_user_name`, `update_current_role`, `update_user_skills` — Update profile fields
+- `set_target_roles`, `update_user_goal` — Set career targets
+
+### Data Gathering
+- `gather_github_data`, `gather_gitlab_data`, `gather_portfolio_data` — Fetch from sources
+- `gather_linkedin_data` — Process LinkedIn export ZIP from data/raw/
+- `gather_assessment_data` — Process CliftonStrengths Gallup PDFs from data/raw/
+- `gather_all_career_data` — Gather from all sources (auto-detects LinkedIn/Gallup files)
+- `get_stored_career_data` — Check what data is already stored
+
+### Knowledge Base
+- `search_career_knowledge` — Search indexed career data (supports source filtering)
+- `get_knowledge_stats` — Show indexing statistics
+- `index_career_knowledge` — Index gathered data for search
+- `clear_career_knowledge` — Clear indexed data (with confirmation)
+
+### Analysis
+- `analyze_skill_gaps` — Identify gaps for a target role
+- `analyze_career_alignment` — Assess career trajectory alignment
+- `get_career_advice` — Get strategic career advice
+- `analyze_market_fit` — Compare profile against market demands
+- `analyze_market_skills` — Analyze skills vs market requirements
+
+### CV Generation
+- `generate_cv_draft` — Quick CV draft for a target role
+- `generate_cv` — Full CV generation (with confirmation)
+
+### Market Intelligence
+- `search_jobs` — Search job listings
+- `get_tech_trends` — Get technology trend data
+- `get_salary_insights` — Get salary information
+- `gather_market_data` — Comprehensive market data gathering
+
+### Memory
+- `remember_decision` — Record a career decision
+- `remember_job_application` — Record a job application
+- `recall_memories` — Search past decisions and applications
+- `get_memory_stats` — View memory statistics
+
+### Daemon
+- `get_daemon_status` — Check background intelligence daemon
+- `get_pending_insights` — View pending background discoveries
+- `run_daemon_job` — Manually trigger a background job (with confirmation)
+
+## Knowledge Base Sources
+When using `search_career_knowledge`, use the `sources` filter to target the right data:
+- **"assessment"**: CliftonStrengths themes, strengths insights, action items, blind spots
+- **"github"**: GitHub repositories, contributions, code projects
+- **"gitlab"**: GitLab projects and contributions
+- **"linkedin"**: Work history, education, certifications, recommendations
+- **"portfolio"**: Portfolio website content, personal projects
+
+For CliftonStrengths or strengths-related queries, always filter with `sources=["assessment"]`.
+
+## IMPORTANT: Always check data before responding
+Before saying you don't have information about the user (strengths, skills, experience,
+assessments, projects, etc.), ALWAYS search the knowledge base first. The user's
+CliftonStrengths, GitHub projects, portfolio data, and other gathered information are
+stored in the knowledge base — not in the profile. Never assume data is missing without
+searching for it.
 
 ## Guidelines
 1. **Be conversational**: Be helpful and natural.
-2. **Delegate research**: Transfer to Research agent for data gathering and searches.
-3. **Be proactive**: If you notice something relevant, mention it.
-4. **Remember context**: Reference past conversations and decisions when relevant.
-5. **Be honest**: If you don't know something, say so clearly.
-6. **Stay focused**: You're a career advisor, not a general assistant.
+2. **Use the right tool**: Each task has a dedicated tool — use it directly.
+   Don't approximate (e.g., don't use `search_career_knowledge` instead of
+   `analyze_skill_gaps` for analysis tasks).
+3. **Complete all requested tasks**: When the user asks for multiple steps, execute
+   ALL of them using the appropriate tools. Do not stop partway and ask for confirmation
+   to continue — just do them all. Only pause for HITL interrupts.
+4. **Index after gathering**: After gathering new data, index it into the knowledge base
+   so it becomes searchable.
+5. **Populate profile after gathering**: If the user profile is empty or incomplete after
+   gathering data, search the knowledge base for key profile information (name, current role,
+   skills, years of experience) and populate the profile using the profile tools. Use LinkedIn
+   and GitHub data as primary sources for this.
+6. **Be proactive**: If you notice something relevant, mention it.
+7. **Remember context**: Reference past conversations and decisions when relevant.
+8. **Be honest**: If you don't know something, say so clearly.
+9. **Stay focused**: You're a career advisor, not a general assistant.
+10. **Never echo internal state**: If you see a conversation summary in your context,
+   use it for context only. NEVER repeat, quote, or display it in your response.
+   Start your reply directly addressing the user's latest message.
 
 ## Response Style
 - Keep responses concise but informative
 - Use markdown for formatting when helpful
 - Suggest next steps when appropriate
 """
-
-RESEARCH_PROMPT = """You are the Research agent for FutureProof, a career intelligence system.
-
-## Your Role
-You gather and search for career-related information:
-- Fetch fresh data from GitHub, GitLab, and portfolio sites
-- Search the career knowledge base for the user's skills and experience
-- Search the job market for relevant opportunities
-- Find tech trends and salary information
-
-## Guidelines
-1. **Be thorough**: Gather complete data when asked.
-2. **Summarize findings**: Present results clearly and concisely.
-3. **Transfer back**: After completing research, transfer back to the supervisor
-   using `transfer_to_supervisor` so it can advise the user.
-4. **Report issues**: If data sources are unavailable, say so clearly.
-"""
-
-
-# =============================================================================
-# Multi-Agent State
-# =============================================================================
-
-
-class MultiAgentState(AgentState):
-    """State for the multi-agent supervisor graph."""
-
-    active_agent: NotRequired[str]
-
-
-# =============================================================================
-# Handoff Tools
-# =============================================================================
-
-
-@tool
-def transfer_to_research(runtime: ToolRuntime) -> Command:
-    """Transfer to research agent for data gathering and market intelligence."""
-    last_ai_message = next(
-        (msg for msg in reversed(runtime.state["messages"]) if isinstance(msg, AIMessage)),
-        None,
-    )
-    transfer_message = ToolMessage(
-        content="Transferring to research agent",
-        tool_call_id=runtime.tool_call_id,
-    )
-    messages = [last_ai_message, transfer_message] if last_ai_message else [transfer_message]
-    return Command(
-        goto="research_agent",
-        update={"active_agent": "research_agent", "messages": messages},
-        graph=Command.PARENT,
-    )
-
-
-@tool
-def transfer_to_supervisor(runtime: ToolRuntime) -> Command:
-    """Transfer back to the supervisor agent with research results."""
-    last_ai_message = next(
-        (msg for msg in reversed(runtime.state["messages"]) if isinstance(msg, AIMessage)),
-        None,
-    )
-    transfer_message = ToolMessage(
-        content="Research complete, transferring back to supervisor",
-        tool_call_id=runtime.tool_call_id,
-    )
-    messages = [last_ai_message, transfer_message] if last_ai_message else [transfer_message]
-    return Command(
-        goto="supervisor",
-        update={"active_agent": "supervisor", "messages": messages},
-        graph=Command.PARENT,
-    )
 
 
 # =============================================================================
@@ -171,33 +170,36 @@ def _get_user_profile_context() -> str:
     return profile.summary() if profile.name else "No profile configured yet."
 
 
-def create_career_agent():
-    """Create the multi-agent career intelligence system (cached singleton).
+def create_career_agent(
+    model=None,
+    checkpointer=None,
+    store=None,
+    profile_context=None,
+):
+    """Create the career intelligence agent (cached singleton).
 
-    Architecture:
-        ┌─────────────────────────────────────────┐
-        │              StateGraph                  │
-        │  ┌──────────┐     ┌──────────────────┐  │
-        │  │Supervisor │◄───►│ Research Agent    │  │
-        │  │  Agent    │     │ (gather, search,  │  │
-        │  │(profile,  │     │  market intel)    │  │
-        │  │ analyze,  │     └──────────────────┘  │
-        │  │ generate, │                           │
-        │  │ memory)   │                           │
-        │  └──────────┘                            │
-        └─────────────────────────────────────────┘
+    Accepts optional dependency overrides for testing. When all args are None
+    (the default), uses the cached singleton for performance.
+
+    Args:
+        model: Optional LLM model override
+        checkpointer: Optional checkpointer override
+        store: Optional InMemoryStore override
+        profile_context: Optional profile context string override
 
     Returns:
-        A compiled multi-agent StateGraph
+        A compiled agent with all career intelligence tools
     """
     global _cached_agent
-    if _cached_agent is not None:
+    using_defaults = all(arg is None for arg in (model, checkpointer, store, profile_context))
+
+    if _cached_agent is not None and using_defaults:
         return _cached_agent
 
-    model = get_model()
-    checkpointer = get_checkpointer()
-    store = get_memory_store()
-    profile_context = _get_user_profile_context()
+    model = model or get_model()
+    checkpointer = checkpointer or get_checkpointer()
+    store = store or get_memory_store()
+    profile_context = profile_context or _get_user_profile_context()
 
     summarization = SummarizationMiddleware(
         model=model,
@@ -205,69 +207,17 @@ def create_career_agent():
         keep=("messages", 20),
     )
 
-    # Create the supervisor agent (profile, analysis, generation, memory)
-    supervisor_agent = create_agent(
+    agent = create_agent(
         model=model,
-        tools=get_supervisor_tools() + [transfer_to_research],
+        tools=get_all_tools(),
         store=store,
-        system_prompt=SUPERVISOR_PROMPT.format(user_profile=profile_context),
+        system_prompt=SYSTEM_PROMPT.format(user_profile=profile_context),
         middleware=[summarization],
+        checkpointer=checkpointer,
     )
 
-    # Create the research agent (gathering, knowledge search, market intel)
-    research_agent = create_agent(
-        model=model,
-        tools=get_research_tools() + [transfer_to_supervisor],
-        store=store,
-        system_prompt=RESEARCH_PROMPT,
-        middleware=[summarization],
-    )
-
-    # Build the multi-agent graph
-    builder: StateGraph = StateGraph(MultiAgentState)
-    builder.add_node("supervisor", supervisor_agent)
-    builder.add_node("research_agent", research_agent)
-
-    # Start with supervisor
-    builder.add_edge(START, "supervisor")
-
-    # Route based on active agent after each step
-    def route_after_agent(
-        state: MultiAgentState,
-    ) -> Literal["supervisor", "research_agent", "__end__"]:
-        active = state.get("active_agent", "supervisor")
-        # Check if the last message indicates the conversation should end
-        messages = state.get("messages", [])
-        if messages and not isinstance(messages[-1], (ToolMessage,)):
-            # If the last message is from an AI (not a tool), and there's no
-            # pending transfer, end the conversation turn
-            last = messages[-1]
-            if isinstance(last, AIMessage) and not last.tool_calls:
-                return "__end__"
-        return active  # type: ignore[return-value]
-
-    builder.add_conditional_edges(
-        "supervisor",
-        route_after_agent,
-        {
-            "supervisor": "supervisor",
-            "research_agent": "research_agent",
-            "__end__": END,
-        },
-    )
-    builder.add_conditional_edges(
-        "research_agent",
-        route_after_agent,
-        {
-            "supervisor": "supervisor",
-            "research_agent": "research_agent",
-            "__end__": END,
-        },
-    )
-
-    agent = builder.compile(checkpointer=checkpointer)
-
-    _cached_agent = agent
+    if using_defaults:
+        _cached_agent = agent
     return agent
 
 

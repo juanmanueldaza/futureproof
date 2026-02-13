@@ -12,6 +12,7 @@ SRP-compliant: Task functions use extracted helpers for:
 - Result key mapping (helpers/result_mapper.py)
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from langgraph.func import entrypoint, task
@@ -144,6 +145,85 @@ def advise_task(state: dict[str, Any]) -> dict[str, Any]:
 
 
 # ============================================================================
+# Action Handlers (extracted from execute_workflow for OCP)
+# ============================================================================
+
+
+def _handle_gather(state: dict[str, Any]) -> dict[str, Any]:
+    """Parallel execution of all career data gatherers."""
+    github_future = gather_github_task()
+    gitlab_future = gather_gitlab_task()
+    portfolio_future = gather_portfolio_task()
+
+    github_result = github_future.result()
+    gitlab_result = gitlab_future.result()
+    portfolio_result = portfolio_future.result()
+
+    updates: dict[str, Any] = {}
+    errors: list[str] = []
+    for result in [github_result, gitlab_result, portfolio_result]:
+        if "error" in result and result["error"]:
+            errors.append(result["error"])
+        else:
+            updates.update(result)
+
+    if errors and not any(k.endswith("_data") for k in updates):
+        updates["error"] = "; ".join(errors)
+
+    return {**state, **updates}
+
+
+def _handle_gather_market(state: dict[str, Any]) -> dict[str, Any]:
+    """Market intelligence gathering."""
+    result = gather_market_task().result()
+    return {**state, **result}
+
+
+def _handle_analyze_market(state: dict[str, Any]) -> dict[str, Any]:
+    """Analyze career data against market intelligence."""
+    result = analyze_market_task(state).result()
+    return {**state, **result}
+
+
+def _handle_analyze(state: dict[str, Any]) -> dict[str, Any]:
+    """General career analysis."""
+    result = analyze_task(state).result()
+    return {**state, **result}
+
+
+def _handle_generate(state: dict[str, Any]) -> dict[str, Any]:
+    """CV generation."""
+    result = generate_task(state).result()
+    return {**state, **result}
+
+
+def _handle_advise(state: dict[str, Any]) -> dict[str, Any]:
+    """Career advice generation."""
+    result = advise_task(state).result()
+    return {**state, **result}
+
+
+# Dispatch tables — add new actions here without modifying execute_workflow.
+# Exact matches are checked first, then prefix matches as fallback.
+_EXACT_HANDLERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "gather": _handle_gather,
+    "gather_all": _handle_gather,
+    "gather_market": _handle_gather_market,
+    "analyze_market": _handle_analyze_market,
+    "analyze_market_fit": _handle_analyze_market,
+    "analyze_skill_gaps": _handle_analyze_market,
+    "analyze_skills": _handle_analyze_market,
+    "analyze_trends": _handle_analyze_market,
+    "generate": _handle_generate,
+    "advise": _handle_advise,
+}
+
+_PREFIX_HANDLERS: list[tuple[str, Callable[[dict[str, Any]], dict[str, Any]]]] = [
+    ("analyze", _handle_analyze),
+]
+
+
+# ============================================================================
 # Entrypoint (replaces StateGraph + conditional routing)
 # ============================================================================
 
@@ -152,7 +232,7 @@ def advise_task(state: dict[str, Any]) -> dict[str, Any]:
 def execute_workflow(state: dict[str, Any]) -> dict[str, Any]:
     """Execute a career intelligence workflow based on the action field.
 
-    Routes to the appropriate task based on state["action"]:
+    Routes to the appropriate task via dispatch tables:
     - gather / gather_all: Parallel data gathering from all sources
     - gather_market: Market intelligence gathering
     - analyze_*: Career or market analysis
@@ -167,55 +247,13 @@ def execute_workflow(state: dict[str, Any]) -> dict[str, Any]:
     """
     action = state.get("action", "")
 
-    if action in ("gather", "gather_all"):
-        # Parallel execution of all gatherers
-        github_future = gather_github_task()
-        gitlab_future = gather_gitlab_task()
-        portfolio_future = gather_portfolio_task()
+    handler = _EXACT_HANDLERS.get(action)
+    if handler:
+        return handler(state)
 
-        github_result = github_future.result()
-        gitlab_result = gitlab_future.result()
-        portfolio_result = portfolio_future.result()
-
-        # Merge results
-        updates: dict[str, Any] = {}
-        errors: list[str] = []
-        for result in [github_result, gitlab_result, portfolio_result]:
-            if "error" in result and result["error"]:
-                errors.append(result["error"])
-            else:
-                updates.update(result)
-
-        if errors and not any(k.endswith("_data") for k in updates):
-            updates["error"] = "; ".join(errors)
-
-        return {**state, **updates}
-
-    if action == "gather_market":
-        result = gather_market_task().result()
-        return {**state, **result}
-
-    if action in (
-        "analyze_market",
-        "analyze_market_fit",
-        "analyze_skill_gaps",
-        "analyze_skills",
-        "analyze_trends",
-    ):
-        result = analyze_market_task(state).result()
-        return {**state, **result}
-
-    if action.startswith("analyze"):
-        result = analyze_task(state).result()
-        return {**state, **result}
-
-    if action == "generate":
-        result = generate_task(state).result()
-        return {**state, **result}
-
-    if action == "advise":
-        result = advise_task(state).result()
-        return {**state, **result}
+    for prefix, prefix_handler in _PREFIX_HANDLERS:
+        if action.startswith(prefix):
+            return prefix_handler(state)
 
     # Unknown action — return state unchanged
     return state

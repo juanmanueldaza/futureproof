@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-FutureProof is a career intelligence CLI tool that gathers professional data from multiple sources (LinkedIn, GitHub, GitLab, portfolio sites) and uses AI to analyze career trajectories, identify gaps, and generate optimized CVs.
+FutureProof is a career intelligence system powered by a conversational AI agent. It gathers professional data from multiple sources (LinkedIn, GitHub, GitLab, portfolio sites, CliftonStrengths), uses AI to analyze career trajectories, identify gaps, and generate optimized CVs — all through an interactive chat interface.
 
 ## Tech Stack
 
 - **Python 3.13** with type hints
 - **LangChain/LangGraph** for AI orchestration
-- **Pydantic** for configuration and validation
-- **Typer** for CLI
+- **Pydantic** for configuration
+- **Typer** for CLI (chat entry point)
 - **pytest** for testing
 - **uv** for package management
 
@@ -18,6 +18,7 @@ FutureProof is a career intelligence CLI tool that gathers professional data fro
 ```
 src/futureproof/
 ├── agents/          # LangGraph orchestration and state management
+│   └── tools/       # Modular agent tools (profile, gathering, analysis, market, etc.)
 ├── chat/            # Interactive chat interface
 ├── gatherers/       # Data collection from external sources
 │   ├── portfolio/   # Decomposed portfolio gatherer (SRP)
@@ -29,33 +30,26 @@ src/futureproof/
 │   ├── knowledge.py # ChromaDB knowledge store (RAG)
 │   ├── episodic.py  # Episodic memory store
 │   └── store.py     # LangGraph InMemoryStore (runtime semantic search)
+├── daemon/          # Background intelligence scheduler
 ├── mcp/             # MCP client implementations
 ├── prompts/         # AI prompt templates
 ├── services/        # Business logic layer
-├── utils/           # Shared utilities (logging, data loading, security)
-└── validation/      # Pydantic input validation models
+└── utils/           # Shared utilities (logging, data loading, security)
 ```
 
 ## Commands
 
 ```bash
-# Run tests
+# Run the chat agent
+futureproof chat
+futureproof chat --verbose      # Show tool usage
+futureproof ask "What are my top skills?"
+
+# Dev commands
 pytest tests/ -q
-
-# Type checking
 pyright src/futureproof
-
-# Linting
 ruff check .
-
-# Fix lint issues
 ruff check . --fix
-
-# Run CLI
-futureproof --help
-futureproof gather all
-futureproof analyze full
-futureproof generate cv
 ```
 
 ## Architecture Principles
@@ -65,32 +59,35 @@ This codebase follows SOLID, DRY, KISS, and YAGNI principles:
 - **SRP**: Each class has a single responsibility (e.g., PortfolioGatherer split into Fetcher, HTMLExtractor, JSExtractor, MarkdownWriter)
 - **OCP**: MCP clients extensible via registry pattern; LLM providers configured declaratively in `FallbackLLMManager`
 - **DIP**: High-level modules depend on `FallbackLLMManager` abstraction with `init_chat_model()` universal factory
-- **DRY**: Service layer eliminates CLI command duplication; CareerDataLoader consolidates data loading
+- **DRY**: Service layer provides shared business logic for all agent tools
 - **ISP**: CareerState split into focused TypedDicts (GatherInput, AnalyzeInput, etc.)
 
 ## Agent Architecture
 
-The chat agent uses a **multi-agent supervisor pattern** built on LangGraph:
+All functionality is accessible through the **chat interface** via a single agent built with LangChain's `create_agent()`:
 
-- **Supervisor agent**: Handles profile management, analysis, CV generation, and memory tools. Routes to research agent when data gathering or market intelligence is needed.
-- **Research agent**: Handles data gathering (GitHub, GitLab, portfolio), knowledge search, and market intelligence (jobs, trends, salaries).
-- **Handoff tools**: `transfer_to_research` and `transfer_to_supervisor` use `Command(goto=..., graph=Command.PARENT)` for inter-agent routing.
-- **Human-in-the-loop**: `interrupt()` on `generate_cv` and `gather_all_career_data` for user confirmation.
+- **Single agent**: One agent with all 35 tools — profile, gathering, analysis, generation, knowledge, market, memory, daemon.
+- **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, `clear_career_knowledge`, and `run_daemon_job` for user confirmation.
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages).
 - **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent).
-- **State**: `add_messages` reducer from `langgraph.graph.message` for message deduplication by ID.
+- **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, GitHub).
 - **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for parallel gatherer execution.
 - **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — supports Azure, Groq, Gemini, Cerebras, SambaNova.
+
+### Agent Tools (35 tools in `agents/tools/`)
+
+- **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
+- **Gathering** (7): `gather_github_data`, `gather_gitlab_data`, `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data`
+- **Knowledge** (4): `search_career_knowledge`, `get_knowledge_stats`, `index_career_knowledge`, `clear_career_knowledge` (HITL)
+- **Analysis** (5): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`, `analyze_market_fit`, `analyze_market_skills`
+- **Generation** (2): `generate_cv` (HITL), `generate_cv_draft`
+- **Market** (4): `search_jobs`, `get_tech_trends`, `get_salary_insights`, `gather_market_data`
+- **Memory** (4): `remember_decision`, `remember_job_application`, `recall_memories`, `get_memory_stats`
+- **Daemon** (3): `get_daemon_status`, `get_pending_insights`, `run_daemon_job` (HITL)
 
 ## Security
 
 The codebase implements security best practices:
-
-### Input Validation
-- All user inputs validated via Pydantic models (`validation/models.py`)
-- GitHub/GitLab usernames validated with strict regex patterns
-- GitLab groups validated before CLI execution to prevent argument injection
-- URLs validated with Pydantic's `HttpUrl` type
 
 ### Prompt Injection Protection
 - User inputs checked for injection patterns before inclusion in LLM prompts
@@ -205,18 +202,13 @@ The knowledge base provides RAG (Retrieval Augmented Generation) for career data
 - Maps source names to file paths in `data/processed/`
 - Methods: `index_source()`, `index_all()`, `search()`, `get_stats()`
 
-### Agent Tools
-
-Two tools available to the career agent (`agents/tools.py`):
+### Agent Tools (`agents/tools/knowledge.py`)
 
 ```python
-@tool
-def search_career_knowledge(query: str, sources: list[str] | None = None, limit: int = 5) -> str:
-    """Search the career knowledge base for relevant information."""
-
-@tool
-def get_knowledge_stats() -> str:
-    """Get statistics about the career knowledge base."""
+search_career_knowledge(query, sources, limit)   # Search indexed career data
+get_knowledge_stats()                              # Show indexing status
+index_career_knowledge(source)                     # Index gathered data
+clear_career_knowledge(source)                     # Clear indexed data (HITL)
 ```
 
 ### Auto-Indexing
@@ -229,14 +221,4 @@ After each gather operation, the `GathererService` automatically indexes the sou
 KNOWLEDGE_AUTO_INDEX=true       # Auto-index after gather (default: true)
 KNOWLEDGE_CHUNK_MAX_TOKENS=500  # Max tokens per chunk
 KNOWLEDGE_CHUNK_MIN_TOKENS=50   # Min tokens per chunk
-```
-
-### CLI Commands
-
-```bash
-futureproof index [SOURCE]      # Index all or specific source
-futureproof knowledge stats     # Show knowledge base stats
-futureproof knowledge search    # Search knowledge base
-futureproof knowledge clear     # Clear indexed data
-futureproof chat --verbose      # Show tool usage during chat
 ```

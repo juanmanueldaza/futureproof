@@ -2,6 +2,7 @@
 
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
@@ -15,79 +16,27 @@ from ..utils.security import anonymize_career_data
 logger = logging.getLogger(__name__)
 
 
-class CVGenerator:
-    """Generate CVs in multiple languages and formats."""
+def render_pdf(markdown_path: Path) -> Path:
+    """Convert markdown to styled PDF.
 
-    def __init__(self) -> None:
-        self.output_dir = settings.output_dir
+    Args:
+        markdown_path: Path to the markdown file to convert
 
-    def _generate_with_llm(
-        self,
-        career_data: str,
-        language: Literal["en", "es"],
-        format: Literal["ats", "creative"],
-    ) -> str:
-        """Generate CV content using LLM."""
-        model, _config = get_model_with_fallback(temperature=settings.cv_temperature)
+    Returns:
+        Path to the generated PDF, or markdown_path if PDF is unavailable.
+    """
+    try:
+        import markdown
+        from weasyprint import HTML
 
-        lang_instruction = {
-            "en": "Generate the CV in English.",
-            "es": "Generate the CV in Spanish (Español). All content should be in Spanish.",
-        }
+        md_content = markdown_path.read_text()
 
-        format_instruction = {
-            "ats": """Focus on ATS optimization:
-- Use standard section headers
-- Include keywords naturally
-- Simple, clean formatting
-- No tables or columns""",
-            "creative": """Use a more creative format:
-- Compelling narrative in summary
-- Highlight unique achievements
-- Show personality while remaining professional""",
-        }
+        html_content = markdown.markdown(
+            md_content,
+            extensions=["tables", "fenced_code"],
+        )
 
-        # Anonymize PII before sending to external LLM
-        # For CV generation, we preserve professional email domains for context
-        safe_career_data = anonymize_career_data(career_data, preserve_professional_emails=True)
-
-        prompt = f"""{GENERATE_CV_PROMPT}
-
-{lang_instruction[language]}
-
-{format_instruction[format]}
-
-CAREER DATA:
-{safe_career_data}
-
-Generate a complete, professional CV in Markdown format."""
-
-        try:
-            response = model.invoke(prompt)
-            return str(response.content)
-        except Exception:
-            # Log full error, show sanitized message to user
-            logger.exception("LLM invocation failed")
-            console.print("[red]CV generation failed. Check logs for details.[/red]")
-            raise
-
-    def _convert_to_pdf(self, markdown_path: Path) -> Path:
-        """Convert markdown to PDF using weasyprint."""
-        try:
-            import markdown
-            from weasyprint import HTML
-
-            # Read markdown
-            md_content = markdown_path.read_text()
-
-            # Convert to HTML
-            html_content = markdown.markdown(
-                md_content,
-                extensions=["tables", "fenced_code"],
-            )
-
-            # Add basic styling
-            styled_html = f"""
+        styled_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -141,19 +90,80 @@ Generate a complete, professional CV in Markdown format."""
 </html>
 """
 
-            # Generate PDF with secure permissions
-            pdf_path = markdown_path.with_suffix(".pdf")
-            HTML(string=styled_html).write_pdf(pdf_path)
-            os.chmod(pdf_path, 0o600)  # Owner read/write only
-            console.print(f"  [dim]PDF generated: {pdf_path}[/dim]")
-            return pdf_path
+        pdf_path = markdown_path.with_suffix(".pdf")
+        HTML(string=styled_html).write_pdf(pdf_path)
+        os.chmod(pdf_path, 0o600)  # Owner read/write only
+        console.print(f"  [dim]PDF generated: {pdf_path}[/dim]")
+        return pdf_path
 
-        except ImportError as e:
-            console.print(f"  [yellow]PDF generation skipped: {e}[/yellow]")
-            return markdown_path
-        except Exception as e:
-            console.print(f"  [yellow]PDF generation failed: {e}[/yellow]")
-            return markdown_path
+    except ImportError as e:
+        console.print(f"  [yellow]PDF generation skipped: {e}[/yellow]")
+        return markdown_path
+    except Exception as e:
+        console.print(f"  [yellow]PDF generation failed: {e}[/yellow]")
+        return markdown_path
+
+
+class CVGenerator:
+    """Generate CVs in multiple languages and formats."""
+
+    def __init__(
+        self,
+        llm_factory: Callable[..., tuple] | None = None,
+        output_dir: Path | None = None,
+    ) -> None:
+        self.output_dir = output_dir or settings.output_dir
+        self._llm_factory = llm_factory or get_model_with_fallback
+
+    def _generate_with_llm(
+        self,
+        career_data: str,
+        language: Literal["en", "es"],
+        format: Literal["ats", "creative"],
+    ) -> str:
+        """Generate CV content using LLM."""
+        model, _config = self._llm_factory(temperature=settings.cv_temperature)
+
+        lang_instruction = {
+            "en": "Generate the CV in English.",
+            "es": "Generate the CV in Spanish (Español). All content should be in Spanish.",
+        }
+
+        format_instruction = {
+            "ats": """Focus on ATS optimization:
+- Use standard section headers
+- Include keywords naturally
+- Simple, clean formatting
+- No tables or columns""",
+            "creative": """Use a more creative format:
+- Compelling narrative in summary
+- Highlight unique achievements
+- Show personality while remaining professional""",
+        }
+
+        # Anonymize PII before sending to external LLM
+        # For CV generation, we preserve professional email domains for context
+        safe_career_data = anonymize_career_data(career_data, preserve_professional_emails=True)
+
+        prompt = f"""{GENERATE_CV_PROMPT}
+
+{lang_instruction[language]}
+
+{format_instruction[format]}
+
+CAREER DATA:
+{safe_career_data}
+
+Generate a complete, professional CV in Markdown format."""
+
+        try:
+            response = model.invoke(prompt)
+            return str(response.content)
+        except Exception:
+            # Log full error, show sanitized message to user
+            logger.exception("LLM invocation failed")
+            console.print("[red]CV generation failed. Check logs for details.[/red]")
+            raise
 
     def generate(
         self,
@@ -197,6 +207,6 @@ Generate a complete, professional CV in Markdown format."""
         console.print(f"  [dim]Markdown saved: {output_path}[/dim]")
 
         # Convert to PDF
-        self._convert_to_pdf(output_path)
+        render_pdf(output_path)
 
         return output_path

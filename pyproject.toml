@@ -14,8 +14,8 @@ dependencies = [
     "langchain>=0.3",
     "langgraph>=0.3",
     "langchain-google-genai>=2",
-    "langchain-openai>=0.3",  # For OpenAI-compatible APIs (Cerebras, SambaNova)
-    "google-generativeai>=0.8",  # For Gemini embeddings (faster than local sentence-transformers)
+    "langchain-openai>=0.3", # For OpenAI-compatible APIs (Cerebras, SambaNova)
+    "google-generativeai>=0.8", # For Gemini embeddings (faster than local sentence-transformers)
     # Data gathering
     "linkedin2md>=0.3",
     "github2md>=0.1",
