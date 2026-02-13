@@ -20,12 +20,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # API Keys (all providers have free tiers)
-    gemini_api_key: str = ""  # https://aistudio.google.com/apikey
-    groq_api_key: str = ""  # https://console.groq.com/keys
-    cerebras_api_key: str = ""  # https://cloud.cerebras.ai/
-    sambanova_api_key: str = ""  # https://cloud.sambanova.ai/
-
     # Azure OpenAI / AI Foundry
     azure_openai_api_key: str = ""  # https://ai.azure.com/
     azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com/
@@ -46,7 +40,7 @@ class Settings(BaseSettings):
     default_language: Literal["en", "es"] = "en"
 
     # LLM Configuration
-    llm_provider: Literal["gemini", "groq", "azure"] = "gemini"
+    llm_provider: Literal["azure"] = "azure"
     llm_model: str = ""  # Empty = use provider default
     llm_temperature: float = 0.3
     cv_temperature: float = 0.2  # Lower for more consistent CV output

@@ -107,22 +107,27 @@ Copy `.env.example` and set your keys:
 cp .env.example .env
 ```
 
-**Minimum (one key is enough):**
+**Minimum:**
 ```bash
-GEMINI_API_KEY=AIza...
+AZURE_OPENAI_API_KEY=abc123...
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_CHAT_DEPLOYMENT=gpt-4.1
+AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 ```
 
 **Recommended:**
 ```bash
-GEMINI_API_KEY=AIza...                          # LLM + embeddings
-GROQ_API_KEY=gsk_...                            # Fast fallback
+AZURE_OPENAI_API_KEY=abc123...                  # LLM + embeddings
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_CHAT_DEPLOYMENT=gpt-4.1
+AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 GITHUB_USERNAME=your_username
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data via MCP
 PORTFOLIO_URL=https://your-site.com
 TAVILY_API_KEY=tvly-...                         # Market research
 ```
 
-The LLM fallback chain tries models in order: Azure GPT-4.1 → Groq Llama 3.3 → Gemini 2.5 Flash → Cerebras → SambaNova. Configure any provider and it works.
+The LLM fallback chain tries Azure models in order: GPT-4.1 → GPT-4.1 Mini, auto-switching on rate limits.
 
 ## Project structure
 
@@ -158,7 +163,7 @@ src/futureproof/
 │   ├── knowledge.py        # ChromaDB knowledge store (RAG)
 │   ├── episodic.py         # ChromaDB episodic memory
 │   ├── chunker.py          # Markdown chunker for indexing
-│   ├── embeddings.py       # Gemini/Azure embedding functions
+│   ├── embeddings.py       # Azure OpenAI embedding functions
 │   ├── checkpointer.py     # SQLite conversation persistence
 │   └── profile.py          # User profile (YAML)
 ├── mcp/                    # 13 MCP clients (GitHub, GitLab, HN, Tavily, job boards)

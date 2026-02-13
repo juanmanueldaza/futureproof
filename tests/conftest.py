@@ -50,10 +50,10 @@ def mock_llm() -> MagicMock:
 
 
 @pytest.fixture
-def mock_llm_with_gemini_format() -> MagicMock:
-    """Mock LLM returning Gemini 3 format (list of dicts)."""
+def mock_llm_with_structured_format() -> MagicMock:
+    """Mock LLM returning structured content format (list of dicts)."""
     mock = MagicMock()
-    mock.invoke.return_value.content = [{"type": "text", "text": "Mocked Gemini 3 response"}]
+    mock.invoke.return_value.content = [{"type": "text", "text": "Mocked structured response"}]
     return mock
 
 

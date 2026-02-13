@@ -1,6 +1,6 @@
 """Embedding functions for ChromaDB vector stores.
 
-Provides fast cloud-based embeddings using Gemini API instead of
+Provides cloud-based embeddings using Azure OpenAI instead of
 slow local sentence-transformers. This significantly improves
 knowledge base search latency from ~30s to ~1-2s.
 
@@ -22,83 +22,6 @@ from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 from futureproof.config import settings
 
 logger = logging.getLogger(__name__)
-
-
-class GeminiEmbeddingFunction(EmbeddingFunction[Documents]):
-    """ChromaDB embedding function using Google Gemini API.
-
-    Uses the gemini-embedding-001 model which is:
-    - Fast (cloud-based, no local computation)
-    - Free tier: 1,500 requests/minute
-    - High quality embeddings (768 dimensions)
-    """
-
-    MODEL_NAME = "models/gemini-embedding-001"
-
-    def __init__(self, api_key: str | None = None) -> None:
-        """Initialize the Gemini embedding function.
-
-        Args:
-            api_key: Google API key. Uses settings.gemini_api_key if not provided.
-        """
-        self._api_key = api_key or settings.gemini_api_key
-        self._client: Any = None
-
-    @property
-    def client(self) -> Any:
-        """Lazy-load the Gemini client."""
-        if self._client is None:
-            try:
-                import warnings
-
-                # Suppress deprecation warning for google.generativeai
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=FutureWarning)
-                    import google.generativeai as genai  # type: ignore[import-untyped]
-
-                genai.configure(api_key=self._api_key)  # type: ignore[no-untyped-call]
-                self._client = genai
-                logger.debug("Gemini embedding client initialized")
-            except ImportError:
-                raise ImportError(
-                    "google-generativeai is required for Gemini embeddings. "
-                    "Install with: pip install google-generativeai"
-                )
-        return self._client
-
-    def __call__(self, input: Documents) -> Embeddings:
-        """Generate embeddings for a list of documents.
-
-        Args:
-            input: List of text documents to embed
-
-        Returns:
-            List of embedding vectors
-        """
-        if not input:
-            return []
-
-        try:
-            # Batch embed all documents
-            result = self.client.embed_content(
-                model=self.MODEL_NAME,
-                content=input,
-                task_type="retrieval_document",
-            )
-
-            embedding = result["embedding"]
-
-            # Handle single string input vs list input
-            # When input is a string, API returns a single embedding (list of floats)
-            # When input is a list, API returns list of embeddings (list of lists)
-            if isinstance(input, str):
-                return [embedding]  # Wrap single embedding in list
-            else:
-                return embedding  # Already a list of embeddings
-
-        except Exception as e:
-            logger.error(f"Gemini embedding failed: {e}")
-            raise
 
 
 class AzureOpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -233,7 +156,7 @@ _embedding_function: EmbeddingFunction[Documents] | None = None
 def get_embedding_function(use_cache: bool = True) -> EmbeddingFunction[Documents]:
     """Get the configured embedding function for ChromaDB.
 
-    Returns Gemini embeddings if API key is available, otherwise falls back
+    Returns Azure OpenAI embeddings if configured, otherwise falls back
     to ChromaDB's default (sentence-transformers, slower but works offline).
 
     Args:
@@ -254,17 +177,10 @@ def get_embedding_function(use_cache: bool = True) -> EmbeddingFunction[Document
             _embedding_function = CachedEmbeddingFunction(base)
         else:
             _embedding_function = base
-    elif settings.gemini_api_key:
-        logger.info("Using Gemini embeddings (fast, cloud-based)")
-        base = GeminiEmbeddingFunction()
-        if use_cache:
-            _embedding_function = CachedEmbeddingFunction(base)
-        else:
-            _embedding_function = base
     else:
         logger.warning(
             "No embedding API configured. Using default embeddings (slow, local). "
-            "Set AZURE_OPENAI_API_KEY or GEMINI_API_KEY for faster performance."
+            "Set AZURE_OPENAI_API_KEY and AZURE_EMBEDDING_DEPLOYMENT for faster performance."
         )
         # Return None to let ChromaDB use its default
         return None  # type: ignore[return-value]

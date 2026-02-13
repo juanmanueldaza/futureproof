@@ -454,7 +454,7 @@ async def run_chat_async(thread_id: str = "main") -> None:
                             continue
                         if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
                             content = chunk.content  # type: ignore[union-attr]
-                            # Handle Gemini's structured content format
+                            # Handle structured content format (list of dicts)
                             if isinstance(content, list):
                                 content = "".join(
                                     block.get("text", "") if isinstance(block, dict) else str(block)
@@ -515,7 +515,7 @@ def ask(question: str, thread_id: str = "main") -> str:
                 continue
             if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
                 content = chunk.content  # type: ignore[union-attr]
-                # Handle Gemini's structured content format
+                # Handle structured content format (list of dicts)
                 if isinstance(content, list):
                     content = "".join(
                         block.get("text", "") if isinstance(block, dict) else str(block)

@@ -39,7 +39,7 @@ src/futureproof/
 │   ├── knowledge.py     # ChromaDB knowledge store (RAG)
 │   ├── episodic.py      # ChromaDB episodic memory store
 │   ├── chunker.py       # Markdown text chunker for indexing
-│   ├── embeddings.py    # Gemini/Azure embedding functions with caching
+│   ├── embeddings.py    # Azure OpenAI embedding functions with caching
 │   ├── checkpointer.py  # SQLite conversation persistence
 │   └── profile.py       # User profile (YAML, secure permissions)
 ├── mcp/                 # MCP client implementations (13 clients)
@@ -82,7 +82,7 @@ All functionality is accessible through the **chat interface** via a single agen
 - **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent)
 - **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, GitHub)
 - **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for career analysis workflows (used by `AnalysisService`)
-- **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — supports Azure, Groq, Gemini, Cerebras, SambaNova
+- **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — Azure OpenAI only
 - **Caching**: Agent singleton (`_cached_agent`), checkpointer singleton, embedding function singleton
 
 ### Agent Tools (32 tools in `agents/tools/`)
@@ -101,13 +101,10 @@ Shared async helper: `_async.py` with `run_async()` for sync tool → async serv
 
 `FallbackLLMManager` in `llm/fallback.py` tries models in order, auto-skipping on rate limits or errors:
 
-1. Azure GPT-4.1 → Azure GPT-4.1 Mini
-2. Groq Llama 3.3 70B → Groq Mixtral 8x7B → Groq Llama 8B
-3. Gemini 2.5 Flash → Gemini 2.0 Flash → Gemini 3 Flash Preview
-4. Cerebras Llama 3.3 70B
-5. SambaNova Llama 3.1 70B → SambaNova Llama 405B
+1. Azure GPT-4.1
+2. Azure GPT-4.1 Mini
 
-Provider map uses `init_chat_model()` with: `azure_openai`, `groq`, `google_genai`, `openai` (for Cerebras/SambaNova via base_url).
+Uses `init_chat_model()` with `azure_openai` provider.
 
 ## MCP Clients (`mcp/`)
 
@@ -159,17 +156,12 @@ Provider map uses `init_chat_model()` with: `azure_openai`, `groq`, `google_gena
 
 Settings loaded from environment variables via Pydantic (`config.py`). All have defaults; the app works with a single API key.
 
-### LLM Providers
-- `GEMINI_API_KEY` — Gemini LLM and embeddings
-- `GROQ_API_KEY` — Groq LLM (fast fallback)
-- `CEREBRAS_API_KEY` — Cerebras LLM
-- `SAMBANOVA_API_KEY` — SambaNova LLM
-- `AZURE_OPENAI_API_KEY` — Azure OpenAI (top priority in fallback chain)
+### Azure OpenAI (required)
+- `AZURE_OPENAI_API_KEY` — Azure OpenAI API key
 - `AZURE_OPENAI_ENDPOINT` — Azure endpoint URL
 - `AZURE_OPENAI_API_VERSION` — Azure API version (default: `2024-12-01-preview`)
 - `AZURE_CHAT_DEPLOYMENT` — Azure chat model deployment name
 - `AZURE_EMBEDDING_DEPLOYMENT` — Azure embedding deployment name
-- `LLM_PROVIDER` — Default provider: `gemini`, `groq`, or `azure`
 - `LLM_MODEL` — Override model name (empty = provider default)
 - `LLM_TEMPERATURE` — Generation temperature (default: `0.3`)
 - `CV_TEMPERATURE` — CV generation temperature (default: `0.2`)
@@ -210,7 +202,7 @@ Single agent with `create_agent()`, unified system prompt, `SummarizationMiddlew
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).
 
 ### `llm/fallback.py`
-`FallbackLLMManager` with 11-model chain across 5 providers. Uses `init_chat_model()` with provider map. Auto-detects rate limits and model errors via string matching, marks failed models, tries next in chain.
+`FallbackLLMManager` with 2-model Azure chain. Uses `init_chat_model()` with `azure_openai` provider. Auto-detects rate limits and model errors via string matching, marks failed models, tries next in chain.
 
 ### `memory/knowledge.py`
 `CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Supports filtering by `KnowledgeSource` enum (github, gitlab, linkedin, portfolio, assessment). Methods: `index_markdown_file()`, `search()`, `clear_source()`, `get_stats()`.
@@ -219,7 +211,7 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 `EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION, CONVERSATION, MILESTONE, LEARNING, FEEDBACK. Methods: `remember()`, `recall()`, `get_recent()`, `forget()`, `stats()`.
 
 ### `memory/store.py`
-`InMemoryStore` with semantic search embeddings (Azure or Gemini). Used by the agent for runtime cross-thread memory. Passed to `create_agent()` as `store` param.
+`InMemoryStore` with Azure OpenAI semantic search embeddings. Used by the agent for runtime cross-thread memory. Passed to `create_agent()` as `store` param.
 
 ### `memory/chunker.py`
 `MarkdownChunker` — splits markdown by `##` headers while preserving section hierarchy. Configurable max/min token limits. Merges small chunks, splits large ones.

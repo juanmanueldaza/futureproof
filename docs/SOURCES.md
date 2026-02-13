@@ -2,13 +2,13 @@
 
 FutureProof connects to many data sources. **None are strictly required** -- the system works with whatever you configure and gracefully skips the rest.
 
-**Minimum to get started:** one LLM provider API key (Gemini is the easiest -- free, no credit card).
+**Minimum to get started:** Azure OpenAI API key and endpoint.
 
 ---
 
 ## Table of Contents
 
-- [LLM Providers](#llm-providers)
+- [LLM Provider](#llm-provider)
 - [Career Data Sources](#career-data-sources)
 - [Market Intelligence Sources](#market-intelligence-sources)
 - [Embeddings (Knowledge Base)](#embeddings-knowledge-base)
@@ -16,43 +16,11 @@ FutureProof connects to many data sources. **None are strictly required** -- the
 
 ---
 
-## LLM Providers
+## LLM Provider
 
-FutureProof uses a **fallback chain** -- if one provider hits a rate limit or errors, it automatically tries the next. Configure as many as you want for resilience.
-
-### Google Gemini (default)
-
-The easiest provider to start with. Generous free tier.
-
-| | |
-|---|---|
-| **Free tier** | 1M tokens/day, 15 requests/minute |
-| **Env var** | `GEMINI_API_KEY` |
-| **Get key** | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
-| **Credit card** | No |
-
-```bash
-GEMINI_API_KEY=AIza...
-```
-
-### Groq
-
-Very fast inference. Good as a secondary provider.
-
-| | |
-|---|---|
-| **Free tier** | 100k tokens/day per model |
-| **Env var** | `GROQ_API_KEY` |
-| **Get key** | [console.groq.com/keys](https://console.groq.com/keys) |
-| **Credit card** | No |
-
-```bash
-GROQ_API_KEY=gsk_...
-```
+FutureProof uses **Azure OpenAI** with a 2-model fallback chain — if GPT-4.1 hits a rate limit or errors, it automatically falls back to GPT-4.1 Mini.
 
 ### Azure OpenAI / AI Foundry
-
-Most capable models. $200 free credits on signup.
 
 | | |
 |---|---|
@@ -73,36 +41,6 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_VERSION=2024-12-01-preview
 AZURE_CHAT_DEPLOYMENT=gpt-4.1
 AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
-```
-
-### Cerebras
-
-Extremely fast inference speed.
-
-| | |
-|---|---|
-| **Free tier** | Yes |
-| **Env var** | `CEREBRAS_API_KEY` |
-| **Get key** | [cloud.cerebras.ai](https://cloud.cerebras.ai/) |
-| **Credit card** | No |
-
-```bash
-CEREBRAS_API_KEY=csk-...
-```
-
-### SambaNova
-
-Access to very large models (Llama 405B) for free.
-
-| | |
-|---|---|
-| **Free tier** | Yes |
-| **Env var** | `SAMBANOVA_API_KEY` |
-| **Get key** | [cloud.sambanova.ai/apis](https://cloud.sambanova.ai/apis) |
-| **Credit card** | No |
-
-```bash
-SAMBANOVA_API_KEY=...
 ```
 
 ---
@@ -267,15 +205,14 @@ TAVILY_API_KEY=tvly-...
 
 ## Embeddings (Knowledge Base)
 
-The knowledge base uses embeddings for semantic search over your career data. The system auto-selects the best available provider:
+The knowledge base uses embeddings for semantic search over your career data. Azure OpenAI embeddings are used when configured:
 
 | Priority | Provider | Env var | Notes |
 |----------|----------|---------|-------|
 | 1 | Azure OpenAI | `AZURE_OPENAI_API_KEY` + `AZURE_EMBEDDING_DEPLOYMENT` | Best quality, uses your Azure credits |
-| 2 | Google Gemini | `GEMINI_API_KEY` | Good quality, free tier |
-| 3 | ChromaDB default | None | Local sentence-transformers (slower, no API needed) |
+| 2 | ChromaDB default | None | Local sentence-transformers (slower, no API needed) |
 
-No extra configuration needed -- if you have an LLM provider key, embeddings use it automatically.
+No extra configuration needed -- if you have Azure configured, embeddings use it automatically.
 
 ---
 
@@ -285,18 +222,23 @@ No extra configuration needed -- if you have an LLM provider key, embeddings use
 
 ```bash
 cp .env.example .env
-# Add just one line:
-echo "GEMINI_API_KEY=your_key_here" >> .env
+# Add your Azure credentials:
+echo "AZURE_OPENAI_API_KEY=your_key_here" >> .env
+echo "AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/" >> .env
+echo "AZURE_CHAT_DEPLOYMENT=gpt-4.1" >> .env
+echo "AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small" >> .env
 ```
 
-This gives you: LLM chat, CV generation, career analysis, and all no-auth market intelligence sources.
+This gives you: LLM chat, CV generation, career analysis, embeddings, and all no-auth market intelligence sources.
 
 ### Recommended Setup
 
 ```bash
 # .env
-GEMINI_API_KEY=AIza...                          # LLM + embeddings
-GROQ_API_KEY=gsk_...                            # Fast fallback
+AZURE_OPENAI_API_KEY=abc123...                  # LLM + embeddings
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_CHAT_DEPLOYMENT=gpt-4.1
+AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 GITHUB_USERNAME=your_username
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data gathering
 PORTFOLIO_URL=https://your-site.com
@@ -307,16 +249,12 @@ TAVILY_API_KEY=tvly-...                         # Enhanced market research
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| **LLM Providers** | | | |
-| `GEMINI_API_KEY` | No | `""` | Google Gemini API key |
-| `GROQ_API_KEY` | No | `""` | Groq API key |
-| `CEREBRAS_API_KEY` | No | `""` | Cerebras API key |
-| `SAMBANOVA_API_KEY` | No | `""` | SambaNova API key |
-| `AZURE_OPENAI_API_KEY` | No | `""` | Azure OpenAI API key |
-| `AZURE_OPENAI_ENDPOINT` | If Azure | `""` | Azure endpoint URL |
-| `AZURE_OPENAI_API_VERSION` | If Azure | `2024-12-01-preview` | Azure API version |
-| `AZURE_CHAT_DEPLOYMENT` | If Azure | `""` | Azure chat model deployment name |
-| `AZURE_EMBEDDING_DEPLOYMENT` | If Azure | `""` | Azure embedding deployment name |
+| **Azure OpenAI** | | | |
+| `AZURE_OPENAI_API_KEY` | Yes | `""` | Azure OpenAI API key |
+| `AZURE_OPENAI_ENDPOINT` | Yes | `""` | Azure endpoint URL |
+| `AZURE_OPENAI_API_VERSION` | No | `2024-12-01-preview` | Azure API version |
+| `AZURE_CHAT_DEPLOYMENT` | Yes | `""` | Azure chat model deployment name |
+| `AZURE_EMBEDDING_DEPLOYMENT` | Yes | `""` | Azure embedding deployment name |
 | **Career Data** | | | |
 | `GITHUB_USERNAME` | No | `""` | GitHub username |
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | No | `""` | GitHub PAT for MCP |
@@ -338,7 +276,6 @@ TAVILY_API_KEY=tvly-...                         # Enhanced market research
 | `KNOWLEDGE_CHUNK_MAX_TOKENS` | No | `500` | Max tokens per chunk |
 | `KNOWLEDGE_CHUNK_MIN_TOKENS` | No | `50` | Min tokens per chunk |
 | **LLM Settings** | | | |
-| `LLM_PROVIDER` | No | `gemini` | Default provider (`gemini`, `groq`, `azure`) |
 | `LLM_MODEL` | No | `""` | Override model name |
 | `LLM_TEMPERATURE` | No | `0.3` | General LLM temperature |
 | `CV_TEMPERATURE` | No | `0.2` | CV generation temperature |

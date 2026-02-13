@@ -22,7 +22,6 @@ def _create_store() -> InMemoryStore:
     try:
         from langchain.embeddings import init_embeddings
 
-        # Prefer Azure embeddings if configured, otherwise Gemini
         if settings.azure_openai_api_key and settings.azure_embedding_deployment:
             embeddings = init_embeddings(
                 "azure_openai:text-embedding-3-small",
@@ -32,15 +31,12 @@ def _create_store() -> InMemoryStore:
                 api_version=settings.azure_openai_api_version,
             )
             dims = 1536
-        elif settings.gemini_api_key:
-            embeddings = init_embeddings(
-                "google_genai:models/gemini-embedding-001",
-                google_api_key=settings.gemini_api_key,
-            )
-            dims = 768
         else:
             # No embeddings available — use store without semantic search
-            logger.warning("No embedding API keys configured. Store will not support search.")
+            logger.warning(
+                "Azure OpenAI not configured. Store will not support search. "
+                "Set AZURE_OPENAI_API_KEY and AZURE_EMBEDDING_DEPLOYMENT."
+            )
             return InMemoryStore()
 
         return InMemoryStore(index={"embed": embeddings, "dims": dims})

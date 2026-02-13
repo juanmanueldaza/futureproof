@@ -1,15 +1,8 @@
 """LLM fallback chain for resilient model selection.
 
-Provides automatic fallback between providers and models when rate limits
+Provides automatic fallback between Azure OpenAI models when rate limits
 or other errors are encountered. This ensures the chat remains usable
-even when primary providers are temporarily unavailable.
-
-Supported providers:
-- Azure: Azure OpenAI / AI Foundry ($200 free credits)
-- Groq: Fast inference, 100k tokens/day per model
-- Gemini: Google's models, 15 RPM / 1M tokens/day
-- Cerebras: Extremely fast, free tier (https://cerebras.ai)
-- SambaNova: Free tier with Llama 405B (https://sambanova.ai)
+even when the primary model is temporarily unavailable.
 """
 
 import logging
@@ -35,47 +28,17 @@ class ModelConfig:
         """Get the API key for this provider."""
         if self.provider == "azure":
             return settings.azure_openai_api_key
-        elif self.provider == "groq":
-            return settings.groq_api_key
-        elif self.provider == "gemini":
-            return settings.gemini_api_key
-        elif self.provider == "cerebras":
-            return settings.cerebras_api_key
-        elif self.provider == "sambanova":
-            return settings.sambanova_api_key
         return ""
 
     def is_available(self) -> bool:
         """Check if this model is available (has API key configured)."""
-        if self.provider == "azure":
-            return settings.has_azure
-        return bool(self.get_api_key())
+        return settings.has_azure
 
 
 # Default fallback chain - ordered by preference
-# Note: Check provider docs for current model availability
 DEFAULT_FALLBACK_CHAIN: list[ModelConfig] = [
-    # Primary: Azure OpenAI ($200 free credits, high quality)
     ModelConfig("azure", "gpt-4.1", "Azure GPT-4.1"),
     ModelConfig("azure", "gpt-4.1-mini", "Azure GPT-4.1 Mini"),
-    # Fallback: Groq (100k TPD per model, very fast)
-    ModelConfig("groq", "llama-3.3-70b-versatile", "Groq Llama 3.3 70B"),
-    # Fallback 1: Groq Mixtral (separate 100k TPD quota)
-    ModelConfig("groq", "mixtral-8x7b-32768", "Groq Mixtral 8x7B"),
-    # Fallback 2: Groq smaller model (separate 100k TPD quota)
-    ModelConfig("groq", "llama-3.1-8b-instant", "Groq Llama 8B"),
-    # Fallback 3: Gemini 2.5 Flash (latest, fast)
-    ModelConfig("gemini", "gemini-2.5-flash", "Gemini 2.5 Flash"),
-    # Fallback 4: Gemini 2.0 Flash
-    ModelConfig("gemini", "gemini-2.0-flash", "Gemini 2.0 Flash"),
-    # Fallback 5: Gemini 3 Flash Preview
-    ModelConfig("gemini", "gemini-3-flash-preview", "Gemini 3 Flash Preview"),
-    # Fallback 6: Cerebras (extremely fast inference)
-    ModelConfig("cerebras", "llama-3.3-70b", "Cerebras Llama 3.3 70B"),
-    # Fallback 7: SambaNova 70B
-    ModelConfig("sambanova", "Meta-Llama-3.1-70B-Instruct", "SambaNova Llama 3.1 70B"),
-    # Fallback 8: SambaNova 405B (largest free model available!)
-    ModelConfig("sambanova", "Meta-Llama-3.1-405B-Instruct", "SambaNova Llama 405B"),
 ]
 
 
@@ -138,16 +101,6 @@ class FallbackLLMManager:
     # Provider to init_chat_model model_provider mapping
     _PROVIDER_MAP: dict[str, str] = {
         "azure": "azure_openai",
-        "groq": "groq",
-        "gemini": "google_genai",
-        "cerebras": "openai",
-        "sambanova": "openai",
-    }
-
-    # OpenAI-compatible providers that need a custom base_url
-    _BASE_URLS: dict[str, str] = {
-        "cerebras": "https://api.cerebras.ai/v1",
-        "sambanova": "https://api.sambanova.ai/v1",
     }
 
     def _create_model(self, config: ModelConfig, temperature: float | None = None) -> BaseChatModel:
@@ -170,19 +123,10 @@ class FallbackLLMManager:
             "streaming": True,
         }
 
-        if config.provider == "azure":
-            kwargs["azure_deployment"] = config.model
-            kwargs["azure_endpoint"] = settings.azure_openai_endpoint
-            kwargs["api_version"] = settings.azure_openai_api_version
-            kwargs["api_key"] = config.get_api_key()
-        elif config.provider == "gemini":
-            kwargs["google_api_key"] = config.get_api_key()
-        else:
-            kwargs["api_key"] = config.get_api_key()
-
-        base_url = self._BASE_URLS.get(config.provider)
-        if base_url:
-            kwargs["base_url"] = base_url
+        kwargs["azure_deployment"] = config.model
+        kwargs["azure_endpoint"] = settings.azure_openai_endpoint
+        kwargs["api_version"] = settings.azure_openai_api_version
+        kwargs["api_key"] = config.get_api_key()
 
         return init_chat_model(
             model=config.model,
@@ -222,7 +166,7 @@ class FallbackLLMManager:
         if not available:
             raise RuntimeError(
                 "No LLM models available. Please configure "
-                "AZURE_OPENAI_API_KEY, GROQ_API_KEY, or GEMINI_API_KEY."
+                "AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT."
             )
 
         config = available[0]
