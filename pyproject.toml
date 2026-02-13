@@ -33,7 +33,6 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=3.0.3",
     "prompt-toolkit>=3.0.52",
     "chromadb>=1.4.1",
-    "apscheduler>=4.0.0a5",
     "langchain-groq>=1.1.1",
 ]
 
@@ -49,7 +48,7 @@ packages = ["src/futureproof"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

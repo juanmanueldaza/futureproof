@@ -18,6 +18,7 @@ FutureProof is a career intelligence system powered by a conversational AI agent
 ```
 src/futureproof/
 ├── agents/          # LangGraph orchestration and state management
+│   ├── helpers/     # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
 │   └── tools/       # Modular agent tools (profile, gathering, analysis, market, etc.)
 ├── chat/            # Interactive chat interface
 ├── gatherers/       # Data collection from external sources
@@ -30,7 +31,6 @@ src/futureproof/
 │   ├── knowledge.py # ChromaDB knowledge store (RAG)
 │   ├── episodic.py  # Episodic memory store
 │   └── store.py     # LangGraph InMemoryStore (runtime semantic search)
-├── daemon/          # Background intelligence scheduler
 ├── mcp/             # MCP client implementations
 ├── prompts/         # AI prompt templates
 ├── services/        # Business logic layer
@@ -66,24 +66,23 @@ This codebase follows SOLID, DRY, KISS, and YAGNI principles:
 
 All functionality is accessible through the **chat interface** via a single agent built with LangChain's `create_agent()`:
 
-- **Single agent**: One agent with all 35 tools — profile, gathering, analysis, generation, knowledge, market, memory, daemon.
-- **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, `clear_career_knowledge`, and `run_daemon_job` for user confirmation.
+- **Single agent**: One agent with all 32 tools — profile, gathering, analysis, generation, knowledge, market, memory.
+- **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation.
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages).
 - **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent).
 - **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, GitHub).
-- **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for parallel gatherer execution.
+- **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for career analysis workflows (used by `AnalysisService`).
 - **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — supports Azure, Groq, Gemini, Cerebras, SambaNova.
 
-### Agent Tools (35 tools in `agents/tools/`)
+### Agent Tools (32 tools in `agents/tools/`)
 
 - **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
 - **Gathering** (7): `gather_github_data`, `gather_gitlab_data`, `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data`
 - **Knowledge** (4): `search_career_knowledge`, `get_knowledge_stats`, `index_career_knowledge`, `clear_career_knowledge` (HITL)
-- **Analysis** (5): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`, `analyze_market_fit`, `analyze_market_skills`
+- **Analysis** (3): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`
 - **Generation** (2): `generate_cv` (HITL), `generate_cv_draft`
-- **Market** (4): `search_jobs`, `get_tech_trends`, `get_salary_insights`, `gather_market_data`
+- **Market** (6): `search_jobs`, `get_tech_trends`, `get_salary_insights`, `gather_market_data`, `analyze_market_fit`, `analyze_market_skills`
 - **Memory** (4): `remember_decision`, `remember_job_application`, `recall_memories`, `get_memory_stats`
-- **Daemon** (3): `get_daemon_status`, `get_pending_insights`, `run_daemon_job` (HITL)
 
 ## Security
 
@@ -139,14 +138,42 @@ The codebase implements security best practices:
 
 ## Configuration
 
-Settings are loaded from environment variables via Pydantic:
+Settings are loaded from environment variables via Pydantic (`config.py`):
 
-- `GEMINI_API_KEY` - For Gemini LLM and embeddings
-- `AZURE_OPENAI_API_KEY` - For Azure OpenAI (top priority in fallback chain)
-- `GROQ_API_KEY` - For Groq LLM
-- `GITHUB_USERNAME`, `GITLAB_USERNAME` - For data gathering
+### LLM Providers
+- `GEMINI_API_KEY` - Gemini LLM and embeddings
+- `GROQ_API_KEY` - Groq LLM (fast fallback)
+- `CEREBRAS_API_KEY` - Cerebras LLM
+- `SAMBANOVA_API_KEY` - SambaNova LLM
+- `AZURE_OPENAI_API_KEY` - Azure OpenAI (top priority in fallback chain)
+- `AZURE_OPENAI_ENDPOINT` - Azure endpoint URL
+- `AZURE_OPENAI_API_VERSION` - Azure API version (default: `2024-12-01-preview`)
+- `AZURE_CHAT_DEPLOYMENT` - Azure chat model deployment name
+- `AZURE_EMBEDDING_DEPLOYMENT` - Azure embedding deployment name
+- `LLM_PROVIDER` - Default provider: `gemini`, `groq`, or `azure`
+- `LLM_MODEL` - Override model name (empty = provider default)
+- `LLM_TEMPERATURE` - Generation temperature (default: `0.3`)
+- `CV_TEMPERATURE` - CV generation temperature (default: `0.2`)
+
+### Data Sources
+- `GITHUB_USERNAME`, `GITLAB_USERNAME` - Profiles to gather
 - `GITLAB_GROUPS` - Comma-separated GitLab groups (validated for safe characters)
 - `PORTFOLIO_URL` - Portfolio website URL
+
+### MCP Servers
+- `GITHUB_PERSONAL_ACCESS_TOKEN` - GitHub API token
+- `GITHUB_MCP_TOKEN` - Alternative GitHub token for MCP
+- `GITHUB_MCP_USE_DOCKER` - Use Docker for GitHub MCP server (default: `true`)
+- `GITLAB_MCP_URL` - GitLab MCP server URL
+- `GITLAB_MCP_TOKEN` - GitLab MCP token
+- `TAVILY_API_KEY` - Tavily search API key
+
+### Market Intelligence
+- `JOBSPY_ENABLED` - Enable JobSpy scraping (default: `true`)
+- `HN_MCP_ENABLED` - Enable Hacker News trends (default: `true`)
+- `MARKET_CACHE_HOURS` - Tech trends cache TTL (default: `24`)
+- `JOB_CACHE_HOURS` - Job data cache TTL (default: `12`)
+- `CONTENT_CACHE_HOURS` - Content trends cache TTL (default: `12`)
 
 ## Key Modules
 
@@ -169,6 +196,15 @@ HTTP client with security features:
 - SSL verification enabled
 - Redirect limiting (max 5)
 - Request timeout (30 seconds)
+
+### `mcp/`
+MCP client implementations (13 clients) with registry pattern via `factory.py`:
+- `github_client.py`, `gitlab_client.py` — Code platform APIs (stdio transport)
+- `hn_client.py` — Hacker News via Algolia API (no auth)
+- `tavily_client.py` — Web search API
+- `jobspy_client.py` — Job board scraping (LinkedIn, Indeed, Glassdoor, ZipRecruiter)
+- `remoteok_client.py`, `himalayas_client.py`, `jobicy_client.py`, `weworkremotely_client.py`, `remotive_client.py` — Remote job board APIs
+- `devto_client.py`, `stackoverflow_client.py` — Developer content trends
 
 ## Knowledge Base Architecture
 
@@ -215,10 +251,6 @@ clear_career_knowledge(source)                     # Clear indexed data (HITL)
 
 After each gather operation, the `GathererService` automatically indexes the source if `KNOWLEDGE_AUTO_INDEX=true` (default). Market intelligence data (ephemeral JSON with TTL) is NOT indexed.
 
-### Configuration
+### Knowledge Base Configuration
 
-```bash
-KNOWLEDGE_AUTO_INDEX=true       # Auto-index after gather (default: true)
-KNOWLEDGE_CHUNK_MAX_TOKENS=500  # Max tokens per chunk
-KNOWLEDGE_CHUNK_MIN_TOKENS=50   # Min tokens per chunk
-```
+See `KNOWLEDGE_AUTO_INDEX`, `KNOWLEDGE_CHUNK_MAX_TOKENS`, `KNOWLEDGE_CHUNK_MIN_TOKENS` in the Configuration section above.

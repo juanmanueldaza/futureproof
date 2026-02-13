@@ -2,7 +2,7 @@
 
 Single agent with all career intelligence tools — profile management,
 analysis, CV generation, data gathering, knowledge search, market
-intelligence, memory, and daemon control.
+intelligence, and memory.
 
 Uses LangChain's create_agent() with SummarizationMiddleware for automatic
 context management and InMemoryStore for cross-thread episodic memory.
@@ -100,11 +100,6 @@ You help users navigate their career by:
 - `remember_job_application` — Record a job application
 - `recall_memories` — Search past decisions and applications
 - `get_memory_stats` — View memory statistics
-
-### Daemon
-- `get_daemon_status` — Check background intelligence daemon
-- `get_pending_insights` — View pending background discoveries
-- `run_daemon_job` — Manually trigger a background job (with confirmation)
 
 ## Knowledge Base Sources
 When using `search_career_knowledge`, use the `sources` filter to target the right data:

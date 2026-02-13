@@ -6,13 +6,12 @@ A conversational AI agent that aggregates professional data from LinkedIn, GitHu
 
 ## Features
 
-- **Interactive Chat Agent** - Conversational interface powered by a multi-agent LangGraph system
+- **Interactive Chat Agent** - Conversational interface powered by a single AI agent with 32 specialized tools
 - **Data Gathering** - Pull professional data from GitHub, GitLab, LinkedIn, portfolio sites, and CliftonStrengths
 - **CV Generation** - Produce ATS-optimized CVs in English and Spanish (with human-in-the-loop confirmation)
 - **Career Analysis** - Compare stated goals vs actual behavior, identify gaps, assess market fit
 - **Market Intelligence** - Real-time job market data, tech trends, salary insights, and skill demand analysis
 - **Knowledge Base** - RAG-powered semantic search over your career data
-- **Background Daemon** - Scheduled intelligence gathering with insights queue
 - **Privacy Protection** - PII anonymization before sending data to external LLMs
 
 ## Installation
@@ -82,8 +81,6 @@ Everything is accessible through the chat agent. Just ask:
 - **"Search for remote Python developer jobs"** - Job market search
 - **"What are the latest tech trends?"** - Trending technologies from Hacker News
 - **"Generate my CV in ATS format"** - Creates an optimized CV (with confirmation)
-- **"What's the daemon status?"** - Check background intelligence gathering
-- **"Show me pending insights"** - Review background discoveries
 
 ### Data Sources Setup
 
@@ -128,8 +125,9 @@ futureproof/
 ├── src/futureproof/
 │   ├── cli.py              # Typer CLI (chat, ask, memory)
 │   ├── config.py           # Pydantic settings
-│   ├── agents/             # LangGraph multi-agent system
-│   │   ├── career_agent.py # Supervisor + Research agents
+│   ├── agents/             # Single agent with tool modules
+│   │   ├── career_agent.py # Single agent with create_agent()
+│   │   ├── helpers/        # Orchestrator support
 │   │   └── tools/          # Agent tool modules
 │   │       ├── profile.py      # User profile management
 │   │       ├── gathering.py    # Data collection tools
@@ -137,19 +135,18 @@ futureproof/
 │   │       ├── market.py       # Market intelligence tools
 │   │       ├── generation.py   # CV generation tools
 │   │       ├── knowledge.py    # RAG search & indexing tools
-│   │       ├── memory.py       # Episodic memory tools
-│   │       └── daemon.py       # Background daemon tools
+│   │       └── memory.py       # Episodic memory tools
 │   ├── chat/               # Chat client (streaming, HITL)
 │   ├── gatherers/          # Data collectors (MCP + CLI fallback)
 │   │   ├── github.py       # GitHub gatherer
 │   │   ├── gitlab.py       # GitLab gatherer
 │   │   ├── linkedin.py     # LinkedIn ZIP processor
+│   │   ├── cliftonstrengths.py  # CliftonStrengths PDF processor
 │   │   ├── portfolio/      # Portfolio website scraper
 │   │   └── market/         # Market intelligence gatherers
 │   ├── generators/         # CV generators
 │   ├── llm/                # LLM fallback manager
 │   ├── memory/             # Knowledge & memory storage
-│   ├── daemon/             # Background scheduler & insights
 │   ├── mcp/                # MCP client implementations
 │   ├── prompts/            # LLM prompt templates
 │   ├── services/           # Business logic layer

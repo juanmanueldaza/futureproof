@@ -8,11 +8,9 @@ Tools are organized by domain:
 - generation: CV drafts and documents
 - knowledge: RAG search and indexing over career data
 - memory: episodic memory (decisions, applications)
-- daemon: background intelligence daemon status and control
 """
 
 from .analysis import analyze_career_alignment, analyze_skill_gaps, get_career_advice
-from .daemon import get_daemon_status, get_pending_insights, run_daemon_job
 from .gathering import (
     gather_all_career_data,
     gather_assessment_data,
@@ -92,10 +90,6 @@ __all__ = [
     "remember_job_application",
     "recall_memories",
     "get_memory_stats",
-    # Daemon
-    "get_daemon_status",
-    "get_pending_insights",
-    "run_daemon_job",
     # Registry
     "get_all_tools",
 ]
@@ -104,8 +98,8 @@ __all__ = [
 def get_all_tools() -> list:
     """Get all career intelligence tools for the agent.
 
-    Returns all 35 tools: profile, gathering, analysis, market, generation,
-    knowledge, memory, and daemon.
+    Returns all 32 tools: profile, gathering, analysis, market, generation,
+    knowledge, and memory.
     """
     return [
         # Profile
@@ -147,8 +141,4 @@ def get_all_tools() -> list:
         remember_job_application,
         recall_memories,
         get_memory_stats,
-        # Daemon
-        get_daemon_status,
-        get_pending_insights,
-        run_daemon_job,
     ]

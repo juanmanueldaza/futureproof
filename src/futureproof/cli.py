@@ -61,7 +61,6 @@ def chat_command(
     - Generate tailored CVs and cover letters
     - Index and search your career knowledge base
     - Provide strategic career advice
-    - Check background daemon status and insights
     - Remember your goals and preferences
 
     Your conversation is automatically saved and persists across sessions.
