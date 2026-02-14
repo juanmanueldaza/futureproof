@@ -92,7 +92,7 @@ def create_career_agent(
     summary_model = _get_summary_model()
     summarization = SummarizationMiddleware(
         model=summary_model,
-        trigger=("tokens", 8000),
+        trigger=("tokens", 32000),
         keep=("messages", 20),
     )
 
