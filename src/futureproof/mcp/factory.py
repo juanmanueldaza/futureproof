@@ -12,7 +12,6 @@ from .base import MCPClient
 # All MCP server types
 MCPServerType = Literal[
     "github",
-    "gitlab",
     "hn",
     "tavily",
     "jobspy",
@@ -29,7 +28,7 @@ MCPServerType = Literal[
 class MCPClientFactory:
     """Factory for creating MCP clients.
 
-    Supports both career data sources (GitHub, GitLab) and market intelligence
+    Supports career data sources (GitHub) and market intelligence
     sources (Hacker News, Brave Search, JobSpy).
 
     OCP-compliant: add new sources by updating AVAILABILITY_CHECKERS dict.
@@ -43,7 +42,6 @@ class MCPClientFactory:
     AVAILABILITY_CHECKERS: dict[str, Callable[[], bool]] = {
         # Career data sources (require authentication)
         "github": lambda: settings.has_github_mcp,
-        "gitlab": lambda: settings.has_gitlab_mcp,
         # Market intelligence sources with auth
         "tavily": lambda: settings.has_tavily_mcp,
         "hn": lambda: settings.hn_mcp_enabled,
@@ -64,7 +62,6 @@ class MCPClientFactory:
         if cls._clients is None:
             from .devto_client import DevToMCPClient
             from .github_client import GitHubMCPClient
-            from .gitlab_client import GitLabMCPClient
             from .himalayas_client import HimalayasMCPClient
             from .hn_client import HackerNewsMCPClient
             from .jobicy_client import JobicyMCPClient
@@ -78,7 +75,6 @@ class MCPClientFactory:
             cls._clients = {
                 # Career data sources
                 "github": GitHubMCPClient,
-                "gitlab": GitLabMCPClient,
                 # Market intelligence sources
                 "hn": HackerNewsMCPClient,
                 "tavily": TavilyMCPClient,

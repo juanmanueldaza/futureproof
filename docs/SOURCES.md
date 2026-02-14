@@ -82,28 +82,16 @@ GITHUB_MCP_IMAGE=ghcr.io/github/github-mcp-server       # default
 
 ### GitLab
 
-Gathers merge requests, issues, projects, and group contributions.
-
-**Option A: MCP Server (recommended)** -- real-time data via HTTP transport
+Search projects, read repo contents, and browse files via `glab` CLI.
 
 | | |
 |---|---|
-| **Env vars** | `GITLAB_MCP_URL`, `GITLAB_MCP_TOKEN` |
-| **Get token** | [gitlab.com/-/user_settings/personal_access_tokens](https://gitlab.com/-/user_settings/personal_access_tokens) |
-| **Scopes needed** | `api`, `read_user` |
+| **Install** | [gitlab.com/gitlab-org/cli](https://gitlab.com/gitlab-org/cli) or `brew install glab` |
+| **Authenticate** | `glab auth login` |
 
 ```bash
-GITLAB_USERNAME=your_username
-GITLAB_MCP_URL=https://gitlab.com/api/v4/mcp
-GITLAB_MCP_TOKEN=glpat-...
-GITLAB_GROUPS=group1,group2    # comma-separated groups you contributed to
-```
-
-**Option B: CLI fallback** -- uses `gitlab2md` (included as dependency)
-
-```bash
-GITLAB_USERNAME=your_username
-GITLAB_GROUPS=group1,group2
+# Authenticate once — no env vars needed
+glab auth login
 ```
 
 ### LinkedIn
@@ -259,9 +247,6 @@ TAVILY_API_KEY=tvly-...                         # Enhanced market research
 | `GITHUB_USERNAME` | No | `""` | GitHub username |
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | No | `""` | GitHub PAT for MCP |
 | `GITLAB_USERNAME` | No | `""` | GitLab username |
-| `GITLAB_MCP_URL` | No | `""` | GitLab MCP endpoint |
-| `GITLAB_MCP_TOKEN` | No | `""` | GitLab PAT for MCP |
-| `GITLAB_GROUPS` | No | `""` | Comma-separated GitLab groups |
 | `PORTFOLIO_URL` | No | `""` | Portfolio website URL |
 | `DEFAULT_LANGUAGE` | No | `en` | `en` or `es` |
 | **Market Intelligence** | | | |

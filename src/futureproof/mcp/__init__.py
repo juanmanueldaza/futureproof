@@ -1,6 +1,6 @@
 """MCP (Model Context Protocol) client implementations.
 
-Provides clients for connecting to MCP servers like GitHub and GitLab
+Provides clients for connecting to MCP servers like GitHub
 for real-time data access instead of CLI-based gathering.
 
 Also provides market intelligence clients:
@@ -23,7 +23,6 @@ from .base import (
 from .devto_client import DevToMCPClient
 from .factory import MCPClientFactory, MCPServerType
 from .github_client import GitHubMCPClient
-from .gitlab_client import GitLabMCPClient
 from .hn_client import HackerNewsMCPClient
 from .http_client import HTTPMCPClient
 from .job_schema import (
@@ -59,7 +58,6 @@ __all__ = [
     "parse_company_title",
     # Career data clients
     "GitHubMCPClient",
-    "GitLabMCPClient",
     # Market intelligence clients
     "DevToMCPClient",
     "HackerNewsMCPClient",
