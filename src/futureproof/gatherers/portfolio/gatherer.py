@@ -3,9 +3,6 @@
 Orchestrates the extraction process using specialized components.
 """
 
-import os
-from pathlib import Path
-
 from ...config import settings
 from ...utils.console import console
 from ...utils.logging import get_logger
@@ -45,23 +42,21 @@ class PortfolioGatherer(BaseGatherer):
             js_extractor: JS parser (created if not provided)
             markdown_writer: Markdown generator (created if not provided)
         """
-        self.output_dir = settings.processed_dir / "portfolio"
         self._fetcher = fetcher
         self._html_extractor = html_extractor or HTMLExtractor()
         self._js_extractor = js_extractor or JSExtractor()
         self._markdown_writer = markdown_writer or PortfolioMarkdownWriter()
 
-    def gather(self, url: str | None = None) -> Path:
+    def gather(self, url: str | None = None) -> str:
         """Gather data from portfolio website.
 
         Args:
             url: Portfolio URL (defaults to config)
 
         Returns:
-            Path to the generated markdown file
+            Markdown content string (indexed directly to ChromaDB by caller)
         """
         target_url = url or settings.portfolio_url
-        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info("Gathering portfolio from %s", target_url)
         console.print(f"  Fetching: {target_url}")
@@ -93,14 +88,5 @@ class PortfolioGatherer(BaseGatherer):
         # Generate markdown
         markdown = self._markdown_writer.generate(content, js_content)
 
-        # Save outputs with secure permissions (owner read/write only)
-        output_file = self.output_dir / "portfolio.md"
-        output_file.write_text(markdown)
-        os.chmod(output_file, 0o600)
-        console.print(f"  Saved to: {output_file}")
-
-        # Note: Raw JSON debug file removed for security (contained PII)
-        # If debugging needed, use logging instead
-
-        logger.info("Portfolio gathered successfully: %s", output_file)
-        return output_file
+        logger.info("Portfolio gathered successfully from %s", target_url)
+        return markdown

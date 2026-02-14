@@ -521,8 +521,6 @@ source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "chromadb" },
-    { name = "github2md" },
-    { name = "gitlab2md" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "langchain" },
@@ -554,8 +552,6 @@ dev = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4" },
     { name = "chromadb", specifier = ">=1.4.1" },
-    { name = "github2md", specifier = ">=0.1" },
-    { name = "gitlab2md", specifier = ">=0.1" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "jinja2", specifier = ">=3" },
     { name = "langchain", specifier = ">=0.3" },
@@ -581,24 +577,6 @@ dev = [
     { name = "ruff", specifier = ">=0.9" },
     { name = "types-beautifulsoup4", specifier = ">=4.12.0.20250516" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
-]
-
-[[package]]
-name = "github2md"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4c/d3/29da9e04868b152a516635a1a3dc4e4bc73d7162d2c9d12b46f3572f8ec6/github2md-0.1.0.tar.gz", hash = "sha256:0574a8dc9eb61595d663b8b0d4e4378b9e6cf956b75898e9e564fe78c68e4acc", size = 26226, upload-time = "2026-01-22T19:38:16.845Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/37/78426ba94c01bc6f6664502365419688e957a958b8cac9e24837d5ea5469/github2md-0.1.0-py3-none-any.whl", hash = "sha256:34522969e1845ea4a5cfcd7be504b2dae1ad3acd869117d370d87360afbe0f3b", size = 22035, upload-time = "2026-01-22T19:38:15.53Z" },
-]
-
-[[package]]
-name = "gitlab2md"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0e/f5/7b1256ea2f8e74b2bba1b4e083da7660d5f409deb6bd7e555aff96b58c2e/gitlab2md-0.1.0.tar.gz", hash = "sha256:3b52ca1abad65617a806476be783b0e0083bf2d5422ad0801da6752cac1f0d29", size = 47718, upload-time = "2026-01-22T18:29:59.979Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/30/f882f3f81c57fb58375fbf02b735c44e101f0926cfa5e992771689617a1a/gitlab2md-0.1.0-py3-none-any.whl", hash = "sha256:82c75916dc899fb1b7e64737f79d7da555332ff2abf33028f2a6dc350b261060", size = 41104, upload-time = "2026-01-22T18:29:58.665Z" },
 ]
 
 [[package]]

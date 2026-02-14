@@ -1,14 +1,9 @@
 """Configuration management using pydantic-settings."""
 
-import re
 from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-# Validation pattern for GitLab group names
-# GitLab groups: alphanumeric, underscores, dots, hyphens, must start with alphanumeric
-GITLAB_GROUP_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
 class Settings(BaseSettings):
@@ -28,13 +23,7 @@ class Settings(BaseSettings):
     azure_embedding_deployment: str = ""  # e.g. "text-embedding-3-small"
 
     # User profiles
-    github_username: str = "juanmanueldaza"
-    gitlab_username: str = "juanmanueldaza"
     portfolio_url: str = "https://daza.ar"
-
-    # GitLab groups to include (comma-separated)
-    # These are groups where you contributed but may not be a direct member
-    gitlab_groups: str = "colmena-project"
 
     # Defaults
     default_language: Literal["en", "es"] = "en"
@@ -76,55 +65,6 @@ class Settings(BaseSettings):
     knowledge_auto_index: bool = True  # Auto-index after gather
     knowledge_chunk_max_tokens: int = 500  # Max tokens per chunk
     knowledge_chunk_min_tokens: int = 50  # Min tokens per chunk (merge if smaller)
-
-    # Output file names (removes magic strings from code)
-    github_output_filename: str = "github_profile.md"
-    gitlab_output_filename: str = "gitlab_profile.md"
-    portfolio_output_filename: str = "portfolio.md"
-
-    # LinkedIn files to load for different purposes
-    linkedin_profile_files: str = "profile.md,experience.md,education.md,skills.md"
-    linkedin_cv_files: str = (
-        "profile.md,experience.md,education.md,skills.md,"
-        "certifications.md,languages.md,projects.md,recommendations.md"
-    )
-
-    @staticmethod
-    def _split_csv(value: str) -> list[str]:
-        """Split a comma-separated string into a trimmed list."""
-        return [item.strip() for item in value.split(",") if item.strip()]
-
-    @property
-    def linkedin_profile_files_list(self) -> list[str]:
-        """Get LinkedIn profile files as a list."""
-        return self._split_csv(self.linkedin_profile_files)
-
-    @property
-    def linkedin_cv_files_list(self) -> list[str]:
-        """Get LinkedIn CV files as a list."""
-        return self._split_csv(self.linkedin_cv_files)
-
-    @property
-    def gitlab_groups_list(self) -> list[str]:
-        """Get GitLab groups as a validated list.
-
-        Validates each group name to prevent CLI argument injection.
-
-        Returns:
-            List of validated group names
-
-        Raises:
-            ValueError: If any group name contains invalid characters
-        """
-        groups = self._split_csv(self.gitlab_groups)
-        for group in groups:
-            if not GITLAB_GROUP_PATTERN.match(group):
-                raise ValueError(
-                    f"Invalid GitLab group name: '{group}'. "
-                    "Group names must start with alphanumeric and contain only "
-                    "alphanumeric characters, dots, underscores, and hyphens."
-                )
-        return groups
 
     @property
     def github_mcp_token_resolved(self) -> str:

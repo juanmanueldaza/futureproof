@@ -16,8 +16,7 @@ dependencies = [
     "langchain-openai>=0.3",
     # Data gathering
     "linkedin2md>=0.3",
-    "github2md>=0.1",
-    "gitlab2md>=0.1",
+
     "httpx>=0.28",
     "beautifulsoup4>=4",
     # MCP (Model Context Protocol)

@@ -25,26 +25,16 @@ from .helpers import advice_pipeline, default_pipeline, get_result_key, invoke_l
 # ============================================================================
 
 
-def _make_gather_task(gatherer_module_attr: str, data_key: str, label: str):
-    """Create a gather task for a specific data source."""
+@task
+def gather_portfolio_task() -> dict[str, Any]:
+    """Gather portfolio data. Returns content string directly."""
+    from .. import gatherers
 
-    @task
-    def _gather() -> dict[str, Any]:
-        from .. import gatherers
-
-        try:
-            cls = getattr(gatherers, gatherer_module_attr)
-            path = cls().gather()
-            return {data_key: path.read_text()}
-        except Exception as e:
-            return {"error": f"{label}: {e}"}
-
-    return _gather
-
-
-gather_github_task = _make_gather_task("GitHubGatherer", "github_data", "GitHub")
-gather_gitlab_task = _make_gather_task("GitLabGatherer", "gitlab_data", "GitLab")
-gather_portfolio_task = _make_gather_task("PortfolioGatherer", "portfolio_data", "Portfolio")
+    try:
+        content = gatherers.PortfolioGatherer().gather()
+        return {"portfolio_data": content}
+    except Exception as e:
+        return {"error": f"Portfolio: {e}"}
 
 
 @task
@@ -123,25 +113,14 @@ def advise_task(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _handle_gather(state: dict[str, Any]) -> dict[str, Any]:
-    """Parallel execution of all career data gatherers."""
-    github_future = gather_github_task()
-    gitlab_future = gather_gitlab_task()
-    portfolio_future = gather_portfolio_task()
-
-    github_result = github_future.result()
-    gitlab_result = gitlab_future.result()
-    portfolio_result = portfolio_future.result()
+    """Execute portfolio data gathering."""
+    portfolio_result = gather_portfolio_task().result()
 
     updates: dict[str, Any] = {}
-    errors: list[str] = []
-    for result in [github_result, gitlab_result, portfolio_result]:
-        if "error" in result and result["error"]:
-            errors.append(result["error"])
-        else:
-            updates.update(result)
-
-    if errors and not any(k.endswith("_data") for k in updates):
-        updates["error"] = "; ".join(errors)
+    if "error" in portfolio_result and portfolio_result["error"]:
+        updates["error"] = portfolio_result["error"]
+    else:
+        updates.update(portfolio_result)
 
     return {**state, **updates}
 

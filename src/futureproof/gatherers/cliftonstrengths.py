@@ -120,18 +120,10 @@ class CliftonStrengthsGatherer(BaseGatherer):
     and generates a comprehensive markdown summary for career analysis.
     """
 
-    def __init__(self, output_dir: Path | None = None) -> None:
-        """Initialize the gatherer.
+    def __init__(self) -> None:
+        """Initialize the gatherer."""
 
-        Args:
-            output_dir: Directory for output files. Defaults to data/processed/assessment
-        """
-        from ..config import settings
-
-        self.output_dir = output_dir or (settings.data_dir / "processed" / "assessment")
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-
-    def gather(self, input_dir: Path | None = None) -> Path:
+    def gather(self, input_dir: Path | None = None) -> str:
         """Gather CliftonStrengths data from PDF files.
 
         Args:
@@ -139,7 +131,7 @@ class CliftonStrengthsGatherer(BaseGatherer):
                       Defaults to data/raw
 
         Returns:
-            Path to generated markdown file
+            Markdown content string (indexed directly to ChromaDB by caller)
         """
         from ..config import settings
 
@@ -170,12 +162,10 @@ class CliftonStrengthsGatherer(BaseGatherer):
             data.dominant_domain = max(domain_counts, key=lambda d: domain_counts[d])
 
         # Generate markdown
-        output_path = self.output_dir / "cliftonstrengths.md"
         markdown = self._generate_markdown(data)
-        output_path.write_text(markdown)
 
-        logger.info(f"CliftonStrengths data saved to {output_path}")
-        return output_path
+        logger.info("CliftonStrengths data gathered successfully")
+        return markdown
 
     def _is_gallup_pdf(self, path: Path) -> bool:
         """Check if a PDF is a Gallup CliftonStrengths report."""
