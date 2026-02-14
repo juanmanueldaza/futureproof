@@ -56,10 +56,6 @@ def chat_command(
         str,
         typer.Option("--thread", "-t", help="Conversation thread ID for persistence"),
     ] = "main",
-    verbose: Annotated[
-        bool,
-        typer.Option("--verbose", "-v", help="Show tool usage and agent reasoning"),
-    ] = False,
     debug: Annotated[
         bool,
         typer.Option("--debug", help="Show debug-level logs in terminal"),
@@ -78,7 +74,6 @@ def chat_command(
 
     Your conversation is automatically saved and persists across sessions.
 
-    Use --verbose to see which tools the agent is using.
     Use --debug to also show debug-level logs in the terminal.
     """
     if debug:
@@ -94,7 +89,7 @@ def chat_command(
     from .chat.client import run_chat
 
     try:
-        run_chat(thread_id=thread, verbose=verbose)
+        run_chat(thread_id=thread)
     except KeyboardInterrupt:
         console.print("\n[dim]Chat ended.[/dim]")
     except Exception as e:

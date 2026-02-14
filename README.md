@@ -38,8 +38,8 @@ cp .env.example .env
 ### Interactive chat
 
 ```bash
-futureproof chat                    # Start chat session
-futureproof chat --verbose          # Show tool usage
+futureproof chat                    # Start chat session (verbose by default)
+futureproof chat --debug            # Also show debug logs in terminal
 futureproof chat --thread work      # Use a named thread
 ```
 
@@ -149,7 +149,7 @@ src/futureproof/
 │       └── memory.py       # Episodic memory (4 tools)
 ├── chat/                   # Streaming chat client with HITL support
 ├── gatherers/
-│   ├── linkedin.py         # LinkedIn ZIP via linkedin2md CLI
+│   ├── linkedin.py         # LinkedIn ZIP direct CSV parser
 │   ├── cliftonstrengths.py # CliftonStrengths PDF parser
 │   ├── portfolio/          # Website scraper (fetcher, HTML/JS extractors)
 │   └── market/             # Job market, tech trends, content trends

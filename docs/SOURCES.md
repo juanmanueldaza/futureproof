@@ -53,7 +53,7 @@ These are the primary sources for your professional profile.
 
 Gathers your profile, repositories, pull requests, issues, and code reviews.
 
-**Option A: MCP Server (recommended)** -- real-time data via Docker
+Accessed live via MCP server — real-time queries, no data gathering needed.
 
 | | |
 |---|---|
@@ -65,13 +65,6 @@ Gathers your profile, repositories, pull requests, issues, and code reviews.
 ```bash
 GITHUB_USERNAME=your_username
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
-```
-
-**Option B: CLI fallback** -- uses `github2md` (included as dependency, no token needed for public repos)
-
-```bash
-GITHUB_USERNAME=your_username
-# No token needed for public data
 ```
 
 **Docker config (optional):**
@@ -102,13 +95,13 @@ Processes your LinkedIn data export (ZIP file).
 |---|---|
 | **How to get** | [linkedin.com/mypreferences/d/download-my-data](https://www.linkedin.com/mypreferences/d/download-my-data) |
 | **Format** | ZIP file |
-| **Tool** | `linkedin2md` (included as dependency) |
+| **Parser** | Direct CSV parsing (17 CSVs, 3 tiers) |
 
 **Steps:**
 1. Go to LinkedIn Settings > Data Privacy > Get a copy of your data
 2. Request your data and wait for the email (can take up to 24 hours)
 3. Download the ZIP file
-4. Run: `futureproof gather linkedin path/to/LinkedInDataExport.zip`
+4. In chat: "Import my LinkedIn data" and provide the path to the ZIP file
 
 ### Portfolio Website
 
@@ -142,8 +135,8 @@ Processes your Gallup CliftonStrengths PDF reports.
 sudo apt install poppler-utils    # Debian/Ubuntu
 brew install poppler              # macOS
 
-# Place PDFs in data/raw/ then run
-futureproof gather assessment
+# Place PDFs in data/raw/ then in chat:
+# "Gather my assessment data"
 ```
 
 ---

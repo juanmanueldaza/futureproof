@@ -49,9 +49,8 @@ src/futureproof/
 ## Commands
 
 ```bash
-futureproof chat                    # Interactive chat
-futureproof chat --verbose          # Show tool usage with timing
-futureproof chat --verbose --debug  # Also show debug logs in terminal
+futureproof chat                    # Interactive chat (verbose by default)
+futureproof chat --debug            # Also show debug logs in terminal
 futureproof chat --thread work      # Named conversation thread
 futureproof ask "question"          # One-off question
 futureproof memory --threads        # List threads
@@ -212,7 +211,7 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 Rich-based terminal UI components. Verbose mode display functions: `display_tool_start()` (category badge + args), `display_tool_result()` (full output in bordered Panel), `display_model_info()`, `display_model_switch()`, `display_timing()`, `display_node_transition()`, `display_indexing_result()`, `display_gather_result()`. Tool category styling maps all 36 tools to categories (profile, gathering, github, gitlab, knowledge, analysis, generation, market, memory) with unique colors.
 
 ### `chat/client.py`
-Streaming chat client with HITL interrupt loop (iterative, not recursive), summary echo stripping, fallback retry, tool timing. Verbose mode uses Rich UI functions from `chat/ui.py` for styled output. `_stream_response()` handles the full stream lifecycle including sequential HITL interrupts via `while True` loop.
+Streaming chat client with HITL interrupt loop (iterative, not recursive), summary echo stripping, fallback retry, tool timing. Always shows Rich UI output (tool badges, timing, model info) via `chat/ui.py`. `_stream_response()` handles the full stream lifecycle including sequential HITL interrupts via `while True` loop.
 
 ### `agents/career_agent.py`
 Single agent with `create_agent()`, unified system prompt, `ToolCallRepairMiddleware` + `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `get_agent_config()`, `get_agent_model_name()`, `reset_career_agent()`.

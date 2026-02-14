@@ -250,7 +250,6 @@ def _stream_response(
     agent: Any,
     input_message: Any,
     config: dict[str, Any],
-    verbose: bool,
     console: Console,
     session: PromptSession,  # type: ignore[type-arg]
 ) -> tuple[str, set[str]]:
@@ -301,20 +300,16 @@ def _stream_response(
     stream_start = time.monotonic()
     logger.debug("Stream started")
 
-    if verbose:
-        # Verbose mode: print tool info directly, no Live widget.
-        for chunk, metadata in _stream_iter():
-            if _verbose_print(chunk, metadata):
-                continue
-            acc.accumulate(chunk)
-        # Render only the final AI response once
-        display_text = _strip_summary_echo(acc.msg_buf)
-        if display_text:
-            console.print()
-            console.print(Markdown(display_text))
-        display_timing(time.monotonic() - stream_start)
-    else:
-        _stream_to_live(_stream_iter(), acc, console)
+    for chunk, metadata in _stream_iter():
+        if _verbose_print(chunk, metadata):
+            continue
+        acc.accumulate(chunk)
+    # Render only the final AI response once
+    display_text = _strip_summary_echo(acc.msg_buf)
+    if display_text:
+        console.print()
+        console.print(Markdown(display_text))
+    display_timing(time.monotonic() - stream_start)
 
     logger.debug("Stream ended (%.1fs)", time.monotonic() - stream_start)
 
@@ -349,30 +344,19 @@ def _stream_response(
         resume_start = time.monotonic()
         logger.debug("Resume stream started")
 
-        if verbose:
-            for chunk, metadata in agent.stream(
-                Command(resume=approved),
-                cast(RunnableConfig, config),
-                stream_mode="messages",
-            ):
-                if _verbose_print(chunk, metadata):
-                    continue
-                resume_acc.accumulate(chunk)
-            display_text = _strip_summary_echo(resume_acc.msg_buf)
-            if display_text:
-                console.print()
-                console.print(Markdown(display_text))
-            display_timing(time.monotonic() - resume_start)
-        else:
-            _stream_to_live(
-                agent.stream(
-                    Command(resume=approved),
-                    cast(RunnableConfig, config),
-                    stream_mode="messages",
-                ),
-                resume_acc,
-                console,
-            )
+        for chunk, metadata in agent.stream(
+            Command(resume=approved),
+            cast(RunnableConfig, config),
+            stream_mode="messages",
+        ):
+            if _verbose_print(chunk, metadata):
+                continue
+            resume_acc.accumulate(chunk)
+        display_text = _strip_summary_echo(resume_acc.msg_buf)
+        if display_text:
+            console.print()
+            console.print(Markdown(display_text))
+        display_timing(time.monotonic() - resume_start)
 
         logger.debug("Resume stream ended (%.1fs)", time.monotonic() - resume_start)
 
@@ -383,12 +367,11 @@ def _stream_response(
     return full_response, shown_tools
 
 
-def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
+def run_chat(thread_id: str = "main") -> None:
     """Run the synchronous chat loop.
 
     Args:
         thread_id: Conversation thread identifier for persistence
-        verbose: If True, show tool usage and agent reasoning
     """
     # Set up prompt session with history
     history = FileHistory(str(get_history_path()))
@@ -402,11 +385,9 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
         agent = create_career_agent()
         config = get_agent_config(thread_id=thread_id)
 
-        # Show which model is being used in verbose mode
-        if verbose:
-            model_name = get_agent_model_name()
-            if model_name:
-                display_model_info(model_name)
+        model_name = get_agent_model_name()
+        if model_name:
+            display_model_info(model_name)
     except Exception as e:
         display_error(f"Failed to initialize agent: {e}")
         return
@@ -439,7 +420,7 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
             for attempt in range(max_retries):
                 try:
                     full_response, shown_tools = _stream_response(
-                        agent, input_message, config, verbose, console, session
+                        agent, input_message, config, console, session
                     )
                     break  # Success, exit retry loop
 
@@ -469,8 +450,7 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
                             e,
                             next_model,
                         )
-                        if verbose:
-                            display_model_switch(next_model)
+                        display_model_switch(next_model)
                         # Recreate agent with new model
                         reset_career_agent()
                         agent = create_career_agent()
