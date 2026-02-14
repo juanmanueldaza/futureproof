@@ -148,6 +148,7 @@ def recall_memories(
     that are relevant to the current discussion.
     """
     result_parts: list[str] = []
+    seen_texts: set[str] = set()
 
     # Search ChromaDB (persistent, primary source)
     try:
@@ -159,6 +160,7 @@ def recall_memories(
         if memories:
             result_parts.append(f"Found {len(memories)} relevant memories:")
             for mem in memories:
+                seen_texts.add(mem.content)
                 date_str = mem.timestamp.strftime("%Y-%m-%d")
                 result_parts.append(f"\n**[{mem.memory_type.value}] {date_str}**")
                 result_parts.append(f"  {mem.content}")
@@ -176,7 +178,8 @@ def recall_memories(
                 for item in items:
                     text = item.value.get("text", "")
                     mem_type = item.value.get("type", "memory")
-                    if text and text not in "\n".join(result_parts):
+                    if text and text not in seen_texts:
+                        seen_texts.add(text)
                         result_parts.append(f"\n**[{mem_type}]** {text}")
         except Exception:
             logger.debug("InMemoryStore search failed (non-critical)", exc_info=True)

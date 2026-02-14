@@ -176,11 +176,6 @@ _EXACT_HANDLERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "advise": _handle_advise,
 }
 
-_PREFIX_HANDLERS: list[tuple[str, Callable[[dict[str, Any]], dict[str, Any]]]] = [
-    ("analyze", _handle_analyze),
-]
-
-
 # ============================================================================
 # Entrypoint (replaces StateGraph + conditional routing)
 # ============================================================================
@@ -192,7 +187,6 @@ def execute_workflow(state: dict[str, Any]) -> dict[str, Any]:
 
     Routes to the appropriate task via dispatch tables:
     - gather / gather_all: Parallel data gathering from all sources
-    - gather_market: Market intelligence gathering
     - analyze_*: Career or market analysis
     - generate: CV generation
     - advise: Career advice
@@ -209,9 +203,9 @@ def execute_workflow(state: dict[str, Any]) -> dict[str, Any]:
     if handler:
         return handler(state)
 
-    for prefix, prefix_handler in _PREFIX_HANDLERS:
-        if action.startswith(prefix):
-            return prefix_handler(state)
+    # Fallback: any unregistered analyze_* action gets general analysis
+    if action.startswith("analyze"):
+        return _handle_analyze(state)
 
     # Unknown action — return state unchanged
     return state

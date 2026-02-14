@@ -1,6 +1,6 @@
 """Data preparation for orchestrator nodes."""
 
-import functools
+from functools import partial
 from typing import Any
 
 
@@ -34,5 +34,5 @@ def prepare_data(
 
 
 # Pre-configured callables for common use cases
-default_pipeline = functools.partial(prepare_data)
-advice_pipeline = functools.partial(prepare_data, include_analysis=True)
+default_pipeline = prepare_data
+advice_pipeline = partial(prepare_data, include_analysis=True)

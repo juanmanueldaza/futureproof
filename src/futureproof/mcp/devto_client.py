@@ -23,9 +23,6 @@ class DevToMCPClient(HTTPMCPClient):
         "Accept": "application/json",
     }
 
-    def __init__(self) -> None:
-        super().__init__()
-
     async def list_tools(self) -> list[str]:
         """List available tools."""
         return ["search_articles", "get_trending", "get_by_tag"]

@@ -109,9 +109,6 @@ class HackerNewsMCPClient(HTTPMCPClient):
         ],
     }
 
-    def __init__(self) -> None:
-        super().__init__()
-
     # Salary patterns for extraction
     SALARY_PATTERNS: list[str] = [
         r"\$(\d{2,3})[kK]?\s*[-–—to]+\s*\$?(\d{2,3})[kK]",  # $150k-$200k

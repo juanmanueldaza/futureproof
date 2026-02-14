@@ -15,35 +15,6 @@ from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Private IP ranges that should be blocked (SSRF protection)
-BLOCKED_IP_PREFIXES = (
-    "127.",  # Loopback
-    "10.",  # Private Class A
-    "172.16.",
-    "172.17.",
-    "172.18.",
-    "172.19.",
-    "172.20.",
-    "172.21.",
-    "172.22.",
-    "172.23.",
-    "172.24.",
-    "172.25.",
-    "172.26.",
-    "172.27.",
-    "172.28.",
-    "172.29.",
-    "172.30.",
-    "172.31.",  # Private Class B
-    "192.168.",  # Private Class C
-    "169.254.",  # Link-local
-    "0.",  # Invalid
-    "::1",  # IPv6 loopback
-    "fe80:",  # IPv6 link-local
-    "fc00:",  # IPv6 unique local
-    "fd00:",  # IPv6 unique local
-)
-
 
 @dataclass
 class FetchResult:
@@ -102,6 +73,9 @@ class PortfolioFetcher:
     def _is_safe_url(self, url: str) -> bool:
         """Check if URL is safe to fetch (SSRF protection).
 
+        Uses ipaddress.is_private which covers all RFC 1918 ranges,
+        loopback, link-local, Carrier-Grade NAT, and IPv6 equivalents.
+
         Args:
             url: URL to validate
 
@@ -127,14 +101,15 @@ class PortfolioFetcher:
                     logger.warning("Blocked private IP: %s", hostname)
                     return False
             except ValueError:
-                # Not an IP, resolve hostname
+                # Not an IP, resolve hostname and check resolved address
                 try:
-                    resolved_ip = socket.gethostbyname(hostname)
-                    if resolved_ip.startswith(BLOCKED_IP_PREFIXES):
+                    resolved = socket.gethostbyname(hostname)
+                    ip = ip_address(resolved)
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
                         logger.warning(
                             "Blocked hostname resolving to private IP: %s -> %s",
                             hostname,
-                            resolved_ip,
+                            resolved,
                         )
                         return False
                 except socket.gaierror:

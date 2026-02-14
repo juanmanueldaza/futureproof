@@ -24,16 +24,6 @@ class ModelConfig:
     model: str
     description: str
 
-    def get_api_key(self) -> str:
-        """Get the API key for this provider."""
-        if self.provider == "azure":
-            return settings.azure_openai_api_key
-        return ""
-
-    def is_available(self) -> bool:
-        """Check if this model is available (has API key configured)."""
-        return settings.has_azure
-
 
 # Default fallback chain - ordered by preference
 DEFAULT_FALLBACK_CHAIN: list[ModelConfig] = [
@@ -98,11 +88,6 @@ class FallbackLLMManager:
         error_str = str(error).lower()
         return any(indicator in error_str for indicator in self.FALLBACK_ERROR_INDICATORS)
 
-    # Provider to init_chat_model model_provider mapping
-    _PROVIDER_MAP: dict[str, str] = {
-        "azure": "azure_openai",
-    }
-
     def _create_model(self, config: ModelConfig, temperature: float | None = None) -> BaseChatModel:
         """Create a LangChain chat model from config using init_chat_model.
 
@@ -113,9 +98,9 @@ class FallbackLLMManager:
         """
         from langchain.chat_models import init_chat_model
 
-        model_provider = self._PROVIDER_MAP.get(config.provider)
-        if not model_provider:
+        if config.provider != "azure":
             raise ValueError(f"Unknown provider: {config.provider}")
+        model_provider = "azure_openai"
 
         effective_temperature = temperature if temperature is not None else self._temperature
         kwargs: dict[str, Any] = {
@@ -126,7 +111,7 @@ class FallbackLLMManager:
         kwargs["azure_deployment"] = config.model
         kwargs["azure_endpoint"] = settings.azure_openai_endpoint
         kwargs["api_version"] = settings.azure_openai_api_version
-        kwargs["api_key"] = config.get_api_key()
+        kwargs["api_key"] = settings.azure_openai_api_key
 
         return init_chat_model(
             model=config.model,
@@ -139,7 +124,7 @@ class FallbackLLMManager:
         return [
             config
             for config in self._chain
-            if config.is_available() and self._model_key(config) not in self._failed_models
+            if settings.has_azure and self._model_key(config) not in self._failed_models
         ]
 
     def get_model(self, temperature: float | None = None) -> tuple[BaseChatModel, ModelConfig]:

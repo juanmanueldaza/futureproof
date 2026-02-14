@@ -23,9 +23,6 @@ class RemoteOKMCPClient(HTTPMCPClient):
         "Accept": "application/json",
     }
 
-    def __init__(self) -> None:
-        super().__init__()
-
     async def list_tools(self) -> list[str]:
         """List available tools."""
         return ["search_remote_jobs"]
