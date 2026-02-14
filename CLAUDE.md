@@ -74,7 +74,7 @@ ruff check . --fix                  # Auto-fix
 
 All functionality is accessible through the **chat interface** via a single agent built with LangChain's `create_agent()`:
 
-- **Single agent**: One agent with all 30 tools — profile, gathering, analysis, generation, knowledge, market, memory
+- **Single agent**: One agent with all 33 tools — profile, gathering, github, analysis, generation, knowledge, market, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages)
 - **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent)
@@ -83,10 +83,11 @@ All functionality is accessible through the **chat interface** via a single agen
 - **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — Azure OpenAI only
 - **Caching**: Agent singleton (`_cached_agent`), checkpointer singleton, embedding function singleton
 
-### Agent Tools (30 tools in `agents/tools/`)
+### Agent Tools (33 tools in `agents/tools/`)
 
 - **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
 - **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — portfolio/assessment index directly to ChromaDB; LinkedIn reads CLI output files
+- **GitHub** (3): `search_github_repos`, `get_github_repo`, `get_github_profile` — live queries via GitHub MCP server
 - **Knowledge** (4): `search_career_knowledge`, `get_knowledge_stats`, `index_career_knowledge`, `clear_career_knowledge` (HITL)
 - **Analysis** (3): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`
 - **Generation** (2): `generate_cv` (HITL), `generate_cv_draft`

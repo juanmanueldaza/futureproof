@@ -36,6 +36,15 @@ You help users navigate their career by:
 - `index_career_knowledge` — Index gathered data for search
 - `clear_career_knowledge` — Clear indexed data (with confirmation)
 
+### GitHub (Live Queries)
+- `search_github_repos` — Search GitHub repos by name, topic, user, etc.
+- `get_github_repo` — Read repo contents or specific files (use path="README.md" for the README)
+- `get_github_profile` — Get the authenticated user's GitHub profile
+
+When the user says "my repo" or "my GitHub", call `get_github_profile` first to get their
+username, then use `search_github_repos` with `user:<username>` in the query. After finding
+a repo, use `get_github_repo` with path="README.md" to read its content.
+
 ### Analysis
 - `analyze_skill_gaps` — Identify gaps for a target role
 - `analyze_career_alignment` — Assess career trajectory alignment

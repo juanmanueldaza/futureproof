@@ -19,6 +19,7 @@ from .gathering import (
     get_stored_career_data,
 )
 from .generation import generate_cv, generate_cv_draft
+from .github import get_github_profile, get_github_repo, search_github_repos
 from .knowledge import (
     clear_career_knowledge,
     get_knowledge_stats,
@@ -64,6 +65,10 @@ _ALL_TOOLS = [
     gather_assessment_data,
     gather_all_career_data,
     get_stored_career_data,
+    # GitHub
+    search_github_repos,
+    get_github_repo,
+    get_github_profile,
     # Knowledge
     search_career_knowledge,
     get_knowledge_stats,
@@ -96,7 +101,7 @@ __all__ = [getattr(t, "__name__", t.name) for t in _ALL_TOOLS] + ["get_all_tools
 def get_all_tools() -> list:
     """Get all career intelligence tools for the agent.
 
-    Returns all 30 tools: profile, gathering, analysis, market, generation,
-    knowledge, and memory.
+    Returns all 33 tools: profile, gathering, github, analysis, market,
+    generation, knowledge, and memory.
     """
     return list(_ALL_TOOLS)
