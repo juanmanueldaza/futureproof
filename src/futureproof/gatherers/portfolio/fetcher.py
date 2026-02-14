@@ -138,6 +138,10 @@ class PortfolioFetcher:
         if not self._client:
             raise RuntimeError("PortfolioFetcher must be used as context manager")
 
+        # Prepend https:// if no scheme provided
+        if not urlparse(url).scheme:
+            url = f"https://{url}"
+
         # SSRF protection
         if not self._is_safe_url(url):
             raise ValueError(f"URL blocked by security policy: {url}")
