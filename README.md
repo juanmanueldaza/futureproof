@@ -117,13 +117,16 @@ AZURE_OPENAI_API_KEY=abc123...                  # LLM + embeddings
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_CHAT_DEPLOYMENT=gpt-4.1
 AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+AZURE_AGENT_DEPLOYMENT=gpt-4o                   # Best model for tool calling
+AZURE_ANALYSIS_DEPLOYMENT=gpt-4.1               # Analysis & CV generation
+AZURE_SUMMARY_DEPLOYMENT=gpt-4o-mini            # Cheap model for summarization
 GITHUB_USERNAME=your_username
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data via MCP
 PORTFOLIO_URL=https://your-site.com
 TAVILY_API_KEY=tvly-...                         # Market research
 ```
 
-The LLM fallback chain tries Azure models in order: GPT-4.1 → GPT-4.1 Mini, auto-switching on rate limits.
+The LLM fallback chain tries Azure models in order: GPT-4.1 → GPT-4o → GPT-4.1 Mini → GPT-4o Mini, auto-switching on rate limits. Purpose-based model routing lets you assign different models to agent tool calling, analysis, and summarization via env vars.
 
 ## Project structure
 
@@ -153,7 +156,7 @@ src/futureproof/
 │   ├── portfolio/          # Website scraper (fetcher, HTML/JS extractors)
 │   └── market/             # Job market, tech trends, content trends
 ├── generators/             # CV generation (Markdown + PDF via WeasyPrint)
-├── llm/                    # FallbackLLMManager with init_chat_model()
+├── llm/                    # FallbackLLMManager with purpose-based model routing
 ├── memory/
 │   ├── knowledge.py        # ChromaDB knowledge store (RAG)
 │   ├── episodic.py         # ChromaDB episodic memory
@@ -161,7 +164,7 @@ src/futureproof/
 │   ├── embeddings.py       # Azure OpenAI embedding functions
 │   ├── checkpointer.py     # SQLite conversation persistence
 │   └── profile.py          # User profile (YAML)
-├── mcp/                    # 13 MCP clients (GitHub, GitLab, HN, Tavily, job boards)
+├── mcp/                    # 12 MCP clients (GitHub, HN, Tavily, job boards)
 ├── prompts/                # LLM prompt templates
 ├── services/               # Business logic layer
 └── utils/                  # Security, data loading, logging

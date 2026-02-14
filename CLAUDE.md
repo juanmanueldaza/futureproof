@@ -75,7 +75,7 @@ All functionality is accessible through the **chat interface** via a single agen
 
 - **Single agent**: One agent with all 36 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
-- **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages)
+- **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 32k tokens, keeps last 20 messages, uses separate cheaper model)
 - **Memory**: ChromaDB for persistent episodic memory (decisions, applications) and career knowledge RAG
 - **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, portfolio)
 - **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for career analysis workflows (used by `AnalysisService`)
@@ -101,7 +101,9 @@ Shared async helper: `_async.py` with `run_async()` for sync tool → async serv
 `FallbackLLMManager` in `llm/fallback.py` tries models in order, auto-skipping on rate limits or errors:
 
 1. Azure GPT-4.1
-2. Azure GPT-4.1 Mini
+2. Azure GPT-4o
+3. Azure GPT-4.1 Mini
+4. Azure GPT-4o Mini
 
 Uses `init_chat_model()` with `azure_openai` provider.
 
@@ -109,9 +111,9 @@ Uses `init_chat_model()` with `azure_openai` provider.
 
 | Purpose | Call Sites | Config Var | Recommended Model |
 |---|---|---|---|
-| `agent` | `create_agent()` | `AZURE_AGENT_DEPLOYMENT` | Best available (GPT-5/5.2) |
+| `agent` | `create_agent()` | `AZURE_AGENT_DEPLOYMENT` | GPT-4o (stable tool calling) or GPT-5/5.2 (best) |
 | `analysis` | `invoke_llm()`, `CVGenerator` | `AZURE_ANALYSIS_DEPLOYMENT` | GPT-4.1 |
-| `summary` | `SummarizationMiddleware` | `AZURE_SUMMARY_DEPLOYMENT` | GPT-4.1 Mini |
+| `summary` | `SummarizationMiddleware` | `AZURE_SUMMARY_DEPLOYMENT` | GPT-4o Mini or GPT-4.1 Mini |
 
 ## MCP Clients (`mcp/`)
 
@@ -173,9 +175,9 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `CV_TEMPERATURE` — CV generation temperature (default: `0.2`)
 
 ### Model Routing (optional)
-- `AZURE_AGENT_DEPLOYMENT` — Deployment for tool calling (e.g. `gpt-5`). Empty = use default chain.
+- `AZURE_AGENT_DEPLOYMENT` — Deployment for tool calling (e.g. `gpt-4o`, `gpt-5`). Empty = use default chain.
 - `AZURE_ANALYSIS_DEPLOYMENT` — Deployment for analysis/CV generation (e.g. `gpt-4.1`). Empty = use default chain.
-- `AZURE_SUMMARY_DEPLOYMENT` — Deployment for summarization (e.g. `gpt-4.1-mini`). Empty = use default chain.
+- `AZURE_SUMMARY_DEPLOYMENT` — Deployment for summarization (e.g. `gpt-4o-mini`). Empty = use default chain.
 
 ### Data Sources
 - `PORTFOLIO_URL` — Portfolio website URL
@@ -210,7 +212,7 @@ Single agent with `create_agent()`, unified system prompt, `SummarizationMiddlew
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).
 
 ### `llm/fallback.py`
-`FallbackLLMManager` with 2-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
+`FallbackLLMManager` with 4-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
 ### `memory/knowledge.py`
 `CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Database-first: `index_content()` accepts raw strings (no file I/O). `get_all_content()` retrieves all chunks for a source. `KnowledgeSource` enum: linkedin, portfolio, assessment. Also has `index_markdown_file()` (for LinkedIn CLI files), `search()`, `clear_source()`, `get_stats()`.
