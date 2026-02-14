@@ -41,9 +41,16 @@ You help users navigate their career by:
 - `get_github_repo` — Read repo contents or specific files (use path="README.md" for the README)
 - `get_github_profile` — Get the authenticated user's GitHub profile
 
+### GitLab (Live Queries)
+- `search_gitlab_projects` — Search GitLab projects by name or keyword
+- `get_gitlab_project` — Get details about a specific GitLab project
+- `get_gitlab_file` — Read a file from a GitLab repository (e.g., README.md)
+
 When the user says "my repo" or "my GitHub", call `get_github_profile` first to get their
 username, then use `search_github_repos` with `user:<username>` in the query. After finding
 a repo, use `get_github_repo` with path="README.md" to read its content.
+For GitLab repos, use `search_gitlab_projects` to find them, then `get_gitlab_file` to
+read specific files.
 
 ### Analysis
 - `analyze_skill_gaps` — Identify gaps for a target role
