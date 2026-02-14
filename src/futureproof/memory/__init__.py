@@ -7,7 +7,7 @@ This module provides four-tier memory architecture:
 - Knowledge: ChromaDB for career data RAG retrieval
 """
 
-from futureproof.memory.checkpointer import get_async_checkpointer_context, get_checkpointer
+from futureproof.memory.checkpointer import get_checkpointer
 
 # Chunker for markdown processing
 from futureproof.memory.chunker import MarkdownChunk, MarkdownChunker
@@ -19,10 +19,7 @@ from futureproof.memory.episodic import (
     MemoryType,
     get_episodic_store,
     remember_application,
-    remember_conversation,
     remember_decision,
-    remember_learning,
-    remember_milestone,
 )
 
 # Knowledge base for RAG
@@ -37,7 +34,6 @@ from futureproof.memory.profile import UserProfile, load_profile, save_profile
 __all__ = [
     # Checkpointer
     "get_checkpointer",
-    "get_async_checkpointer_context",
     # Profile
     "UserProfile",
     "load_profile",
@@ -52,9 +48,6 @@ __all__ = [
     "get_episodic_store",
     "remember_decision",
     "remember_application",
-    "remember_milestone",
-    "remember_conversation",
-    "remember_learning",
     # Knowledge Base
     "CareerKnowledgeStore",
     "KnowledgeChunk",

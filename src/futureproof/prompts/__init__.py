@@ -3,7 +3,6 @@
 from .builders import PromptBuilder, get_prompt_builder
 from .templates import (
     ANALYZE_CAREER_PROMPT,
-    COMPARE_ALIGNMENT_PROMPT,
     GENERATE_CV_PROMPT,
     MARKET_FIT_PROMPT,
     MARKET_SKILL_GAP_PROMPT,
@@ -13,7 +12,6 @@ from .templates import (
 
 __all__ = [
     "ANALYZE_CAREER_PROMPT",
-    "COMPARE_ALIGNMENT_PROMPT",
     "GENERATE_CV_PROMPT",
     "MARKET_FIT_PROMPT",
     "MARKET_SKILL_GAP_PROMPT",

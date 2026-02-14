@@ -31,24 +31,6 @@ class RemotiveMCPClient(HTTPMCPClient):
         "Accept": "application/json",
     }
 
-    # Available categories
-    CATEGORIES = [
-        "software-dev",
-        "customer-support",
-        "design",
-        "marketing",
-        "sales",
-        "product",
-        "business",
-        "data",
-        "devops",
-        "finance",
-        "hr",
-        "qa",
-        "writing",
-        "all-others",
-    ]
-
     def __init__(self) -> None:
         super().__init__()
 

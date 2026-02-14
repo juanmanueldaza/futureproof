@@ -173,7 +173,7 @@ class CareerKnowledgeStore:
             )
         return self._collection
 
-    def index_document(
+    def _index_document(
         self,
         source: KnowledgeSource,
         content: str,
@@ -240,7 +240,7 @@ class CareerKnowledgeStore:
                 **(extra_metadata or {}),
             }
 
-            chunk_id = self.index_document(
+            chunk_id = self._index_document(
                 source=source,
                 content=chunk.content,
                 section=section,

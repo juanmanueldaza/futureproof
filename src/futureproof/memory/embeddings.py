@@ -186,9 +186,3 @@ def get_embedding_function(use_cache: bool = True) -> EmbeddingFunction[Document
         return None  # type: ignore[return-value]
 
     return _embedding_function
-
-
-def clear_embedding_cache() -> None:
-    """Clear the embedding cache and reset the global instance."""
-    global _embedding_function
-    _embedding_function = None

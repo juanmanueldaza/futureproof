@@ -8,23 +8,18 @@ Also provides market intelligence clients:
 - Tavily: Web search for salary data and market research
 - JobSpy: Multi-platform job aggregation (LinkedIn, Indeed, Glassdoor, ZipRecruiter)
 - RemoteOK: Remote-only job listings
-- Dice: Tech-focused job database
 - WeWorkRemotely: RSS-based remote jobs with salary data
 - Remotive: Remote jobs API with tags and location data
 """
 
 from .base import MCPClient, MCPClientError, MCPConnectionError, MCPToolError, MCPToolResult
 from .devto_client import DevToMCPClient
-from .dice_client import DiceMCPClient
 from .factory import CareerMCPType, MarketMCPType, MCPClientFactory, MCPServerType
 from .github_client import GitHubMCPClient
 from .gitlab_client import GitLabMCPClient
 from .hn_client import HackerNewsMCPClient
 from .http_client import HTTPMCPClient
 from .job_schema import (
-    JobNormalizer,
-    NormalizedJob,
-    SalaryInfo,
     attach_salary,
     clean_html_description,
     clean_html_entities,
@@ -50,10 +45,7 @@ __all__ = [
     "CareerMCPType",
     "MarketMCPType",
     "MCPServerType",
-    # Job schema and normalizers
-    "JobNormalizer",
-    "NormalizedJob",
-    "SalaryInfo",
+    # Job schema utilities
     "attach_salary",
     "clean_html_description",
     "clean_html_entities",
@@ -64,7 +56,6 @@ __all__ = [
     "GitLabMCPClient",
     # Market intelligence clients
     "DevToMCPClient",
-    "DiceMCPClient",
     "HackerNewsMCPClient",
     "JobSpyMCPClient",
     "RemoteOKMCPClient",

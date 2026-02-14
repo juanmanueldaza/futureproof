@@ -40,30 +40,3 @@ class GenerationService:
             return output_path
         except Exception as e:
             raise GenerationError(f"CV generation failed: {e}") from e
-
-    def generate_all_cvs(self) -> list[Path]:
-        """Generate all CV variants (all languages and formats).
-
-        Generates all 4 combinations (2 languages x 2 formats).
-        Continues on error to try all variants.
-
-        Returns:
-            List of paths to successfully generated files
-        """
-        from ..generators import CVGenerator
-
-        generator = CVGenerator()
-        paths: list[Path] = []
-
-        for language in ("en", "es"):
-            for cv_format in ("ats", "creative"):
-                try:
-                    path = generator.generate(
-                        language=language,  # type: ignore[arg-type]
-                        format=cv_format,  # type: ignore[arg-type]
-                    )
-                    paths.append(path)
-                except Exception:
-                    pass  # Continue with other variants
-
-        return paths

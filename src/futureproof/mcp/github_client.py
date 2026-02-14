@@ -180,49 +180,6 @@ class GitHubMCPClient(MCPClient):
         query = f"user:{owner}" if owner else ""
         return await self.call_tool("search_repositories", {"query": query, "perPage": per_page})
 
-    async def get_repo_commits(
-        self,
-        owner: str,
-        repo: str,
-        per_page: int = 100,
-    ) -> MCPToolResult:
-        """Get recent commits for a repository.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            per_page: Number of commits to fetch
-
-        Returns:
-            MCPToolResult with commit list
-        """
-        return await self.call_tool(
-            "list_commits",
-            {
-                "owner": owner,
-                "repo": repo,
-                "perPage": per_page,
-            },
-        )
-
-    async def search_user_repos(self, username: str, per_page: int = 100) -> MCPToolResult:
-        """Search for repositories by a specific user.
-
-        Args:
-            username: GitHub username
-            per_page: Number of results
-
-        Returns:
-            MCPToolResult with search results
-        """
-        return await self.call_tool(
-            "search_repositories",
-            {
-                "query": f"user:{username}",
-                "perPage": per_page,
-            },
-        )
-
     async def search_user_pull_requests(self, username: str, per_page: int = 100) -> MCPToolResult:
         """Search for pull requests authored by a user.
 

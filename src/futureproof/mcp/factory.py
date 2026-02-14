@@ -18,7 +18,6 @@ MarketMCPType = Literal[
     "tavily",
     "jobspy",
     "remoteok",
-    "dice",
     "himalayas",
     "jobicy",
     "devto",
@@ -35,7 +34,6 @@ MCPServerType = Literal[
     "tavily",
     "jobspy",
     "remoteok",
-    "dice",
     "himalayas",
     "jobicy",
     "devto",
@@ -75,8 +73,6 @@ class MCPClientFactory:
         "weworkremotely": lambda: True,
         "remotive": lambda: True,
         "stackoverflow": lambda: True,  # 300/day without key
-        # Disabled sources
-        "dice": lambda: False,  # Requires special setup
     }
 
     @classmethod
@@ -84,7 +80,6 @@ class MCPClientFactory:
         """Lazy-load client classes to avoid circular imports."""
         if cls._clients is None:
             from .devto_client import DevToMCPClient
-            from .dice_client import DiceMCPClient
             from .github_client import GitHubMCPClient
             from .gitlab_client import GitLabMCPClient
             from .himalayas_client import HimalayasMCPClient
@@ -106,7 +101,6 @@ class MCPClientFactory:
                 "tavily": TavilyMCPClient,
                 "jobspy": JobSpyMCPClient,
                 "remoteok": RemoteOKMCPClient,
-                "dice": DiceMCPClient,
                 # Additional market intelligence sources
                 "himalayas": HimalayasMCPClient,
                 "jobicy": JobicyMCPClient,
@@ -170,7 +164,6 @@ class MCPClientFactory:
             "tavily",
             "jobspy",
             "remoteok",
-            "dice",
             "himalayas",
             "jobicy",
             "devto",

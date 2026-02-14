@@ -20,7 +20,6 @@ Usage:
 from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 # Cached singleton to avoid creating new connections on every call
 _checkpointer: SqliteSaver | None = None
@@ -54,30 +53,6 @@ def get_checkpointer() -> SqliteSaver:
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     _checkpointer = SqliteSaver(conn)
     return _checkpointer
-
-
-def reset_checkpointer() -> None:
-    """Reset the cached checkpointer instance.
-
-    Use this for testing or when you need to force a fresh connection.
-    """
-    global _checkpointer
-    _checkpointer = None
-
-
-def get_async_checkpointer_context():
-    """Get an async SqliteSaver checkpointer context manager.
-
-    Returns:
-        Context manager that yields AsyncSqliteSaver instance.
-
-    Usage:
-        async with get_async_checkpointer_context() as checkpointer:
-            agent = create_agent(..., checkpointer=checkpointer)
-            await agent.ainvoke(...)
-    """
-    db_path = get_data_dir() / "memory.db"
-    return AsyncSqliteSaver.from_conn_string(str(db_path))
 
 
 def clear_thread_history(thread_id: str) -> None:
