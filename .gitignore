@@ -77,9 +77,7 @@ logs/
 *.sqlite
 *.sqlite3
 
-# uv
-.uv/
-uv.lock
+
 
 # mypy / pyright / ruff
 .mypy_cache/
