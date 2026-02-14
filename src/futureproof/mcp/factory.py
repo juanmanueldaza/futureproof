@@ -9,23 +9,6 @@ from typing import Literal
 from ..config import settings
 from .base import MCPClient
 
-# Career data sources
-CareerMCPType = Literal["github", "gitlab"]
-
-# Market intelligence sources
-MarketMCPType = Literal[
-    "hn",
-    "tavily",
-    "jobspy",
-    "remoteok",
-    "himalayas",
-    "jobicy",
-    "devto",
-    "stackoverflow",
-    "weworkremotely",
-    "remotive",
-]
-
 # All MCP server types
 MCPServerType = Literal[
     "github",
@@ -150,42 +133,3 @@ class MCPClientFactory:
         if checker is None:
             return False
         return checker()
-
-    @classmethod
-    def get_available_market_sources(cls) -> list[MarketMCPType]:
-        """Get list of available market intelligence sources.
-
-        Returns:
-            List of available market MCP types
-        """
-        available: list[MarketMCPType] = []
-        market_types: list[MarketMCPType] = [
-            "hn",
-            "tavily",
-            "jobspy",
-            "remoteok",
-            "himalayas",
-            "jobicy",
-            "devto",
-            "stackoverflow",
-            "weworkremotely",
-            "remotive",
-        ]
-        for source in market_types:
-            if cls.is_available(source):
-                available.append(source)
-        return available
-
-    @classmethod
-    def get_available_career_sources(cls) -> list[CareerMCPType]:
-        """Get list of available career data sources.
-
-        Returns:
-            List of available career MCP types
-        """
-        available: list[CareerMCPType] = []
-        career_types: list[CareerMCPType] = ["github", "gitlab"]
-        for source in career_types:
-            if cls.is_available(source):
-                available.append(source)
-        return available

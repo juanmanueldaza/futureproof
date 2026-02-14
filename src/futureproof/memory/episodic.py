@@ -8,19 +8,6 @@ Example uses:
 - "Remember when I rejected that Stripe offer?" -> Recalls the decision context
 - "What companies have I applied to?" -> Searches past job applications
 - "Why did I pivot to backend?" -> Finds career transition reasoning
-
-Architecture:
-    ┌─────────────────────────────────────────┐
-    │           Episodic Memory               │
-    │  ┌─────────────────────────────────┐    │
-    │  │         ChromaDB                 │    │
-    │  │  ┌────────────────────────────┐  │    │
-    │  │  │  career_decisions          │  │    │
-    │  │  │  job_applications          │  │    │
-    │  │  │  conversation_summaries    │  │    │
-    │  │  └────────────────────────────┘  │    │
-    │  └─────────────────────────────────┘    │
-    └─────────────────────────────────────────┘
 """
 
 import logging
@@ -31,7 +18,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from .embeddings import get_embedding_function
+from .chromadb_store import ChromaDBStore
 
 logger = logging.getLogger(__name__)
 
@@ -89,71 +76,26 @@ class EpisodicMemory:
         )
 
 
-class EpisodicStore:
+class EpisodicStore(ChromaDBStore):
     """ChromaDB-backed store for episodic memories.
 
     Provides semantic search over past decisions and experiences.
     """
 
+    collection_name = "career_memories"
+    collection_description = "Career decisions and experiences"
+
     def __init__(self, persist_dir: Path | None = None) -> None:
-        """Initialize the episodic store.
-
-        Args:
-            persist_dir: Directory for ChromaDB persistence.
-                        Defaults to ~/.futureproof/episodic/
-        """
-        from futureproof.memory.checkpointer import get_data_dir
-
-        if persist_dir is None:
-            persist_dir = get_data_dir() / "episodic"
-
-        self.persist_dir = persist_dir
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
-
-        self._client = None
-        self._collection = None
-
-    @property
-    def client(self):
-        """Lazy-load ChromaDB client."""
-        if self._client is None:
-            try:
-                import chromadb  # type: ignore[import-not-found]
-
-                self._client = chromadb.PersistentClient(path=str(self.persist_dir))
-                logger.info(f"ChromaDB initialized at {self.persist_dir}")
-            except ImportError:
-                logger.warning("ChromaDB not installed. Episodic memory disabled.")
-                raise
-        return self._client
-
-    @property
-    def collection(self):
-        """Get or create the memories collection."""
-        if self._collection is None:
-            embedding_fn = get_embedding_function()
-            self._collection = self.client.get_or_create_collection(
-                name="career_memories",
-                metadata={"description": "Career decisions and experiences"},
-                embedding_function=embedding_fn,  # type: ignore[arg-type]
-            )
-        return self._collection
+        super().__init__(persist_dir)
 
     def remember(self, memory: EpisodicMemory) -> str:
-        """Store a new episodic memory.
-
-        Args:
-            memory: The memory to store
-
-        Returns:
-            The memory ID
-        """
-        self.collection.add(
+        """Store a new episodic memory."""
+        self._add(
             ids=[memory.id],
             documents=[memory.to_document()],
             metadatas=[memory.to_metadata()],
         )
-        logger.info(f"Stored memory: {memory.id} ({memory.memory_type.value})")
+        logger.info("Stored memory: %s (%s)", memory.id, memory.memory_type.value)
         return memory.id
 
     def recall(
@@ -162,54 +104,19 @@ class EpisodicStore:
         limit: int = 5,
         memory_type: MemoryType | None = None,
     ) -> list[EpisodicMemory]:
-        """Search for relevant memories.
-
-        Args:
-            query: Search query (semantic search)
-            limit: Maximum results to return
-            memory_type: Optional filter by memory type
-
-        Returns:
-            List of matching memories, ordered by relevance
-        """
+        """Search for relevant memories."""
         where = None
         if memory_type:
             where = {"memory_type": memory_type.value}
 
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where=where,  # type: ignore[arg-type]
-        )
-
-        memories = []
-        if results["ids"] and results["ids"][0]:
-            for i, id in enumerate(results["ids"][0]):
-                doc = results["documents"][0][i] if results["documents"] else ""
-                meta = results["metadatas"][0][i] if results["metadatas"] else {}
-                memories.append(EpisodicMemory.from_chromadb(id, doc, dict(meta)))
-
-        return memories
+        results = self._query(query, limit=limit, where=where)
+        return [EpisodicMemory.from_chromadb(id, doc, meta) for id, doc, meta in results]
 
     def stats(self) -> dict[str, Any]:
-        """Get statistics about the episodic store.
-
-        Returns:
-            Dictionary with store statistics
-        """
-        count = self.collection.count()
-
-        # Count by type
-        type_counts = {}
-        for mem_type in MemoryType:
-            results = self.collection.get(
-                where={"memory_type": mem_type.value},
-            )
-            type_counts[mem_type.value] = len(results["ids"]) if results["ids"] else 0
-
+        """Get statistics about the episodic store."""
         return {
-            "total_memories": count,
-            "by_type": type_counts,
+            "total_memories": self.collection.count(),
+            "by_type": self._count_by_values("memory_type", [mt.value for mt in MemoryType]),
             "persist_dir": str(self.persist_dir),
         }
 
@@ -289,11 +196,7 @@ _store: EpisodicStore | None = None
 
 
 def get_episodic_store() -> EpisodicStore:
-    """Get the global episodic store instance.
-
-    Returns:
-        EpisodicStore singleton
-    """
+    """Get the global episodic store instance."""
     global _store
     if _store is None:
         _store = EpisodicStore()

@@ -3,19 +3,6 @@
 Provides semantic search over career documents (GitHub, GitLab, LinkedIn, Portfolio).
 Unlike EpisodicStore (for decisions/experiences), this stores factual career data
 that can be queried by the agent instead of loading full documents into context.
-
-Architecture:
-    ┌─────────────────────────────────────────┐
-    │         Career Knowledge Base           │
-    │  ┌─────────────────────────────────┐    │
-    │  │         ChromaDB                 │    │
-    │  │  ┌────────────────────────────┐  │    │
-    │  │  │  career_knowledge          │  │    │
-    │  │  │  (github, gitlab, linkedin │  │    │
-    │  │  │   portfolio, assessment)   │  │    │
-    │  │  └────────────────────────────┘  │    │
-    │  └─────────────────────────────────┘    │
-    └─────────────────────────────────────────┘
 """
 
 import logging
@@ -26,8 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from .chromadb_store import ChromaDBStore
 from .chunker import MarkdownChunker
-from .embeddings import get_embedding_function
 
 logger = logging.getLogger(__name__)
 
@@ -93,38 +80,23 @@ class KnowledgeChunk:
         )
 
 
-class CareerKnowledgeStore:
+class CareerKnowledgeStore(ChromaDBStore):
     """ChromaDB-backed store for career knowledge RAG.
 
-    Follows same pattern as EpisodicStore but for factual career data.
-    Uses a separate collection to keep episodic and factual data distinct.
+    Uses a separate collection from EpisodicStore to keep
+    factual career data distinct from episodic memories.
     """
 
-    COLLECTION_NAME = "career_knowledge"
+    collection_name = "career_knowledge"
+    collection_description = "Career knowledge for RAG retrieval"
 
     def __init__(
         self,
         persist_dir: Path | None = None,
         chunker: MarkdownChunker | None = None,
     ) -> None:
-        """Initialize the knowledge store.
-
-        Args:
-            persist_dir: Directory for ChromaDB persistence.
-                        Defaults to ~/.futureproof/episodic/ (shared with episodic)
-            chunker: MarkdownChunker instance (uses default if not provided)
-        """
-        from futureproof.memory.checkpointer import get_data_dir
-
-        if persist_dir is None:
-            persist_dir = get_data_dir() / "episodic"
-
-        self.persist_dir = persist_dir
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
-
+        super().__init__(persist_dir)
         self._chunker = chunker
-        self._client = None
-        self._collection = None
 
     @property
     def chunker(self) -> MarkdownChunker:
@@ -138,32 +110,6 @@ class CareerKnowledgeStore:
             )
         return self._chunker
 
-    @property
-    def client(self):
-        """Lazy-load ChromaDB client."""
-        if self._client is None:
-            try:
-                import chromadb  # type: ignore[import-not-found]
-
-                self._client = chromadb.PersistentClient(path=str(self.persist_dir))
-                logger.info(f"ChromaDB knowledge store initialized at {self.persist_dir}")
-            except ImportError:
-                logger.warning("ChromaDB not installed. Knowledge base disabled.")
-                raise
-        return self._client
-
-    @property
-    def collection(self):
-        """Get or create the knowledge collection."""
-        if self._collection is None:
-            embedding_fn = get_embedding_function()
-            self._collection = self.client.get_or_create_collection(
-                name=self.COLLECTION_NAME,
-                metadata={"description": "Career knowledge for RAG retrieval"},
-                embedding_function=embedding_fn,  # type: ignore[arg-type]
-            )
-        return self._collection
-
     def _index_document(
         self,
         source: KnowledgeSource,
@@ -171,17 +117,7 @@ class CareerKnowledgeStore:
         section: str,
         metadata: dict[str, Any] | None = None,
     ) -> str:
-        """Index a single document chunk.
-
-        Args:
-            source: Knowledge source (github, gitlab, etc.)
-            content: The text content to index
-            section: Section name (e.g., "Repositories", "Experience")
-            metadata: Additional metadata
-
-        Returns:
-            The chunk ID
-        """
+        """Index a single document chunk."""
         chunk = KnowledgeChunk(
             id=str(uuid.uuid4()),
             content=content,
@@ -190,13 +126,13 @@ class CareerKnowledgeStore:
             metadata=metadata or {},
         )
 
-        self.collection.add(
+        self._add(
             ids=[chunk.id],
             documents=[chunk.to_document()],
             metadatas=[chunk.to_metadata()],
         )
 
-        logger.debug(f"Indexed chunk: {chunk.id} ({source.value}/{section})")
+        logger.debug("Indexed chunk: %s (%s/%s)", chunk.id, source.value, section)
         return chunk.id
 
     def index_markdown_file(
@@ -216,7 +152,7 @@ class CareerKnowledgeStore:
             List of chunk IDs created
         """
         if not file_path.exists():
-            logger.warning(f"File not found: {file_path}")
+            logger.warning("File not found: %s", file_path)
             return []
 
         content = file_path.read_text()
@@ -239,7 +175,7 @@ class CareerKnowledgeStore:
             )
             chunk_ids.append(chunk_id)
 
-        logger.info(f"Indexed {len(chunk_ids)} chunks from {file_path.name}")
+        logger.info("Indexed %d chunks from %s", len(chunk_ids), file_path.name)
         return chunk_ids
 
     def search(
@@ -248,16 +184,7 @@ class CareerKnowledgeStore:
         limit: int = 5,
         sources: list[KnowledgeSource] | None = None,
     ) -> list[KnowledgeChunk]:
-        """Semantic search across career knowledge.
-
-        Args:
-            query: Search query
-            limit: Maximum results to return
-            sources: Optional filter by sources
-
-        Returns:
-            List of matching chunks, ordered by relevance
-        """
+        """Semantic search across career knowledge."""
         where = None
         if sources:
             if len(sources) == 1:
@@ -265,60 +192,23 @@ class CareerKnowledgeStore:
             else:
                 where = {"source": {"$in": [s.value for s in sources]}}
 
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where=where,  # type: ignore[arg-type]
-        )
-
-        chunks = []
-        if results["ids"] and results["ids"][0]:
-            for i, id in enumerate(results["ids"][0]):
-                doc = results["documents"][0][i] if results["documents"] else ""
-                meta = results["metadatas"][0][i] if results["metadatas"] else {}
-                chunks.append(KnowledgeChunk.from_chromadb(id, doc, dict(meta)))
-
-        return chunks
+        results = self._query(query, limit=limit, where=where)
+        return [KnowledgeChunk.from_chromadb(id, doc, meta) for id, doc, meta in results]
 
     def clear_source(self, source: KnowledgeSource) -> int:
-        """Clear all chunks from a source (before re-indexing).
-
-        Args:
-            source: The source to clear
-
-        Returns:
-            Number of chunks deleted
-        """
-        results = self.collection.get(
-            where={"source": source.value},
-        )
-
-        if results["ids"]:
-            self.collection.delete(ids=results["ids"])
-            logger.info(f"Cleared {len(results['ids'])} chunks from {source.value}")
-            return len(results["ids"])
-
+        """Clear all chunks from a source (before re-indexing)."""
+        ids = self._get_by_filter({"source": source.value})
+        if ids:
+            self.collection.delete(ids=ids)
+            logger.info("Cleared %d chunks from %s", len(ids), source.value)
+            return len(ids)
         return 0
 
     def get_stats(self) -> dict[str, Any]:
-        """Get statistics about the knowledge store.
-
-        Returns:
-            Dictionary with store statistics
-        """
-        total = self.collection.count()
-
-        # Count by source
-        source_counts = {}
-        for src in KnowledgeSource:
-            results = self.collection.get(
-                where={"source": src.value},
-            )
-            source_counts[src.value] = len(results["ids"]) if results["ids"] else 0
-
+        """Get statistics about the knowledge store."""
         return {
-            "total_chunks": total,
-            "by_source": source_counts,
+            "total_chunks": self.collection.count(),
+            "by_source": self._count_by_values("source", [src.value for src in KnowledgeSource]),
             "persist_dir": str(self.persist_dir),
         }
 
@@ -331,11 +221,7 @@ _store: CareerKnowledgeStore | None = None
 
 
 def get_knowledge_store() -> CareerKnowledgeStore:
-    """Get the global knowledge store instance.
-
-    Returns:
-        CareerKnowledgeStore singleton
-    """
+    """Get the global knowledge store instance."""
     global _store
     if _store is None:
         _store = CareerKnowledgeStore()

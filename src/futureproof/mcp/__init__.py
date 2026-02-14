@@ -14,7 +14,7 @@ Also provides market intelligence clients:
 
 from .base import MCPClient, MCPClientError, MCPConnectionError, MCPToolError, MCPToolResult
 from .devto_client import DevToMCPClient
-from .factory import CareerMCPType, MarketMCPType, MCPClientFactory, MCPServerType
+from .factory import MCPClientFactory, MCPServerType
 from .github_client import GitHubMCPClient
 from .gitlab_client import GitLabMCPClient
 from .hn_client import HackerNewsMCPClient
@@ -42,8 +42,6 @@ __all__ = [
     "MCPToolError",
     "MCPToolResult",
     # Type aliases
-    "CareerMCPType",
-    "MarketMCPType",
     "MCPServerType",
     # Job schema utilities
     "attach_salary",

@@ -4,22 +4,7 @@ from typing import Annotated
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
-from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
-
-# ============================================================================
-# Market Data Model
-# ============================================================================
-
-
-class MarketData(BaseModel):
-    """Market intelligence data from external sources."""
-
-    job_market: str = Field(default="", description="Job market data (JobSpy, Brave)")
-    tech_trends: str = Field(default="", description="Technology trends (HN, GitHub)")
-    economic_context: str = Field(default="", description="Economic indicators (BLS)")
-    salary_data: str = Field(default="", description="Salary/compensation data")
-
 
 # ============================================================================
 # LangGraph State
@@ -50,7 +35,6 @@ class CareerState(TypedDict, total=False):
     assessment_data: str | None
 
     # Market data
-    market_data: MarketData | None
     job_market: str | None
     tech_trends: str | None
     economic_context: str | None

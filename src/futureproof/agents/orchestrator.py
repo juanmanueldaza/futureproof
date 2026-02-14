@@ -162,16 +162,13 @@ _handle_generate = _make_handler(generate_task)
 _handle_advise = _make_handler(advise_task)
 
 
-# Dispatch tables — add new actions here without modifying execute_workflow.
-# Exact matches are checked first, then prefix matches as fallback.
+# Dispatch table — add new actions here without modifying execute_workflow.
+# Only canonical actions used by callers. Unregistered analyze_* variants
+# fall through to _handle_analyze via the startswith("analyze") fallback.
 _EXACT_HANDLERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "gather": _handle_gather,
-    "gather_all": _handle_gather,
     "analyze_market": _handle_analyze_market,
-    "analyze_market_fit": _handle_analyze_market,
-    "analyze_skill_gaps": _handle_analyze_market,
     "analyze_skills": _handle_analyze_market,
-    "analyze_trends": _handle_analyze_market,
     "generate": _handle_generate,
     "advise": _handle_advise,
 }
@@ -185,9 +182,10 @@ _EXACT_HANDLERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 def execute_workflow(state: dict[str, Any]) -> dict[str, Any]:
     """Execute a career intelligence workflow based on the action field.
 
-    Routes to the appropriate task via dispatch tables:
-    - gather / gather_all: Parallel data gathering from all sources
-    - analyze_*: Career or market analysis
+    Routes to the appropriate task via dispatch table:
+    - gather: Parallel data gathering from all sources
+    - analyze_market / analyze_skills: Market-aware analysis
+    - analyze_*: General career analysis (fallback)
     - generate: CV generation
     - advise: Career advice
 

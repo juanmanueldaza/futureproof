@@ -170,6 +170,51 @@ def handle_command(command: str) -> bool:
     return False
 
 
+class _ChunkAccumulator:
+    """Accumulates streamed chunks, tracking the latest AI message buffer."""
+
+    __slots__ = ("full_response", "msg_id", "msg_buf")
+
+    def __init__(self) -> None:
+        self.full_response = ""
+        self.msg_id: str | None = None
+        self.msg_buf = ""
+
+    def accumulate(self, chunk: Any) -> str:
+        """Extract text from a chunk and append to buffers.
+
+        Returns the extracted content string (empty if chunk had no text).
+        """
+        if not (hasattr(chunk, "content") and chunk.content):  # type: ignore[union-attr]
+            return ""
+        content = chunk.content  # type: ignore[union-attr]
+        if isinstance(content, list):
+            content = "".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            )
+        chunk_id = getattr(chunk, "id", None)
+        if chunk_id and chunk_id != self.msg_id:
+            self.msg_id = chunk_id
+            self.msg_buf = ""
+        self.full_response += content
+        self.msg_buf += content
+        return content
+
+
+def _stream_to_live(stream_iter, acc: _ChunkAccumulator, con: Console) -> None:
+    """Stream chunks to a Rich Live widget, stripping summary echoes."""
+    with Live(Markdown(""), console=con, refresh_per_second=10) as live:
+        for chunk, metadata in stream_iter:
+            if getattr(chunk, "type", None) == "tool":
+                continue
+            if acc.accumulate(chunk):
+                display_text = _strip_summary_echo(acc.msg_buf)
+                if display_text:
+                    live.update(Markdown(display_text))
+    con.print()
+
+
 def _stream_response(
     agent: Any,
     input_message: Any,
@@ -183,11 +228,9 @@ def _stream_response(
     Returns:
         Tuple of (full_response_text, shown_tool_names)
     """
-    full_response = ""
     shown_tools: set[str] = set()
     last_node = ""
-    current_msg_id: str | None = None
-    current_msg_buf = ""
+    acc = _ChunkAccumulator()
 
     def _verbose_print(chunk, metadata) -> bool:
         """Print verbose tool/node info. Returns True if chunk was consumed."""
@@ -214,25 +257,6 @@ def _stream_response(
             return True
         return False
 
-    def _accumulate(chunk) -> str:
-        """Extract content from chunk, track per-message buffer."""
-        nonlocal current_msg_id, current_msg_buf, full_response
-        if not (hasattr(chunk, "content") and chunk.content):  # type: ignore[union-attr]
-            return ""
-        content = chunk.content  # type: ignore[union-attr]
-        if isinstance(content, list):
-            content = "".join(
-                block.get("text", "") if isinstance(block, dict) else str(block)
-                for block in content
-            )
-        chunk_id = getattr(chunk, "id", None)
-        if chunk_id and chunk_id != current_msg_id:
-            current_msg_id = chunk_id
-            current_msg_buf = ""
-        full_response += content
-        current_msg_buf += content
-        return content
-
     def _stream_iter():
         return agent.stream(
             input_message,
@@ -242,31 +266,21 @@ def _stream_response(
 
     if verbose:
         # Verbose mode: print tool info directly, no Live widget.
-        # This avoids the flicker/duplication caused by Live re-rendering
-        # its content every time live.console.print() is called.
         for chunk, metadata in _stream_iter():
             if _verbose_print(chunk, metadata):
                 continue
-            _accumulate(chunk)
+            acc.accumulate(chunk)
         # Render only the final AI response once
-        display_text = _strip_summary_echo(current_msg_buf)
+        display_text = _strip_summary_echo(acc.msg_buf)
         if display_text:
             console.print()
             console.print(Markdown(display_text))
+        console.print()
     else:
-        # Non-verbose: stream with Live in-place rendering.
-        with Live(Markdown(""), console=console, refresh_per_second=10) as live:
-            for chunk, metadata in _stream_iter():
-                if getattr(chunk, "type", None) == "tool":
-                    continue
-                if _accumulate(chunk):
-                    display_text = _strip_summary_echo(current_msg_buf)
-                    if display_text:
-                        live.update(Markdown(display_text))
+        _stream_to_live(_stream_iter(), acc, console)
 
     # Use the cleaned version as the final response
-    full_response = _strip_summary_echo(full_response) or full_response
-    console.print()  # Blank line after response
+    full_response = _strip_summary_echo(acc.full_response) or acc.full_response
 
     # Check for human-in-the-loop interrupts
     state = agent.get_state(cast(RunnableConfig, config))
@@ -438,36 +452,24 @@ async def run_chat_async(thread_id: str = "main") -> None:
 
             input_message: Any = {"messages": [HumanMessage(content=user_input)]}
 
-            full_response = ""
-            current_msg_id: str | None = None
-            current_msg_buf = ""
-
             try:
-                with Live(Markdown(""), console=console, refresh_per_second=10) as live:
-                    async for chunk, metadata in agent.astream(
+                acc = _ChunkAccumulator()
+
+                async def _astream():
+                    async for item in agent.astream(
                         input_message,
                         cast(RunnableConfig, config),
                         stream_mode="messages",
                     ):
-                        # Skip tool message chunks
+                        yield item
+
+                # Collect chunks async, render via Live
+                with Live(Markdown(""), console=console, refresh_per_second=10) as live:
+                    async for chunk, metadata in _astream():
                         if getattr(chunk, "type", None) == "tool":
                             continue
-                        if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
-                            content = chunk.content  # type: ignore[union-attr]
-                            # Handle structured content format (list of dicts)
-                            if isinstance(content, list):
-                                content = "".join(
-                                    block.get("text", "") if isinstance(block, dict) else str(block)
-                                    for block in content
-                                )
-                            # Only display the latest AI message
-                            chunk_id = getattr(chunk, "id", None)
-                            if chunk_id and chunk_id != current_msg_id:
-                                current_msg_id = chunk_id
-                                current_msg_buf = ""
-                            full_response += content
-                            current_msg_buf += content
-                            display_text = _strip_summary_echo(current_msg_buf)
+                        if acc.accumulate(chunk):
+                            display_text = _strip_summary_echo(acc.msg_buf)
                             if display_text:
                                 live.update(Markdown(display_text))
 
@@ -500,36 +502,13 @@ def ask(question: str, thread_id: str = "main") -> str:
     config = get_agent_config(thread_id=thread_id)
 
     input_message: Any = {"messages": [HumanMessage(content=question)]}
+    acc = _ChunkAccumulator()
 
-    full_response = ""
-    current_msg_id: str | None = None
-    current_msg_buf = ""
+    stream_iter = agent.stream(
+        input_message,
+        cast(RunnableConfig, config),
+        stream_mode="messages",
+    )
+    _stream_to_live(stream_iter, acc, console)
 
-    with Live(Markdown(""), console=console, refresh_per_second=10) as live:
-        for chunk, metadata in agent.stream(
-            input_message,
-            cast(RunnableConfig, config),
-            stream_mode="messages",
-        ):
-            if getattr(chunk, "type", None) == "tool":
-                continue
-            if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
-                content = chunk.content  # type: ignore[union-attr]
-                # Handle structured content format (list of dicts)
-                if isinstance(content, list):
-                    content = "".join(
-                        block.get("text", "") if isinstance(block, dict) else str(block)
-                        for block in content
-                    )
-                chunk_id = getattr(chunk, "id", None)
-                if chunk_id and chunk_id != current_msg_id:
-                    current_msg_id = chunk_id
-                    current_msg_buf = ""
-                full_response += content
-                current_msg_buf += content
-                display_text = _strip_summary_echo(current_msg_buf)
-                if display_text:
-                    live.update(Markdown(display_text))
-
-    console.print()
-    return _strip_summary_echo(full_response) or full_response
+    return _strip_summary_echo(acc.full_response) or acc.full_response
