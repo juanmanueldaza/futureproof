@@ -7,6 +7,7 @@ from ._async import run_async
 
 async def _gitlab_call(tool_name: str, args: dict) -> str:
     """Connect to GitLab MCP, call a tool, return content."""
+    from futureproof.mcp.base import MCPClientError
     from futureproof.mcp.gitlab_client import GitLabMCPClient
 
     client = GitLabMCPClient()
@@ -16,6 +17,10 @@ async def _gitlab_call(tool_name: str, args: dict) -> str:
         if result.is_error:
             return f"GitLab API error: {result.error_message or result.content}"
         return result.content
+    except MCPClientError as e:
+        return f"GitLab connection error: {e}"
+    except Exception as e:
+        return f"GitLab error: {e}"
     finally:
         await client.disconnect()
 

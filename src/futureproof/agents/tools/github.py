@@ -7,6 +7,7 @@ from ._async import run_async
 
 async def _github_call(tool_name: str, args: dict) -> str:
     """Connect to GitHub MCP, call a tool, return content."""
+    from futureproof.mcp.base import MCPClientError
     from futureproof.mcp.github_client import GitHubMCPClient
 
     client = GitHubMCPClient()
@@ -16,6 +17,10 @@ async def _github_call(tool_name: str, args: dict) -> str:
         if result.is_error:
             return f"GitHub API error: {result.error_message or result.content}"
         return result.content
+    except MCPClientError as e:
+        return f"GitHub connection error: {e}"
+    except Exception as e:
+        return f"GitHub error: {e}"
     finally:
         await client.disconnect()
 
