@@ -28,7 +28,9 @@ class ModelConfig:
 # Default fallback chain - ordered by preference
 DEFAULT_FALLBACK_CHAIN: list[ModelConfig] = [
     ModelConfig("azure", "gpt-4.1", "Azure GPT-4.1"),
+    ModelConfig("azure", "gpt-4o", "Azure GPT-4o"),
     ModelConfig("azure", "gpt-4.1-mini", "Azure GPT-4.1 Mini"),
+    ModelConfig("azure", "gpt-4o-mini", "Azure GPT-4o Mini"),
 ]
 
 
