@@ -119,7 +119,7 @@ class SessionMCPClient(MCPClient):
     """Base for MCP clients that use ClientSession (stdio or HTTP transport).
 
     Provides shared call_tool/list_tools/is_connected implementations
-    used by GitHub and GitLab MCP clients. Subclasses only need to
+    used by the GitHub MCP client. Subclasses only need to
     implement connect() and disconnect() for their specific transport.
     """
 

@@ -1,28 +1,29 @@
-"""GitLab tools for live queries via MCP server."""
+"""GitLab tools for live queries via glab CLI."""
+
+import subprocess
 
 from langchain_core.tools import tool
 
-from ._async import run_async
 
-
-async def _gitlab_call(tool_name: str, args: dict) -> str:
-    """Connect to GitLab MCP, call a tool, return content."""
-    from futureproof.mcp.base import MCPClientError
-    from futureproof.mcp.gitlab_client import GitLabMCPClient
-
-    client = GitLabMCPClient()
+def _glab(args: list[str], timeout: int = 30) -> str:
+    """Run a glab CLI command and return output."""
     try:
-        await client.connect()
-        result = await client.call_tool(tool_name, args)
-        if result.is_error:
-            return f"GitLab API error: {result.error_message or result.content}"
-        return result.content
-    except MCPClientError as e:
-        return f"GitLab connection error: {e}"
-    except Exception as e:
-        return f"GitLab error: {e}"
-    finally:
-        await client.disconnect()
+        result = subprocess.run(
+            ["glab", *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if result.returncode != 0:
+            error = result.stderr.strip() or result.stdout.strip()
+            return f"GitLab CLI error: {error}"
+        return result.stdout.strip()
+    except FileNotFoundError:
+        return (
+            "GitLab CLI (glab) is not installed. Install it from https://gitlab.com/gitlab-org/cli"
+        )
+    except subprocess.TimeoutExpired:
+        return "GitLab CLI timed out."
 
 
 @tool
@@ -34,12 +35,7 @@ def search_gitlab_projects(query: str) -> str:
 
     Use this to find projects/repositories on GitLab by name or description.
     """
-    return run_async(
-        _gitlab_call(
-            "search",
-            {"search_type": "projects", "query": query},
-        )
-    )
+    return _glab(["repo", "search", "--search", query])
 
 
 @tool
@@ -51,14 +47,9 @@ def get_gitlab_project(project_path: str) -> str:
                       or "group/subgroup/project-name")
 
     Use this to get detailed information about a specific GitLab project
-    including description, visibility, stars, and recent activity.
+    including description, README content, and recent activity.
     """
-    return run_async(
-        _gitlab_call(
-            "get_project",
-            {"project_id": project_path},
-        )
-    )
+    return _glab(["repo", "view", project_path, "--output", "json"])
 
 
 @tool
@@ -73,9 +64,7 @@ def get_gitlab_file(project_path: str, file_path: str, ref: str = "main") -> str
     Use this to read specific files from a GitLab repo like README.md,
     package.json, etc.
     """
-    return run_async(
-        _gitlab_call(
-            "get_file_contents",
-            {"project_id": project_path, "file_path": file_path, "ref": ref},
-        )
-    )
+    # URL-encode the file path for the API endpoint
+    encoded_path = file_path.replace("/", "%2F")
+    endpoint = f"projects/{project_path.replace('/', '%2F')}/repository/files/{encoded_path}/raw"
+    return _glab(["api", endpoint, "--method", "GET", "-f", f"ref={ref}"])

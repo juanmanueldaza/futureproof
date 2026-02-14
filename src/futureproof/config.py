@@ -41,10 +41,6 @@ class Settings(BaseSettings):
     github_mcp_image: str = "ghcr.io/github/github-mcp-server"
     github_mcp_command: str = "github-mcp-server"  # Native binary if not using Docker
 
-    # GitLab MCP Server
-    gitlab_mcp_url: str = ""  # e.g., https://gitlab.com/api/v4/mcp
-    gitlab_mcp_token: str = ""  # GitLab OAuth or personal access token
-
     # Market Intelligence MCP Configuration
     # Tavily Search (1000 free queries/month, no credit card)
     # Get your key at: https://tavily.com/
@@ -81,11 +77,6 @@ class Settings(BaseSettings):
     def has_github_mcp(self) -> bool:
         """Check if GitHub MCP is configured."""
         return bool(self.github_mcp_token_resolved)
-
-    @property
-    def has_gitlab_mcp(self) -> bool:
-        """Check if GitLab MCP is configured."""
-        return bool(self.gitlab_mcp_url and self.gitlab_mcp_token)
 
     @property
     def has_azure(self) -> bool:

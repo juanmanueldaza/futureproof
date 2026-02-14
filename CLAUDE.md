@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-FutureProof is a career intelligence system powered by a conversational AI agent. It gathers professional data from multiple sources (LinkedIn, portfolio sites, CliftonStrengths) and indexes it directly to ChromaDB (database-first, no intermediate files). Uses AI to analyze career trajectories, identify gaps, and generate optimized CVs — all through an interactive chat interface. GitHub and GitLab data is accessed live via MCP clients.
+FutureProof is a career intelligence system powered by a conversational AI agent. It gathers professional data from multiple sources (LinkedIn, portfolio sites, CliftonStrengths) and indexes it directly to ChromaDB (database-first, no intermediate files). Uses AI to analyze career trajectories, identify gaps, and generate optimized CVs — all through an interactive chat interface. GitHub data is accessed live via MCP client; GitLab via glab CLI.
 
 ## Tech Stack
 
@@ -88,7 +88,7 @@ All functionality is accessible through the **chat interface** via a single agen
 - **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
 - **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — portfolio/assessment index directly to ChromaDB; LinkedIn reads CLI output files
 - **GitHub** (3): `search_github_repos`, `get_github_repo`, `get_github_profile` — live queries via GitHub MCP server
-- **GitLab** (3): `search_gitlab_projects`, `get_gitlab_project`, `get_gitlab_file` — live queries via GitLab MCP server
+- **GitLab** (3): `search_gitlab_projects`, `get_gitlab_project`, `get_gitlab_file` — live queries via glab CLI
 - **Knowledge** (4): `search_career_knowledge`, `get_knowledge_stats`, `index_career_knowledge`, `clear_career_knowledge` (HITL)
 - **Analysis** (3): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`
 - **Generation** (2): `generate_cv` (HITL), `generate_cv_draft`
@@ -108,9 +108,9 @@ Uses `init_chat_model()` with `azure_openai` provider.
 
 ## MCP Clients (`mcp/`)
 
-13 MCP client implementations with registry pattern via `factory.py`:
+12 MCP client implementations with registry pattern via `factory.py`:
 
-- **Code platforms**: `github_client.py` (stdio MCP), `gitlab_client.py` (stdio MCP)
+- **Code platforms**: `github_client.py` (stdio MCP)
 - **Search**: `tavily_client.py` (Tavily Search API, 1000 free queries/month)
 - **Hacker News**: `hn_client.py` (Algolia API — stories, hiring trends, job postings with salary parsing)
 - **Job boards**: `jobspy_client.py` (LinkedIn/Indeed/Glassdoor/ZipRecruiter via python-jobspy), `remoteok_client.py`, `himalayas_client.py`, `jobicy_client.py`, `weworkremotely_client.py`, `remotive_client.py`
@@ -174,8 +174,7 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `GITHUB_MCP_TOKEN` — Alternative GitHub token for MCP
 - `GITHUB_MCP_USE_DOCKER` — Use Docker for GitHub MCP server (default: `true`)
 - `GITHUB_MCP_IMAGE` — Docker image (default: `ghcr.io/github/github-mcp-server`)
-- `GITLAB_MCP_URL` — GitLab MCP server URL
-- `GITLAB_MCP_TOKEN` — GitLab MCP token
+
 - `TAVILY_API_KEY` — Tavily search API key
 
 ### Market Intelligence
