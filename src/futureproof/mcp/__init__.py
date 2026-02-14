@@ -18,7 +18,6 @@ from .base import (
     MCPConnectionError,
     MCPToolError,
     MCPToolResult,
-    SessionMCPClient,
 )
 from .devto_client import DevToMCPClient
 from .factory import MCPClientFactory, MCPServerType
@@ -47,7 +46,6 @@ __all__ = [
     "MCPConnectionError",
     "MCPToolError",
     "MCPToolResult",
-    "SessionMCPClient",
     # Type aliases
     "MCPServerType",
     # Job schema utilities

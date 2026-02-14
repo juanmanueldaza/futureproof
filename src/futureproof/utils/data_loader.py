@@ -80,7 +80,3 @@ def combine_career_data(
             parts.append(f"{header_prefix} {name}\n{value}")
 
     return "\n\n".join(parts)
-
-
-def clear_data_cache() -> None:
-    """No-op — ChromaDB is the canonical store, no cache to clear."""

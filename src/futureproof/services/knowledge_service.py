@@ -17,13 +17,6 @@ from ..memory.knowledge import (
 
 logger = logging.getLogger(__name__)
 
-# Map source keys to display names and KnowledgeSource enum values
-_SOURCE_MAP: dict[str, tuple[str, KnowledgeSource]] = {
-    "linkedin_data": ("LinkedIn", KnowledgeSource.LINKEDIN),
-    "portfolio_data": ("Portfolio", KnowledgeSource.PORTFOLIO),
-    "assessment_data": ("CliftonStrengths Assessment", KnowledgeSource.ASSESSMENT),
-}
-
 
 class KnowledgeService:
     """Service for managing the career knowledge base.
@@ -233,7 +226,12 @@ class KnowledgeService:
             Only includes sources that have indexed content.
         """
         data: dict[str, str] = {}
-        for key, (_, source) in _SOURCE_MAP.items():
+        source_keys = {
+            KnowledgeSource.LINKEDIN: "linkedin_data",
+            KnowledgeSource.PORTFOLIO: "portfolio_data",
+            KnowledgeSource.ASSESSMENT: "assessment_data",
+        }
+        for source, key in source_keys.items():
             content = self.store.get_all_content(source)
             if content:
                 data[key] = content

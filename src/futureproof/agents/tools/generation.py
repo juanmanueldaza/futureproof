@@ -39,10 +39,10 @@ def generate_cv(
     if not approved:
         return "CV generation cancelled."
 
-    from futureproof.services import GenerationService
+    from futureproof.generators import CVGenerator
 
-    service = GenerationService()
-    output_path = service.generate_cv(language=language, format=format)
+    generator = CVGenerator()
+    output_path = generator.generate(language=language, format=format)
 
     return (
         f"CV generated successfully{role_note}!\n\n"

@@ -4,7 +4,7 @@ Career intelligence system that gathers your professional data, analyzes your ca
 
 ## Description
 
-FutureProof aggregates data from LinkedIn, GitHub, GitLab, portfolio websites, and CliftonStrengths assessments into a searchable knowledge base. It uses AI to identify skill gaps, assess market fit, track tech trends, and generate ATS-optimized CVs. Everything happens through an interactive chat interface powered by a single LangChain agent with 32 specialized tools.
+FutureProof aggregates data from LinkedIn, GitHub, GitLab, portfolio websites, and CliftonStrengths assessments into a searchable knowledge base. It uses AI to identify skill gaps, assess market fit, track tech trends, and generate ATS-optimized CVs. Everything happens through an interactive chat interface powered by a single LangChain agent with 36 specialized tools.
 
 ### Key capabilities
 
@@ -33,10 +33,6 @@ cp .env.example .env
 
 ### External tools (optional)
 
-These CLI tools provide fallback when MCP servers are unavailable:
-
-- [github2md](https://github.com/juanmanueldaza/github2md) — GitHub profile to markdown
-- [gitlab2md](https://github.com/juanmanueldaza/gitlab2md) — GitLab profile to markdown
 - [linkedin2md](https://github.com/juanmanueldaza/linkedin2md) — LinkedIn export ZIP to markdown
 
 ## Usage
@@ -140,9 +136,11 @@ src/futureproof/
 │   ├── orchestrator.py     # LangGraph Functional API for analysis workflows
 │   ├── state.py            # TypedDict state definitions
 │   ├── helpers/            # Orchestrator support (data pipeline, LLM invoker)
-│   └── tools/              # 32 agent tools organized by domain
+│   └── tools/              # 36 agent tools organized by domain
 │       ├── profile.py      # User profile management (6 tools)
-│       ├── gathering.py    # Data collection (7 tools)
+│       ├── gathering.py    # Data collection (5 tools)
+│       ├── github.py       # Live GitHub queries via MCP (3 tools)
+│       ├── gitlab.py       # Live GitLab queries via glab CLI (3 tools)
 │       ├── knowledge.py    # RAG search & indexing (4 tools)
 │       ├── analysis.py     # Career analysis (3 tools)
 │       ├── market.py       # Market intelligence (6 tools)
@@ -150,8 +148,6 @@ src/futureproof/
 │       └── memory.py       # Episodic memory (4 tools)
 ├── chat/                   # Streaming chat client with HITL support
 ├── gatherers/
-│   ├── github.py           # GitHub via MCP or github2md CLI
-│   ├── gitlab.py           # GitLab via MCP or gitlab2md CLI
 │   ├── linkedin.py         # LinkedIn ZIP via linkedin2md CLI
 │   ├── cliftonstrengths.py # CliftonStrengths PDF parser
 │   ├── portfolio/          # Website scraper (fetcher, HTML/JS extractors)
@@ -159,7 +155,6 @@ src/futureproof/
 ├── generators/             # CV generation (Markdown + PDF via WeasyPrint)
 ├── llm/                    # FallbackLLMManager with init_chat_model()
 ├── memory/
-│   ├── store.py            # LangGraph InMemoryStore (runtime semantic search)
 │   ├── knowledge.py        # ChromaDB knowledge store (RAG)
 │   ├── episodic.py         # ChromaDB episodic memory
 │   ├── chunker.py          # Markdown chunker for indexing
