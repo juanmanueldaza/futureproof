@@ -44,7 +44,6 @@ class MemoryType(Enum):
     CONVERSATION = "conversation"  # Conversation summaries
     MILESTONE = "milestone"  # Career milestones
     LEARNING = "learning"  # Skills learned or courses taken
-    FEEDBACK = "feedback"  # Feedback received
 
 
 @dataclass
@@ -197,76 +196,6 @@ class EpisodicStore:
 
         return memories
 
-    def get_recent(
-        self,
-        limit: int = 10,
-        memory_type: MemoryType | None = None,
-    ) -> list[EpisodicMemory]:
-        """Get most recent memories.
-
-        Args:
-            limit: Maximum results to return
-            memory_type: Optional filter by memory type
-
-        Returns:
-            List of recent memories
-        """
-        where = None
-        if memory_type:
-            where = {"memory_type": memory_type.value}
-
-        # Get all and sort by timestamp (ChromaDB doesn't support sorting)
-        results = self.collection.get(
-            where=where,  # type: ignore[arg-type]
-            limit=limit * 2,  # Get more to allow for sorting
-        )
-
-        memories = []
-        if results["ids"]:
-            for i, id in enumerate(results["ids"]):
-                doc = results["documents"][i] if results["documents"] else ""
-                meta = results["metadatas"][i] if results["metadatas"] else {}
-                memories.append(EpisodicMemory.from_chromadb(id, doc, dict(meta)))
-
-        # Sort by timestamp descending
-        memories.sort(key=lambda m: m.timestamp, reverse=True)
-        return memories[:limit]
-
-    def forget(self, memory_id: str) -> None:
-        """Delete a specific memory.
-
-        Args:
-            memory_id: ID of memory to delete
-        """
-        self.collection.delete(ids=[memory_id])
-        logger.info(f"Deleted memory: {memory_id}")
-
-    def clear_old(self, days: int = 365) -> int:
-        """Clear memories older than specified days.
-
-        Args:
-            days: Delete memories older than this
-
-        Returns:
-            Number of memories deleted
-        """
-        from datetime import timedelta
-
-        cutoff = datetime.now() - timedelta(days=days)
-        cutoff_str = cutoff.isoformat()
-
-        # Get old memories
-        results = self.collection.get(
-            where={"timestamp": {"$lt": cutoff_str}},
-        )
-
-        if results["ids"]:
-            self.collection.delete(ids=results["ids"])
-            logger.info(f"Cleared {len(results['ids'])} old memories")
-            return len(results["ids"])
-
-        return 0
-
     def stats(self) -> dict[str, Any]:
         """Get statistics about the episodic store.
 
@@ -353,92 +282,6 @@ def remember_application(
             "company": company,
             "role": role,
             "status": status,
-        },
-    )
-
-
-def remember_milestone(
-    milestone: str,
-    significance: str,
-    date: datetime | None = None,
-) -> EpisodicMemory:
-    """Create a career milestone memory.
-
-    Args:
-        milestone: Description of the milestone
-        significance: Why this milestone matters
-        date: When the milestone occurred (defaults to now)
-
-    Returns:
-        EpisodicMemory ready to be stored
-    """
-    return EpisodicMemory(
-        id=str(uuid.uuid4()),
-        memory_type=MemoryType.MILESTONE,
-        content=milestone,
-        context=significance,
-        timestamp=date or datetime.now(),
-    )
-
-
-def remember_conversation(
-    summary: str,
-    key_topics: list[str],
-    action_items: list[str] | None = None,
-) -> EpisodicMemory:
-    """Create a conversation summary memory.
-
-    Args:
-        summary: Summary of the conversation
-        key_topics: Main topics discussed
-        action_items: Any action items from the conversation
-
-    Returns:
-        EpisodicMemory ready to be stored
-    """
-    context = f"Topics: {', '.join(key_topics)}"
-    if action_items:
-        context += f". Actions: {', '.join(action_items)}"
-
-    return EpisodicMemory(
-        id=str(uuid.uuid4()),
-        memory_type=MemoryType.CONVERSATION,
-        content=summary,
-        context=context,
-        metadata={
-            "topics": ",".join(key_topics),
-            "action_items": ",".join(action_items or []),
-        },
-    )
-
-
-def remember_learning(
-    skill: str,
-    source: str,
-    proficiency: str = "beginner",
-) -> EpisodicMemory:
-    """Create a learning/skill acquisition memory.
-
-    Args:
-        skill: Skill or technology learned
-        source: How it was learned (course, project, job, etc.)
-        proficiency: Proficiency level achieved
-
-    Returns:
-        EpisodicMemory ready to be stored
-    """
-    content = f"Learned {skill}"
-    context = f"Through {source}. Proficiency: {proficiency}"
-
-    return EpisodicMemory(
-        id=str(uuid.uuid4()),
-        memory_type=MemoryType.LEARNING,
-        content=content,
-        context=context,
-        metadata={
-            "skill": skill,
-            "source": source,
-            "proficiency": proficiency,
         },
     )
 

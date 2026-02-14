@@ -692,19 +692,3 @@ class HackerNewsMCPClient(HTTPMCPClient):
                     titles.append(title.title())
 
         return titles[:3]  # Limit to top 3
-
-    # Convenience methods for direct use
-    async def get_tech_trends(self, months: int = 3) -> dict[str, Any]:
-        """Get tech trends analysis (convenience method)."""
-        result = await self.call_tool("analyze_tech_trends", {"months": months})
-        return json.loads(result.content)
-
-    async def get_hiring_data(self, months: int = 3) -> list[dict[str, Any]]:
-        """Get hiring thread data (convenience method)."""
-        result = await self.call_tool("get_hiring_threads", {"months": months})
-        return json.loads(result.content)
-
-    async def get_job_postings(self, months: int = 1, limit: int = 100) -> list[dict[str, Any]]:
-        """Get parsed job postings (convenience method)."""
-        result = await self.call_tool("extract_job_postings", {"months": months, "limit": limit})
-        return json.loads(result.content).get("postings", [])

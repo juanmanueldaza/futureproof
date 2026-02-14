@@ -172,22 +172,6 @@ class MarketGatherer(ABC):
 
         return data
 
-    def clear_cache(self) -> int:
-        """Clear all cache files for this gatherer.
-
-        Returns:
-            Number of cache files deleted
-        """
-        pattern = f"{self.__class__.__name__}_*.json"
-        deleted = 0
-        for cache_file in self._cache_dir.glob(pattern):
-            try:
-                cache_file.unlink()
-                deleted += 1
-            except OSError:
-                pass
-        return deleted
-
     async def _gather_from_source(
         self,
         source_name: MCPServerType,
@@ -195,7 +179,6 @@ class MarketGatherer(ABC):
         tool_args: dict[str, Any],
         results: dict[str, Any],
         extractor: Callable[[dict[str, Any]], list[dict[str, Any]]] | None = None,
-        result_key: str = "job_listings",
         source_label: str | None = None,
     ) -> list[dict[str, Any]]:
         """Generic method to gather from any MCP source.
@@ -210,7 +193,6 @@ class MarketGatherer(ABC):
             results: Results dict to update with errors
             extractor: Optional function to extract items from response.
                        Default extracts response.get("jobs", [])
-            result_key: Key in results to extend with extracted items
             source_label: Optional human-readable label for logging
 
         Returns:

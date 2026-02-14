@@ -33,7 +33,6 @@ class JobSourceConfig:
         source_label: Human-readable label for logging/display
         build_tool_args: Function to build tool args from (role, location, limit)
         post_process: Optional function to post-process results
-        site_name: Site name to tag results with (if source doesn't provide)
         enabled: Whether source is enabled by default
     """
 
@@ -42,7 +41,6 @@ class JobSourceConfig:
     source_label: str
     build_tool_args: Callable[[str, str, int], dict[str, Any]]
     post_process: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None
-    site_name: str | None = None
     enabled: bool = True
 
 
@@ -107,7 +105,6 @@ JOB_SOURCE_REGISTRY: list[JobSourceConfig] = [
         source_name="remoteok",
         tool_name="search_remote_jobs",
         source_label="RemoteOK",
-        site_name="remoteok",
         build_tool_args=_build_remoteok_args,
         post_process=_tag_with_site("remoteok"),
     ),

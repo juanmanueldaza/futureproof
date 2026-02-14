@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     default_language: Literal["en", "es"] = "en"
 
     # LLM Configuration
-    llm_provider: Literal["azure"] = "azure"
     llm_model: str = ""  # Empty = use provider default
     llm_temperature: float = 0.3
     cv_temperature: float = 0.2  # Lower for more consistent CV output

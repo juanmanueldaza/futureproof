@@ -110,20 +110,6 @@ Based on the career data provided, give strategic advice that:
 Be direct, specific, and actionable. Avoid generic advice."""
 
 
-COMPARE_ALIGNMENT_PROMPT = """\
-Analyze the alignment between stated career goals and actual professional \
-behavior.
-
-For each stated goal, assess:
-1. Evidence supporting progress toward this goal
-2. Evidence contradicting or absent for this goal
-3. Alignment score (0-100)
-4. Specific actions to improve alignment
-
-Be honest and constructive. The goal is to help the person understand where \
-they truly stand."""
-
-
 # ============================================================================
 # Market Intelligence Prompts
 # ============================================================================

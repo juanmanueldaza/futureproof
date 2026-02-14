@@ -111,7 +111,6 @@ class CliftonStrengthsData:
     top_10: list[StrengthInsight] = field(default_factory=list)
     all_34: list[str] = field(default_factory=list)
     dominant_domain: str = ""
-    raw_text: dict[str, str] = field(default_factory=dict)
 
 
 class CliftonStrengthsGatherer(BaseGatherer):
@@ -213,9 +212,7 @@ class CliftonStrengthsGatherer(BaseGatherer):
             logger.warning(f"No text extracted from {pdf_path}")
             return
 
-        # Store raw text by report type
         report_type = self._get_report_type(filename)
-        data.raw_text[report_type] = text
 
         # Extract name and date
         name_match = re.search(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\|\s*(\d{2}-\d{2}-\d{4})", text)
