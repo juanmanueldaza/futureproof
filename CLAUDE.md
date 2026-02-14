@@ -20,13 +20,14 @@ FutureProof is a career intelligence system powered by a conversational AI agent
 src/futureproof/
 ├── agents/
 │   ├── career_agent.py  # Single agent with create_agent(), system prompt, caching
+│   ├── middleware.py    # ToolCallRepairMiddleware (fixes orphaned parallel tool results)
 │   ├── orchestrator.py  # LangGraph Functional API (@entrypoint/@task) for analysis
 │   ├── state.py         # TypedDict state definitions (CareerState, etc.)
 │   ├── helpers/         # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
 │   └── tools/           # 30 agent tools organized by domain
-├── chat/                # Streaming client with HITL, summary echo stripping
+├── chat/                # Streaming client with HITL, Rich verbose UI, summary echo stripping
 ├── gatherers/           # Data collection from external sources
-│   ├── linkedin.py      # LinkedIn ZIP via linkedin2md CLI
+│   ├── linkedin.py      # LinkedIn ZIP direct CSV parser (17 CSVs, 3 tiers)
 │   ├── cliftonstrengths.py  # CliftonStrengths PDF parser (~850 lines)
 │   ├── portfolio/       # Decomposed: Fetcher, HTMLExtractor, JSExtractor, MarkdownWriter
 │   └── market/          # Job market, tech trends, content trends gatherers
@@ -49,7 +50,8 @@ src/futureproof/
 
 ```bash
 futureproof chat                    # Interactive chat
-futureproof chat --verbose          # Show tool usage
+futureproof chat --verbose          # Show tool usage with timing
+futureproof chat --verbose --debug  # Also show debug logs in terminal
 futureproof chat --thread work      # Named conversation thread
 futureproof ask "question"          # One-off question
 futureproof memory --threads        # List threads
@@ -75,6 +77,7 @@ All functionality is accessible through the **chat interface** via a single agen
 
 - **Single agent**: One agent with all 36 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
+- **State repair**: `ToolCallRepairMiddleware` detects orphaned `tool_calls` (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages so the model can proceed
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 32k tokens, keeps last 20 messages, uses separate cheaper model)
 - **Memory**: ChromaDB for persistent episodic memory (decisions, applications) and career knowledge RAG
 - **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, portfolio)
@@ -85,7 +88,7 @@ All functionality is accessible through the **chat interface** via a single agen
 ### Agent Tools (36 tools in `agents/tools/`)
 
 - **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
-- **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — portfolio/assessment index directly to ChromaDB; LinkedIn reads CLI output files
+- **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — all sources index directly to ChromaDB
 - **GitHub** (3): `search_github_repos`, `get_github_repo`, `get_github_profile` — live queries via GitHub MCP server
 - **GitLab** (3): `search_gitlab_projects`, `get_gitlab_project`, `get_gitlab_file` — live queries via glab CLI
 - **Knowledge** (4): `search_career_knowledge`, `get_knowledge_stats`, `index_career_knowledge`, `clear_career_knowledge` (HITL)
@@ -205,8 +208,17 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 
 ## Key Modules
 
+### `chat/ui.py`
+Rich-based terminal UI components. Verbose mode display functions: `display_tool_start()` (category badge + args), `display_tool_result()` (full output in bordered Panel), `display_model_info()`, `display_model_switch()`, `display_timing()`, `display_node_transition()`, `display_indexing_result()`, `display_gather_result()`. Tool category styling maps all 36 tools to categories (profile, gathering, github, gitlab, knowledge, analysis, generation, market, memory) with unique colors.
+
+### `chat/client.py`
+Streaming chat client with HITL interrupt loop (iterative, not recursive), summary echo stripping, fallback retry, tool timing. Verbose mode uses Rich UI functions from `chat/ui.py` for styled output. `_stream_response()` handles the full stream lifecycle including sequential HITL interrupts via `while True` loop.
+
 ### `agents/career_agent.py`
-Single agent with `create_agent()`, unified system prompt, `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `chat()`, `achat()`, `get_agent_config()`, `reset_career_agent()`.
+Single agent with `create_agent()`, unified system prompt, `ToolCallRepairMiddleware` + `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `get_agent_config()`, `get_agent_model_name()`, `reset_career_agent()`.
+
+### `agents/middleware.py`
+`ToolCallRepairMiddleware` — detects orphaned `tool_calls` in message history (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages. Runs as a `before_model` hook before `SummarizationMiddleware`.
 
 ### `agents/orchestrator.py`
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).
@@ -215,7 +227,7 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 `FallbackLLMManager` with 4-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
 ### `memory/knowledge.py`
-`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Database-first: `index_content()` accepts raw strings (no file I/O). `get_all_content()` retrieves all chunks for a source. `KnowledgeSource` enum: linkedin, portfolio, assessment. Also has `index_markdown_file()` (for LinkedIn CLI files), `search()`, `clear_source()`, `get_stats()`.
+`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Database-first: `index_content()` accepts raw strings (no file I/O), uses batch indexing (single `collection.add()` call). `get_all_content()` retrieves all chunks for a source. `KnowledgeSource` enum: linkedin, portfolio, assessment. Methods: `search()`, `clear_source()`, `get_stats()`.
 
 ### `memory/episodic.py`
 `EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION, CONVERSATION, MILESTONE, LEARNING, FEEDBACK. Methods: `remember()`, `recall()`, `get_recent()`, `forget()`, `stats()`.
@@ -230,7 +242,7 @@ Security utilities: `detect_prompt_injection()`, `sanitize_user_input()`, `anony
 Thin wrapper around `KnowledgeService.get_all_content()`. Functions: `load_career_data()` → dict, `load_career_data_for_cv()` → formatted string, `combine_career_data()` → combined string. No file I/O — all data comes from ChromaDB.
 
 ### `services/`
-Business logic layer: `GathererService` (gathering + auto-indexing), `AnalysisService` (LangGraph orchestrator invocation), `KnowledgeService` (indexing/search). CV generation is called directly via `CVGenerator` from agent tools.
+Business logic layer: `GathererService` (gathering + auto-indexing with timing), `AnalysisService` (LangGraph orchestrator invocation), `KnowledgeService` (indexing/search with timing). CV generation is called directly via `CVGenerator` from agent tools.
 
 ### `gatherers/portfolio/`
 Decomposed portfolio scraper (SRP): `PortfolioFetcher` (SSRF-protected HTTP), `HTMLExtractor` (BeautifulSoup), `JSExtractor` (JavaScript content), `MarkdownWriter` (output formatting).

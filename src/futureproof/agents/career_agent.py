@@ -24,6 +24,7 @@ from typing import Any
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware
 
+from futureproof.agents.middleware import ToolCallRepairMiddleware
 from futureproof.agents.tools import get_all_tools
 from futureproof.llm.fallback import get_model_with_fallback
 from futureproof.memory.checkpointer import get_checkpointer
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Cached agent singleton to avoid recompiling the graph on every call
 _cached_agent = None
+_cached_model_desc: str | None = None
 
 
 # =============================================================================
@@ -43,7 +45,9 @@ _cached_agent = None
 
 def get_model():
     """Get the LLM model for the agent with automatic fallback."""
+    global _cached_model_desc
     model, config = get_model_with_fallback(purpose="agent")
+    _cached_model_desc = config.description
     logger.info(f"Career agent using: {config.description}")
     return model
 
@@ -90,6 +94,7 @@ def create_career_agent(
     profile_context = profile_context or _get_user_profile_context()
 
     summary_model = _get_summary_model()
+    repair = ToolCallRepairMiddleware()
     summarization = SummarizationMiddleware(
         model=summary_model,
         trigger=("tokens", 32000),
@@ -100,7 +105,7 @@ def create_career_agent(
         model=model,
         tools=get_all_tools(),
         system_prompt=SYSTEM_PROMPT.format(user_profile=profile_context),
-        middleware=[summarization],
+        middleware=[repair, summarization],  # repair runs before summarization
         checkpointer=checkpointer,
     )
 
@@ -109,14 +114,20 @@ def create_career_agent(
     return agent
 
 
+def get_agent_model_name() -> str | None:
+    """Get the description of the model used by the agent."""
+    return _cached_model_desc
+
+
 def reset_career_agent() -> None:
     """Reset the cached agent instance.
 
     Call this to force recreation of the agent, e.g., after a model fallback
     or when the system prompt needs to be refreshed.
     """
-    global _cached_agent
+    global _cached_agent, _cached_model_desc
     _cached_agent = None
+    _cached_model_desc = None
 
 
 def get_agent_config(

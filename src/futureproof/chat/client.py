@@ -4,7 +4,9 @@ Combines prompt-toolkit for input handling with Rich for output display.
 Provides both sync and async chat loops for different use cases.
 """
 
+import logging
 import re
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -20,6 +22,7 @@ from rich.markdown import Markdown
 from futureproof.agents.career_agent import (
     create_career_agent,
     get_agent_config,
+    get_agent_model_name,
     reset_career_agent,
 )
 from futureproof.chat.ui import (
@@ -27,11 +30,19 @@ from futureproof.chat.ui import (
     display_error,
     display_goals,
     display_help,
+    display_model_info,
+    display_model_switch,
+    display_node_transition,
     display_profile_summary,
+    display_timing,
+    display_tool_result,
+    display_tool_start,
     display_welcome,
 )
 from futureproof.llm.fallback import get_fallback_manager
 from futureproof.memory.checkpointer import get_data_dir
+
+logger = logging.getLogger(__name__)
 
 # Known section headers from SummarizationMiddleware output.
 # The LLM sometimes echoes these verbatim at the start of a response.
@@ -47,6 +58,17 @@ _SUMMARY_SECTIONS = (
 # that the LLM concatenated summary content with the real response.
 # Matches ".I " (pronoun), ".The", ".However", etc.
 _CONCAT_RE = re.compile(r"\.([A-Z](?:[a-z]| ))")
+
+
+def _is_tool_call_state_error(error: Exception) -> bool:
+    """Check if error is caused by orphaned tool_calls in state.
+
+    This happens when parallel tool execution via the Send API fails to
+    merge ToolMessage results back into the messages channel. Azure rejects
+    the next model call with "tool_call_ids did not have response messages".
+    """
+    error_str = str(error).lower()
+    return "tool_call_ids" in error_str and "response messages" in error_str
 
 
 def _is_summary_echo(text: str) -> bool:
@@ -238,6 +260,7 @@ def _stream_response(
         Tuple of (full_response_text, shown_tool_names)
     """
     shown_tools: set[str] = set()
+    tool_start_times: dict[str, float] = {}
     last_node = ""
     acc = _ChunkAccumulator()
 
@@ -246,7 +269,7 @@ def _stream_response(
         nonlocal last_node
         node = metadata.get("langgraph_node", "")
         if node and node != last_node:
-            console.print(f"[dim]@ {node}[/dim]")
+            display_node_transition(node)
             last_node = node
         tool_calls = getattr(chunk, "tool_calls", None)
         if tool_calls:
@@ -254,15 +277,17 @@ def _stream_response(
                 name = tc.get("name", "unknown")
                 if name not in shown_tools:
                     shown_tools.add(name)
+                    tool_start_times[name] = time.monotonic()
                     args = tc.get("args", {})
-                    args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if args else ""
-                    console.print(f"[dim]> {name}({args_str})[/dim]")
+                    display_tool_start(name, args)
         if getattr(chunk, "type", None) == "tool":
             tool_content = getattr(chunk, "content", "")
             tool_name = getattr(chunk, "name", "tool")
+            elapsed: float | None = None
+            if tool_name in tool_start_times:
+                elapsed = time.monotonic() - tool_start_times.pop(tool_name)
             if tool_content:
-                preview = (tool_content[:150] + "...") if len(tool_content) > 150 else tool_content
-                console.print(f"[dim]< {tool_name}: {preview}[/dim]")
+                display_tool_result(tool_name, tool_content, elapsed)
             return True
         return False
 
@@ -272,6 +297,9 @@ def _stream_response(
             cast(RunnableConfig, config),
             stream_mode="messages",
         )
+
+    stream_start = time.monotonic()
+    logger.debug("Stream started")
 
     if verbose:
         # Verbose mode: print tool info directly, no Live widget.
@@ -284,16 +312,24 @@ def _stream_response(
         if display_text:
             console.print()
             console.print(Markdown(display_text))
-        console.print()
+        display_timing(time.monotonic() - stream_start)
     else:
         _stream_to_live(_stream_iter(), acc, console)
+
+    logger.debug("Stream ended (%.1fs)", time.monotonic() - stream_start)
 
     # Use the cleaned version as the final response
     full_response = _strip_summary_echo(acc.full_response) or acc.full_response
 
-    # Check for human-in-the-loop interrupts
-    state = agent.get_state(cast(RunnableConfig, config))
-    if state.interrupts:
+    # Handle human-in-the-loop interrupts (loop instead of recursion to avoid
+    # deep stacks when multiple HITL tools fire in sequence)
+    while True:
+        logger.debug("Checking for HITL interrupts...")
+        state = agent.get_state(cast(RunnableConfig, config))
+        logger.debug("State retrieved, interrupts=%d", len(state.interrupts))
+        if not state.interrupts:
+            break
+
         interrupt_data = state.interrupts[0].value
         question = interrupt_data.get("question", "Proceed?")
         details = interrupt_data.get("details", "")
@@ -305,13 +341,44 @@ def _stream_response(
         answer = session.prompt("[Y/n]: ").strip().lower()
         approved = answer in ("", "y", "yes")
 
+        logger.info("HITL resume: approved=%s", approved)
+        console.print()  # spacing before resume output
+
         # Resume the graph with the user's decision
-        resume_response, resume_tools = _stream_response(
-            agent, Command(resume=approved), config, verbose, console, session
-        )
-        if resume_response:
-            full_response += resume_response
-        shown_tools |= resume_tools
+        resume_acc = _ChunkAccumulator()
+        resume_start = time.monotonic()
+        logger.debug("Resume stream started")
+
+        if verbose:
+            for chunk, metadata in agent.stream(
+                Command(resume=approved),
+                cast(RunnableConfig, config),
+                stream_mode="messages",
+            ):
+                if _verbose_print(chunk, metadata):
+                    continue
+                resume_acc.accumulate(chunk)
+            display_text = _strip_summary_echo(resume_acc.msg_buf)
+            if display_text:
+                console.print()
+                console.print(Markdown(display_text))
+            display_timing(time.monotonic() - resume_start)
+        else:
+            _stream_to_live(
+                agent.stream(
+                    Command(resume=approved),
+                    cast(RunnableConfig, config),
+                    stream_mode="messages",
+                ),
+                resume_acc,
+                console,
+            )
+
+        logger.debug("Resume stream ended (%.1fs)", time.monotonic() - resume_start)
+
+        resume_text = _strip_summary_echo(resume_acc.full_response) or resume_acc.full_response
+        if resume_text:
+            full_response += resume_text
 
     return full_response, shown_tools
 
@@ -337,10 +404,9 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
 
         # Show which model is being used in verbose mode
         if verbose:
-            fallback_mgr = get_fallback_manager()
-            status = fallback_mgr.get_status()
-            if status["current_model"]:
-                console.print(f"[dim]🤖 Model: {status['current_model']}[/dim]\n")
+            model_name = get_agent_model_name()
+            if model_name:
+                display_model_info(model_name)
     except Exception as e:
         display_error(f"Failed to initialize agent: {e}")
         return
@@ -378,6 +444,17 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
                     break  # Success, exit retry loop
 
                 except Exception as e:
+                    # Tool call state error: retry with same model — the
+                    # ToolCallRepairMiddleware will fix state on next attempt
+                    if _is_tool_call_state_error(e) and attempt < max_retries - 1:
+                        logger.warning(
+                            "Tool state error (attempt %d/%d), retrying", attempt + 1, max_retries
+                        )
+                        console.print(
+                            "[yellow]Recovering from tool state error, retrying...[/yellow]"
+                        )
+                        continue
+
                     # Check if this is an error we can recover from via fallback
                     fallback_mgr = get_fallback_manager()
                     if fallback_mgr.handle_error(e) and attempt < max_retries - 1:
@@ -385,14 +462,21 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
                         status = fallback_mgr.get_status()
                         available = status.get("available_models", [])
                         next_model = available[0] if available else "unknown"
-                        console.print(
-                            f"[yellow]Model unavailable, switching to: {next_model}[/yellow]"
+                        logger.warning(
+                            "Model error (attempt %d/%d): %s — switching to %s",
+                            attempt + 1,
+                            max_retries,
+                            e,
+                            next_model,
                         )
+                        if verbose:
+                            display_model_switch(next_model)
                         # Recreate agent with new model
                         reset_career_agent()
                         agent = create_career_agent()
                         continue
                     else:
+                        logger.exception("Unrecoverable agent error")
                         display_error(f"Agent error: {e}")
                         break
 
@@ -405,6 +489,7 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
         except Exception as e:
             # Catch unhandled exceptions from event loop / nest_asyncio
             # to prevent the chat from crashing
+            logger.exception("Unhandled error in chat loop")
             if str(e):
                 display_error(f"Unexpected error: {e}")
             else:

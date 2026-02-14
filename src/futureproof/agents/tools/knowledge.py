@@ -85,28 +85,30 @@ def get_knowledge_stats() -> str:
 
 @tool
 def index_career_knowledge(source: str = "") -> str:
-    """Index gathered career data into the knowledge base for semantic search.
+    """Check indexed career data in the knowledge base.
 
     Args:
-        source: Specific source to index (linkedin, portfolio, assessment).
-                Leave empty to index all available sources.
+        source: Specific source to check (linkedin, portfolio, assessment).
+                Leave empty to check all available sources.
 
-    Portfolio and assessment data are auto-indexed when gathered.
-    Use this to re-index LinkedIn data or to manually trigger indexing.
+    All sources are auto-indexed when gathered. Use this to verify indexing status.
     """
     from futureproof.services.knowledge_service import KnowledgeService
 
     service = KnowledgeService()
 
+    results = service.index_all(verbose=False)
+
     if source:
         ks = _parse_source(source)
-        chunks = service.index_source(ks, verbose=False)
-        return f"Indexed {chunks} chunks from '{source}' into the knowledge base."
+        count = results.get(ks.value, 0)
+        if count > 0:
+            return f"'{source}' has {count} chunks indexed in the knowledge base."
+        return f"No data indexed for '{source}'. Gather the data first."
     else:
-        results = service.index_all(verbose=False)
         total = sum(results.values())
         indexed = sum(1 for c in results.values() if c > 0)
-        result_parts = [f"Indexed {total} chunks from {indexed} sources:"]
+        result_parts = [f"{total} chunks from {indexed} sources:"]
         for src, count in results.items():
             if count > 0:
                 result_parts.append(f"  - {src}: {count} chunks")

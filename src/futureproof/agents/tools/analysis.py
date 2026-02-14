@@ -51,15 +51,17 @@ def analyze_career_alignment() -> str:
 
     Use this for a comprehensive career analysis including goals, skills, and market fit.
     """
-    from futureproof.services import AnalysisService
+    try:
+        from futureproof.services import AnalysisService
 
-    service = AnalysisService()
-    result = service.analyze(action="analyze_full")
+        service = AnalysisService()
+        result = service.analyze(action="analyze_full")
 
-    if result.success:
-        return f"Career alignment analysis:\n\n{result.content}"
-    else:
+        if result.success:
+            return f"Career alignment analysis:\n\n{result.content}"
         return f"Could not complete analysis: {result.error}"
+    except Exception as e:
+        return f"Career alignment analysis encountered an error: {e}"
 
 
 @tool
@@ -71,8 +73,11 @@ def get_career_advice(target: str) -> str:
 
     Use this when the user asks for advice on career decisions or paths.
     """
-    from futureproof.services import AnalysisService
+    try:
+        from futureproof.services import AnalysisService
 
-    service = AnalysisService()
-    advice = service.get_advice(target)
-    return f"Career advice for '{target}':\n\n{advice}"
+        service = AnalysisService()
+        advice = service.get_advice(target)
+        return f"Career advice for '{target}':\n\n{advice}"
+    except Exception as e:
+        return f"Career advice for '{target}' encountered an error: {e}"

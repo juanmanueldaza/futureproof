@@ -2,10 +2,10 @@
 
 Single responsibility: Manage and execute data gathering from external sources.
 Database-first: gatherers return content strings, indexed directly to ChromaDB.
-LinkedIn is the exception (external CLI writes files).
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -79,6 +79,7 @@ class GathererService:
 
             source_map = {
                 "portfolio": KnowledgeSource.PORTFOLIO,
+                "linkedin": KnowledgeSource.LINKEDIN,
                 "assessment": KnowledgeSource.ASSESSMENT,
             }
 
@@ -87,23 +88,6 @@ class GathererService:
                 service = self._get_knowledge_service()
                 count = service.index_content(source, content, verbose=verbose)
                 logger.info("Auto-indexed %d chunks for %s", count, source_name)
-        except ImportError:
-            logger.debug("ChromaDB not available, skipping auto-index")
-        except Exception as e:
-            logger.warning("Auto-index failed for %s: %s", source_name, e)
-
-    def _index_files(self, source_name: str, verbose: bool = False) -> None:
-        """Index files to knowledge base (LinkedIn only)."""
-        if not settings.knowledge_auto_index:
-            return
-
-        try:
-            from ..memory.knowledge import KnowledgeSource
-
-            if source_name == "linkedin":
-                service = self._get_knowledge_service()
-                count = service.index_source(KnowledgeSource.LINKEDIN, verbose=verbose)
-                logger.info("Auto-indexed %d chunks for linkedin", count)
         except ImportError:
             logger.debug("ChromaDB not available, skipping auto-index")
         except Exception as e:
@@ -122,12 +106,29 @@ class GathererService:
             Dict mapping source names to success status
         """
         results: dict[str, bool] = {}
+        total_start = time.monotonic()
 
-        try:
-            self.gather_portfolio(verbose=verbose)
-            results["portfolio"] = True
-        except Exception:
-            results["portfolio"] = False
+        def _timed_gather(name: str, fn, *args, **kwargs) -> bool:
+            t0 = time.monotonic()
+            try:
+                fn(*args, **kwargs)
+                elapsed = time.monotonic() - t0
+                logger.info("%s gathered in %.1fs", name, elapsed)
+                if verbose:
+                    from ..chat.ui import display_gather_result
+
+                    display_gather_result(name, elapsed)
+                return True
+            except Exception as e:
+                elapsed = time.monotonic() - t0
+                logger.warning("%s gather failed in %.1fs: %s", name, elapsed, e)
+                if verbose:
+                    from ..chat.ui import display_gather_result
+
+                    display_gather_result(name, elapsed, success=False)
+                return False
+
+        results["portfolio"] = _timed_gather("portfolio", self.gather_portfolio, verbose=verbose)
 
         # Auto-detect LinkedIn ZIP in data/raw/
         raw_dir = Path("data/raw")
@@ -135,11 +136,9 @@ class GathererService:
             linkedin_zips = list(raw_dir.glob("*[Ll]inked[Ii]n*.zip"))
             if linkedin_zips:
                 linkedin_zip = max(linkedin_zips, key=lambda p: p.stat().st_mtime)
-                try:
-                    self.gather_linkedin(linkedin_zip, verbose=verbose)
-                    results["linkedin"] = True
-                except Exception:
-                    results["linkedin"] = False
+                results["linkedin"] = _timed_gather(
+                    "linkedin", self.gather_linkedin, linkedin_zip, verbose=verbose
+                )
             else:
                 results["linkedin"] = False
 
@@ -152,13 +151,18 @@ class GathererService:
                 if any(ind in p.name.lower() for ind in GALLUP_PDF_INDICATORS)
             ]
             if gallup_pdfs:
-                try:
-                    self.gather_assessment(raw_dir, verbose=verbose)
-                    results["assessment"] = True
-                except Exception:
-                    results["assessment"] = False
+                results["assessment"] = _timed_gather(
+                    "assessment", self.gather_assessment, raw_dir, verbose=verbose
+                )
             else:
                 results["assessment"] = False
+
+        total_elapsed = time.monotonic() - total_start
+        logger.info("All sources gathered in %.1fs", total_elapsed)
+        if verbose:
+            from ..chat.ui import display_timing
+
+            display_timing(total_elapsed)
 
         return results
 
@@ -176,17 +180,16 @@ class GathererService:
 
     def gather_linkedin(
         self, zip_path: Path, output_dir: Path | None = None, verbose: bool = False
-    ) -> Path:
+    ) -> str:
         """Gather data from LinkedIn export.
 
         Returns:
-            Path to profile.md (CLI output)
+            Markdown content string
         """
         gatherer = self._get_gatherer("linkedin")
-        result = gatherer.gather(zip_path, output_dir)
-        path = Path(result) if not isinstance(result, Path) else result
-        self._index_files("linkedin", verbose=verbose)
-        return path
+        content = str(gatherer.gather(zip_path, output_dir))
+        self._index_content("linkedin", content, verbose=verbose)
+        return content
 
     def gather_assessment(self, input_dir: Path | None = None, verbose: bool = False) -> str:
         """Gather CliftonStrengths assessment data from PDFs.

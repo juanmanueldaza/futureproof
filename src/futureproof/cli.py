@@ -35,6 +35,15 @@ def main(
     """FutureProof - Know thyself through your data."""
     settings.ensure_directories()
 
+    # Initialize logging — file handler always active, console only shows warnings
+    from .utils.logging import setup_logging
+
+    setup_logging(
+        level="DEBUG",
+        log_file=settings.data_dir / "futureproof.log",
+        console_level="WARNING",
+    )
+
 
 # ============================================================================
 # CHAT COMMANDS - Conversational interface
@@ -51,6 +60,10 @@ def chat_command(
         bool,
         typer.Option("--verbose", "-v", help="Show tool usage and agent reasoning"),
     ] = False,
+    debug: Annotated[
+        bool,
+        typer.Option("--debug", help="Show debug-level logs in terminal"),
+    ] = False,
 ) -> None:
     """Start an interactive chat session with the career intelligence agent.
 
@@ -66,7 +79,18 @@ def chat_command(
     Your conversation is automatically saved and persists across sessions.
 
     Use --verbose to see which tools the agent is using.
+    Use --debug to also show debug-level logs in the terminal.
     """
+    if debug:
+        import logging
+
+        fp_logger = logging.getLogger("futureproof")
+        for handler in fp_logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                handler.setLevel(logging.DEBUG)
+
     from .chat.client import run_chat
 
     try:

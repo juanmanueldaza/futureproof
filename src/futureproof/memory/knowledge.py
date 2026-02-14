@@ -136,49 +136,6 @@ class CareerKnowledgeStore(ChromaDBStore):
         logger.debug("Indexed chunk: %s (%s/%s)", chunk.id, source.value, section)
         return chunk.id
 
-    def index_markdown_file(
-        self,
-        source: KnowledgeSource,
-        file_path: Path,
-        extra_metadata: dict[str, Any] | None = None,
-    ) -> list[str]:
-        """Parse and index a markdown file by sections.
-
-        Args:
-            source: Knowledge source (github, gitlab, etc.)
-            file_path: Path to the markdown file
-            extra_metadata: Additional metadata to include with all chunks
-
-        Returns:
-            List of chunk IDs created
-        """
-        if not file_path.exists():
-            logger.warning("File not found: %s", file_path)
-            return []
-
-        content = file_path.read_text()
-        chunks = self.chunker.chunk(content)
-
-        chunk_ids = []
-        for chunk in chunks:
-            section = chunk.section_name or file_path.stem
-            metadata = {
-                "file": file_path.name,
-                "parent_section": chunk.parent_section,
-                **(extra_metadata or {}),
-            }
-
-            chunk_id = self._index_document(
-                source=source,
-                content=chunk.content,
-                section=section,
-                metadata=metadata,
-            )
-            chunk_ids.append(chunk_id)
-
-        logger.info("Indexed %d chunks from %s", len(chunk_ids), file_path.name)
-        return chunk_ids
-
     def index_content(
         self,
         source: KnowledgeSource,
@@ -186,6 +143,10 @@ class CareerKnowledgeStore(ChromaDBStore):
         extra_metadata: dict[str, Any] | None = None,
     ) -> list[str]:
         """Chunk and index raw markdown content directly (no file I/O).
+
+        Uses batch indexing — all chunks are sent to ChromaDB in a single
+        ``collection.add()`` call, triggering one batch embedding request
+        instead of one per chunk.
 
         Args:
             source: Knowledge source
@@ -201,19 +162,28 @@ class CareerKnowledgeStore(ChromaDBStore):
 
         chunks = self.chunker.chunk(content)
 
-        chunk_ids = []
-        for idx, chunk in enumerate(chunks):
-            metadata = {"chunk_index": idx, **(extra_metadata or {})}
-            chunk_id = self._index_document(
-                source=source,
-                content=chunk.content,
-                section=chunk.section_name or "general",
-                metadata=metadata,
-            )
-            chunk_ids.append(chunk_id)
+        # Build batch arrays
+        ids: list[str] = []
+        documents: list[str] = []
+        metadatas: list[dict[str, str]] = []
 
-        logger.info("Indexed %d chunks for %s", len(chunk_ids), source.value)
-        return chunk_ids
+        for idx, chunk in enumerate(chunks):
+            kc = KnowledgeChunk(
+                id=str(uuid.uuid4()),
+                content=chunk.content,
+                source=source,
+                section=chunk.section_name or "general",
+                metadata={"chunk_index": idx, **(extra_metadata or {})},
+            )
+            ids.append(kc.id)
+            documents.append(kc.to_document())
+            metadatas.append(kc.to_metadata())
+
+        # Single batch add — one embedding API call for all chunks
+        self._add(ids=ids, documents=documents, metadatas=metadatas)
+
+        logger.info("Indexed %d chunks for %s (batch)", len(ids), source.value)
+        return ids
 
     def get_all_content(self, source: KnowledgeSource) -> str:
         """Retrieve all chunks for a source and join them in order.
