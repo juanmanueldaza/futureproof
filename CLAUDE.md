@@ -12,7 +12,7 @@ FutureProof is a career intelligence system powered by a conversational AI agent
 - **Pydantic** for configuration
 - **Typer** for CLI (chat entry point)
 - **pytest** for testing
-- **uv** for package management
+- **pip** for package management
 
 ## Project Structure
 
