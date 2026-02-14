@@ -77,8 +77,9 @@ logs/
 *.sqlite
 *.sqlite3
 
-# uv cache (lock file should be committed for reproducibility)
+# uv
 .uv/
+uv.lock
 
 # mypy / pyright / ruff
 .mypy_cache/

@@ -1,0 +1,10 @@
+-r requirements.txt
+
+# Dev tools
+pyright>=1.1.408
+pytest>=8
+ruff>=0.9
+
+# Type stubs
+types-beautifulsoup4>=4.12.0.20250516
+types-pyyaml>=6.0.12.20250915

@@ -22,7 +22,7 @@ import logging
 from typing import Any
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import SummarizationMiddleware
+from langchain.agents.middleware.summarization import SummarizationMiddleware
 
 from futureproof.agents.middleware import ToolCallRepairMiddleware
 from futureproof.agents.tools import get_all_tools
