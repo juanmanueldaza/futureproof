@@ -29,8 +29,6 @@ class CareerState(TypedDict, total=False):
 
     # Career data
     linkedin_data: str | None
-    github_data: str | None
-    gitlab_data: str | None
     portfolio_data: str | None
     assessment_data: str | None
 

@@ -1,8 +1,11 @@
 """Career knowledge base for RAG-based retrieval.
 
-Provides semantic search over career documents (GitHub, GitLab, LinkedIn, Portfolio).
+Provides semantic search over career documents (LinkedIn, Portfolio, Assessment).
 Unlike EpisodicStore (for decisions/experiences), this stores factual career data
 that can be queried by the agent instead of loading full documents into context.
+
+Architecture: Database-first — gatherers index content directly to ChromaDB
+via index_content(). No intermediate markdown files on disk.
 """
 
 import logging
@@ -22,8 +25,6 @@ logger = logging.getLogger(__name__)
 class KnowledgeSource(Enum):
     """Sources of career knowledge."""
 
-    GITHUB = "github"
-    GITLAB = "gitlab"
     LINKEDIN = "linkedin"
     PORTFOLIO = "portfolio"
     ASSESSMENT = "assessment"  # CliftonStrengths
@@ -61,11 +62,11 @@ class KnowledgeChunk:
         metadata: dict[str, Any],
     ) -> "KnowledgeChunk":
         """Create from ChromaDB query result."""
-        source_str = metadata.get("source", "github")
+        source_str = metadata.get("source", "portfolio")
         try:
             source = KnowledgeSource(source_str)
         except ValueError:
-            source = KnowledgeSource.GITHUB
+            source = KnowledgeSource.PORTFOLIO
 
         reserved = {"source", "section", "indexed_at"}
         return cls(
@@ -177,6 +178,73 @@ class CareerKnowledgeStore(ChromaDBStore):
 
         logger.info("Indexed %d chunks from %s", len(chunk_ids), file_path.name)
         return chunk_ids
+
+    def index_content(
+        self,
+        source: KnowledgeSource,
+        content: str,
+        extra_metadata: dict[str, Any] | None = None,
+    ) -> list[str]:
+        """Chunk and index raw markdown content directly (no file I/O).
+
+        Args:
+            source: Knowledge source
+            content: Raw markdown content to index
+            extra_metadata: Additional metadata to include with all chunks
+
+        Returns:
+            List of chunk IDs created
+        """
+        if not content.strip():
+            logger.warning("Empty content for source: %s", source.value)
+            return []
+
+        chunks = self.chunker.chunk(content)
+
+        chunk_ids = []
+        for idx, chunk in enumerate(chunks):
+            metadata = {"chunk_index": idx, **(extra_metadata or {})}
+            chunk_id = self._index_document(
+                source=source,
+                content=chunk.content,
+                section=chunk.section_name or "general",
+                metadata=metadata,
+            )
+            chunk_ids.append(chunk_id)
+
+        logger.info("Indexed %d chunks for %s", len(chunk_ids), source.value)
+        return chunk_ids
+
+    def get_all_content(self, source: KnowledgeSource) -> str:
+        """Retrieve all chunks for a source and join them in order.
+
+        Uses metadata-based retrieval (not semantic search) to reconstruct
+        the full content for a source. Chunks are sorted by chunk_index.
+
+        Args:
+            source: Knowledge source to retrieve
+
+        Returns:
+            Combined content string, or empty string if no data
+        """
+        results = self.collection.get(
+            where={"source": source.value},
+            include=["documents", "metadatas"],
+        )
+
+        docs = results["documents"]
+        metas = results["metadatas"]
+        if not docs or not metas:
+            return ""
+
+        # Sort by chunk_index if available, else preserve order
+        def _sort_key(pair: tuple) -> int:
+            idx = pair[1].get("chunk_index", 0)
+            return int(idx) if isinstance(idx, (int, float, str)) else 0
+
+        pairs = list(zip(docs, metas))
+        sorted_docs = sorted(pairs, key=_sort_key)
+        return "\n\n".join(doc for doc, _ in sorted_docs)
 
     def search(
         self,

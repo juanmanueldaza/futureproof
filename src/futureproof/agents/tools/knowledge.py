@@ -25,7 +25,7 @@ def search_career_knowledge(
 
     Args:
         query: What to search for (e.g., "Python projects", "leadership experience")
-        sources: Optional filter by source (github, gitlab, linkedin, portfolio, assessment)
+        sources: Optional filter by source (linkedin, portfolio, assessment)
         limit: Maximum results to return
 
     Use this to find specific information from the user's career history
@@ -88,11 +88,11 @@ def index_career_knowledge(source: str = "") -> str:
     """Index gathered career data into the knowledge base for semantic search.
 
     Args:
-        source: Specific source to index (github, gitlab, linkedin, portfolio,
-                assessment). Leave empty to index all available sources.
+        source: Specific source to index (linkedin, portfolio, assessment).
+                Leave empty to index all available sources.
 
-    This creates embeddings from gathered career data so it can be searched
-    semantically. Run this after gathering new data to make it searchable.
+    Portfolio and assessment data are auto-indexed when gathered.
+    Use this to re-index LinkedIn data or to manually trigger indexing.
     """
     from futureproof.services.knowledge_service import KnowledgeService
 
@@ -118,8 +118,8 @@ def clear_career_knowledge(source: str = "") -> str:
     """Clear indexed data from the career knowledge base.
 
     Args:
-        source: Specific source to clear (github, gitlab, linkedin, portfolio,
-                assessment). Leave empty to clear all indexed data.
+        source: Specific source to clear (linkedin, portfolio, assessment).
+                Leave empty to clear all indexed data.
 
     Use this to remove outdated indexed data before re-indexing.
     """
@@ -127,8 +127,8 @@ def clear_career_knowledge(source: str = "") -> str:
     approved = interrupt(
         {
             "question": f"Clear {target} indexed career data?",
-            "details": "This will remove the data from the knowledge base. "
-            "The original gathered files are not affected.",
+            "details": "This will permanently remove the data from the knowledge base. "
+            "You will need to re-gather to restore it.",
         }
     )
     if not approved:

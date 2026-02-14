@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-FutureProof is a career intelligence system powered by a conversational AI agent. It gathers professional data from multiple sources (LinkedIn, GitHub, GitLab, portfolio sites, CliftonStrengths), uses AI to analyze career trajectories, identify gaps, and generate optimized CVs — all through an interactive chat interface.
+FutureProof is a career intelligence system powered by a conversational AI agent. It gathers professional data from multiple sources (LinkedIn, portfolio sites, CliftonStrengths) and indexes it directly to ChromaDB (database-first, no intermediate files). Uses AI to analyze career trajectories, identify gaps, and generate optimized CVs — all through an interactive chat interface. GitHub and GitLab data is accessed live via MCP clients.
 
 ## Tech Stack
 
@@ -23,11 +23,9 @@ src/futureproof/
 │   ├── orchestrator.py  # LangGraph Functional API (@entrypoint/@task) for analysis
 │   ├── state.py         # TypedDict state definitions (CareerState, etc.)
 │   ├── helpers/         # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
-│   └── tools/           # 32 agent tools organized by domain
+│   └── tools/           # 30 agent tools organized by domain
 ├── chat/                # Streaming client with HITL, summary echo stripping
 ├── gatherers/           # Data collection from external sources
-│   ├── github.py        # GitHub via MCP server or github2md CLI
-│   ├── gitlab.py        # GitLab via MCP server or gitlab2md CLI
 │   ├── linkedin.py      # LinkedIn ZIP via linkedin2md CLI
 │   ├── cliftonstrengths.py  # CliftonStrengths PDF parser (~850 lines)
 │   ├── portfolio/       # Decomposed: Fetcher, HTMLExtractor, JSExtractor, MarkdownWriter
@@ -76,19 +74,19 @@ ruff check . --fix                  # Auto-fix
 
 All functionality is accessible through the **chat interface** via a single agent built with LangChain's `create_agent()`:
 
-- **Single agent**: One agent with all 32 tools — profile, gathering, analysis, generation, knowledge, market, memory
+- **Single agent**: One agent with all 30 tools — profile, gathering, analysis, generation, knowledge, market, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages)
 - **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent)
-- **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, GitHub)
+- **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, portfolio)
 - **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for career analysis workflows (used by `AnalysisService`)
 - **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — Azure OpenAI only
 - **Caching**: Agent singleton (`_cached_agent`), checkpointer singleton, embedding function singleton
 
-### Agent Tools (32 tools in `agents/tools/`)
+### Agent Tools (30 tools in `agents/tools/`)
 
 - **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
-- **Gathering** (7): `gather_github_data`, `gather_gitlab_data`, `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data`
+- **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — portfolio/assessment index directly to ChromaDB; LinkedIn reads CLI output files
 - **Knowledge** (4): `search_career_knowledge`, `get_knowledge_stats`, `index_career_knowledge`, `clear_career_knowledge` (HITL)
 - **Analysis** (3): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`
 - **Generation** (2): `generate_cv` (HITL), `generate_cv_draft`
@@ -132,7 +130,6 @@ Uses `init_chat_model()` with `azure_openai` provider.
 
 ### Other Protections
 - **SSRF**: Portfolio fetcher blocks private IP ranges, validates resolved hostnames
-- **Path traversal**: `_safe_path()` in `utils/data_loader.py` — resolves to absolute, blocks symlinks
 - **Command injection**: `subprocess.run()` with list args, no `shell=True`, 5-min timeout
 - **File permissions**: Sensitive output files (CVs, profile) created with `0o600`
 
@@ -150,7 +147,7 @@ Uses `init_chat_model()` with `azure_openai` provider.
 - Tests in `tests/` directory
 - Use fixtures from `conftest.py` for common test data
 - Mock external services (LLM, HTTP) to avoid API calls
-- Clear data loader cache between tests with `clear_data_cache()`
+- Data loader tests mock `KnowledgeService` (no file I/O)
 
 ## Configuration
 
@@ -167,8 +164,6 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `CV_TEMPERATURE` — CV generation temperature (default: `0.2`)
 
 ### Data Sources
-- `GITHUB_USERNAME`, `GITLAB_USERNAME` — Profiles to gather
-- `GITLAB_GROUPS` — Comma-separated GitLab groups (validated for safe characters)
 - `PORTFOLIO_URL` — Portfolio website URL
 - `DEFAULT_LANGUAGE` — `en` or `es` (default: `en`)
 
@@ -205,7 +200,7 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 `FallbackLLMManager` with 2-model Azure chain. Uses `init_chat_model()` with `azure_openai` provider. Auto-detects rate limits and model errors via string matching, marks failed models, tries next in chain.
 
 ### `memory/knowledge.py`
-`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Supports filtering by `KnowledgeSource` enum (github, gitlab, linkedin, portfolio, assessment). Methods: `index_markdown_file()`, `search()`, `clear_source()`, `get_stats()`.
+`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Database-first: `index_content()` accepts raw strings (no file I/O). `get_all_content()` retrieves all chunks for a source. `KnowledgeSource` enum: linkedin, portfolio, assessment. Also has `index_markdown_file()` (for LinkedIn CLI files), `search()`, `clear_source()`, `get_stats()`.
 
 ### `memory/episodic.py`
 `EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION, CONVERSATION, MILESTONE, LEARNING, FEEDBACK. Methods: `remember()`, `recall()`, `get_recent()`, `forget()`, `stats()`.
@@ -220,7 +215,7 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 Security utilities: `detect_prompt_injection()`, `sanitize_user_input()`, `anonymize_pii()`, `anonymize_career_data()`, `create_safe_prompt()`.
 
 ### `utils/data_loader.py`
-Centralized data loading with path traversal protection (`_safe_path()`), symlink blocking, and memoization.
+Thin wrapper around `KnowledgeService.get_all_content()`. Functions: `load_career_data()` → dict, `load_career_data_for_cv()` → formatted string, `combine_career_data()` → combined string. No file I/O — all data comes from ChromaDB.
 
 ### `services/`
 Business logic layer: `GathererService` (registry-based gathering + auto-indexing), `AnalysisService` (LangGraph orchestrator invocation), `GenerationService` (CV generation), `KnowledgeService` (indexing/search), `CareerService` (facade).

@@ -1,7 +1,5 @@
 """Tests for configuration management."""
 
-import pytest
-
 from futureproof.config import Settings
 
 
@@ -22,21 +20,6 @@ class TestSettings:
         settings = make_settings(azure_openai_api_key="test-key")
         assert settings.default_language == "en"
         assert settings.azure_openai_api_key == "test-key"
-
-    @pytest.mark.parametrize(
-        ("groups_input", "expected"),
-        [
-            ("group1, group2, group3", ["group1", "group2", "group3"]),
-            ("  group1  ,  group2  ", ["group1", "group2"]),
-            ("", []),
-            ("single-group", ["single-group"]),
-        ],
-        ids=["csv", "whitespace", "empty", "single"],
-    )
-    def test_gitlab_groups_list(self, groups_input: str, expected: list[str]) -> None:
-        """Test gitlab_groups string is parsed to list."""
-        settings = make_settings(gitlab_groups=groups_input)
-        assert settings.gitlab_groups_list == expected
 
     def test_directory_paths_are_paths(self) -> None:
         """Test computed directory paths return Path objects."""
@@ -91,9 +74,3 @@ class TestSettings:
         settings = make_settings()
         assert settings.portfolio_url
         assert settings.portfolio_url.startswith("http")
-
-    def test_username_defaults(self) -> None:
-        """Test username fields have defaults."""
-        settings = make_settings()
-        assert settings.github_username
-        assert settings.gitlab_username

@@ -2,7 +2,7 @@
 
 Tools are organized by domain:
 - profile: get/update user profile and goals
-- gathering: collect data from GitHub, GitLab, portfolio, LinkedIn, assessments
+- gathering: collect data from portfolio, LinkedIn, assessments
 - analysis: skill gaps, career alignment, advice
 - market: job search, tech trends, salary insights, market fit/skills analysis
 - generation: CV drafts and documents
@@ -14,8 +14,6 @@ from .analysis import analyze_career_alignment, analyze_skill_gaps, get_career_a
 from .gathering import (
     gather_all_career_data,
     gather_assessment_data,
-    gather_github_data,
-    gather_gitlab_data,
     gather_linkedin_data,
     gather_portfolio_data,
     get_stored_career_data,
@@ -61,8 +59,6 @@ _ALL_TOOLS = [
     set_target_roles,
     update_user_goal,
     # Gathering
-    gather_github_data,
-    gather_gitlab_data,
     gather_portfolio_data,
     gather_linkedin_data,
     gather_assessment_data,
@@ -100,7 +96,7 @@ __all__ = [getattr(t, "__name__", t.name) for t in _ALL_TOOLS] + ["get_all_tools
 def get_all_tools() -> list:
     """Get all career intelligence tools for the agent.
 
-    Returns all 32 tools: profile, gathering, analysis, market, generation,
+    Returns all 30 tools: profile, gathering, analysis, market, generation,
     knowledge, and memory.
     """
     return list(_ALL_TOOLS)
