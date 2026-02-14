@@ -18,7 +18,7 @@ from typing import Any
 from langgraph.func import entrypoint, task
 
 from ..prompts import get_prompt_builder
-from .helpers import advice_pipeline, default_invoker, default_pipeline, get_result_key
+from .helpers import advice_pipeline, default_pipeline, get_result_key, invoke_llm
 
 # ============================================================================
 # Task Functions
@@ -65,21 +65,11 @@ def gather_portfolio_task() -> dict[str, Any]:
 
 
 @task
-def gather_market_task() -> dict[str, Any]:
-    """Gather market intelligence data."""
-    return {
-        "job_market": None,
-        "tech_trends": None,
-        "economic_context": None,
-    }
-
-
-@task
 def analyze_task(state: dict[str, Any]) -> dict[str, Any]:
     """Analyze career data using LLM."""
     prompt_builder = get_prompt_builder()
 
-    career_data = default_pipeline.prepare(state)
+    career_data = default_pipeline(state)
     if not career_data:
         return {"error": "No data available for analysis. Run 'gather' first."}
 
@@ -89,7 +79,7 @@ def analyze_task(state: dict[str, Any]) -> dict[str, Any]:
     action = state.get("action", "analyze_full")
     prompt = prompt_builder.build_analysis_prompt(action, career_data)
 
-    return default_invoker.invoke(prompt, get_result_key(action), "Analysis")
+    return invoke_llm(prompt, get_result_key(action), "Analysis")
 
 
 @task
@@ -97,7 +87,7 @@ def analyze_market_task(state: dict[str, Any]) -> dict[str, Any]:
     """Analyze career data against market intelligence."""
     prompt_builder = get_prompt_builder()
 
-    career_data = default_pipeline.prepare(state)
+    career_data = default_pipeline(state)
     if not career_data:
         return {"error": "No career data available. Run 'gather all' first."}
 
@@ -108,7 +98,7 @@ def analyze_market_task(state: dict[str, Any]) -> dict[str, Any]:
     action = state.get("action", "analyze_market_fit")
     prompt = prompt_builder.build_market_analysis_prompt(action, career_data, market_context)
 
-    return default_invoker.invoke(prompt, get_result_key(action, "market_fit"), "Market analysis")
+    return invoke_llm(prompt, get_result_key(action, "market_fit"), "Market analysis")
 
 
 @task
@@ -131,7 +121,7 @@ def advise_task(state: dict[str, Any]) -> dict[str, Any]:
     prompt_builder = get_prompt_builder()
     target = state.get("target") or "career growth"
 
-    career_data = advice_pipeline.prepare(state)
+    career_data = advice_pipeline(state)
     if not career_data:
         career_data = "No data available."
 
@@ -141,7 +131,7 @@ def advise_task(state: dict[str, Any]) -> dict[str, Any]:
 
     prompt = prompt_builder.build_advice_prompt(target, career_data, market_context)
 
-    return default_invoker.invoke(prompt, "advice", "Advice generation")
+    return invoke_llm(prompt, "advice", "Advice generation")
 
 
 # ============================================================================
@@ -173,12 +163,6 @@ def _handle_gather(state: dict[str, Any]) -> dict[str, Any]:
     return {**state, **updates}
 
 
-def _handle_gather_market(state: dict[str, Any]) -> dict[str, Any]:
-    """Market intelligence gathering."""
-    result = gather_market_task().result()
-    return {**state, **result}
-
-
 def _handle_analyze_market(state: dict[str, Any]) -> dict[str, Any]:
     """Analyze career data against market intelligence."""
     result = analyze_market_task(state).result()
@@ -208,7 +192,6 @@ def _handle_advise(state: dict[str, Any]) -> dict[str, Any]:
 _EXACT_HANDLERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "gather": _handle_gather,
     "gather_all": _handle_gather,
-    "gather_market": _handle_gather_market,
     "analyze_market": _handle_analyze_market,
     "analyze_market_fit": _handle_analyze_market,
     "analyze_skill_gaps": _handle_analyze_market,
@@ -260,12 +243,5 @@ def execute_workflow(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_graph():
-    """Create the career intelligence workflow.
-
-    Returns the Functional API entrypoint, which has .invoke() and .stream()
-    methods compatible with the previous StateGraph interface.
-
-    Returns:
-        The execute_workflow entrypoint
-    """
+    """Return the execute_workflow entrypoint (has .invoke()/.stream())."""
     return execute_workflow

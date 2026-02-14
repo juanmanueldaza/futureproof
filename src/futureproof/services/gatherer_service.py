@@ -127,6 +127,9 @@ class GathererService:
     def gather_all(self, verbose: bool = False) -> dict[str, bool]:
         """Gather data from all sources.
 
+        Gathers from GitHub, GitLab, and Portfolio (if configured), and
+        auto-detects LinkedIn ZIP exports and CliftonStrengths PDFs in data/raw/.
+
         Args:
             verbose: If True, print progress to console
 
@@ -143,6 +146,37 @@ class GathererService:
                 results[name] = True
             except Exception:
                 results[name] = False
+
+        # Auto-detect LinkedIn ZIP in data/raw/
+        raw_dir = Path("data/raw")
+        if raw_dir.exists():
+            linkedin_zips = list(raw_dir.glob("*[Ll]inked[Ii]n*.zip"))
+            if linkedin_zips:
+                linkedin_zip = max(linkedin_zips, key=lambda p: p.stat().st_mtime)
+                try:
+                    self.gather_linkedin(linkedin_zip, verbose=verbose)
+                    results["linkedin"] = True
+                except Exception:
+                    results["linkedin"] = False
+            else:
+                results["linkedin"] = False
+
+            # Auto-detect CliftonStrengths PDFs
+            from ..gatherers.cliftonstrengths import GALLUP_PDF_INDICATORS
+
+            gallup_pdfs = [
+                p
+                for p in raw_dir.glob("*.pdf")
+                if any(ind in p.name.lower() for ind in GALLUP_PDF_INDICATORS)
+            ]
+            if gallup_pdfs:
+                try:
+                    self.gather_assessment(raw_dir, verbose=verbose)
+                    results["assessment"] = True
+                except Exception:
+                    results["assessment"] = False
+            else:
+                results["assessment"] = False
 
         return results
 

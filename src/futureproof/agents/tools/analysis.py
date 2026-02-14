@@ -1,12 +1,8 @@
 """Analysis tools for the career agent."""
 
-import logging
-
 from langchain_core.tools import tool
 
 from futureproof.memory.profile import load_profile
-
-logger = logging.getLogger(__name__)
 
 
 @tool
@@ -23,7 +19,7 @@ def analyze_skill_gaps(target_role: str) -> str:
         from futureproof.services import AnalysisService
 
         service = AnalysisService()
-        result = service.analyze(action="analyze_gaps")
+        result = service.analyze(action="analyze_gaps", target=target_role)
 
         if result.success:
             return f"Skill gap analysis for '{target_role}':\n\n{result.content}"
@@ -55,20 +51,15 @@ def analyze_career_alignment() -> str:
 
     Use this for a comprehensive career analysis including goals, skills, and market fit.
     """
-    try:
-        from futureproof.services import AnalysisService
+    from futureproof.services import AnalysisService
 
-        service = AnalysisService()
-        result = service.analyze(action="analyze_full")
+    service = AnalysisService()
+    result = service.analyze(action="analyze_full")
 
-        if result.success:
-            return f"Career alignment analysis:\n\n{result.content}"
-        else:
-            return f"Could not complete analysis: {result.error}"
-
-    except Exception as e:
-        logger.exception("Error in career analysis")
-        return f"Error performing career analysis: {e}"
+    if result.success:
+        return f"Career alignment analysis:\n\n{result.content}"
+    else:
+        return f"Could not complete analysis: {result.error}"
 
 
 @tool
@@ -80,13 +71,8 @@ def get_career_advice(target: str) -> str:
 
     Use this when the user asks for advice on career decisions or paths.
     """
-    try:
-        from futureproof.services import AnalysisService
+    from futureproof.services import AnalysisService
 
-        service = AnalysisService()
-        advice = service.get_advice(target)
-        return f"Career advice for '{target}':\n\n{advice}"
-
-    except Exception as e:
-        logger.exception("Error getting career advice")
-        return f"Error getting career advice: {e}. I can still provide general guidance."
+    service = AnalysisService()
+    advice = service.get_advice(target)
+    return f"Career advice for '{target}':\n\n{advice}"

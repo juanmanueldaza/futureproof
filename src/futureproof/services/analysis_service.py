@@ -68,12 +68,14 @@ class AnalysisService:
         self,
         action: AnalysisAction,
         market_data: dict | None = None,
+        target: str | None = None,
     ) -> AnalysisResult:
         """Run career analysis.
 
         Args:
             action: Type of analysis to perform
             market_data: Optional market intelligence data for market-aware analysis
+            target: Optional target role for gap analysis
 
         Returns:
             AnalysisResult with content or error
@@ -87,6 +89,9 @@ class AnalysisService:
             raise NoDataError("No career data found. Run 'futureproof gather all' first.")
 
         state["action"] = action
+
+        if target:
+            state["target"] = target
 
         # Add market data if provided
         # Map gatherer keys to state keys expected by the orchestrator

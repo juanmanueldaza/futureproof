@@ -126,16 +126,16 @@ def get_all_tools() -> list:
         analyze_skill_gaps,
         analyze_career_alignment,
         get_career_advice,
-        analyze_market_fit,
-        analyze_market_skills,
-        # Generation
-        generate_cv,
-        generate_cv_draft,
-        # Market Intelligence
+        # Market
         search_jobs,
         get_tech_trends,
         get_salary_insights,
+        analyze_market_fit,
+        analyze_market_skills,
         gather_market_data,
+        # Generation
+        generate_cv,
+        generate_cv_draft,
         # Memory
         remember_decision,
         remember_job_application,

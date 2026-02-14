@@ -71,7 +71,8 @@ def update_user_skills(skills: list[str], skill_type: str = "technical") -> str:
         profile.soft_skills = sorted(existing)
 
     save_profile(profile)
-    return f"Updated {skill_type} skills. Current {skill_type} skills: {', '.join(skills)}"
+    merged = profile.technical_skills if skill_type == "technical" else profile.soft_skills
+    return f"Updated {skill_type} skills. Current {skill_type} skills: {', '.join(merged)}"
 
 
 @tool

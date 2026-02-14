@@ -19,12 +19,10 @@ Usage:
 """
 
 import logging
-from typing import Any, cast
+from typing import Any
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 
 from futureproof.agents.tools import get_all_tools
 from futureproof.llm.fallback import get_model_with_fallback
@@ -245,67 +243,3 @@ def get_agent_config(
             "user_id": user_id,
         }
     }
-
-
-def chat(
-    message: str,
-    thread_id: str = "main",
-    stream: bool = True,
-):
-    """Send a message to the career agent.
-
-    This is a convenience function for simple interactions.
-
-    Args:
-        message: The user's message
-        thread_id: Conversation thread for persistence
-        stream: Whether to stream the response
-
-    Yields:
-        Response chunks if streaming, otherwise returns full response
-    """
-    agent = create_career_agent()
-    config = get_agent_config(thread_id=thread_id)
-
-    input_message: Any = {"messages": [HumanMessage(content=message)]}
-
-    if stream:
-        for chunk, metadata in agent.stream(
-            input_message,
-            cast(RunnableConfig, config),
-            stream_mode="messages",
-        ):
-            # chunk can be AIMessageChunk or str depending on stream mode
-            if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
-                yield chunk.content  # type: ignore[union-attr]
-    else:
-        result = agent.invoke(input_message, cast(RunnableConfig, config))
-        return result["messages"][-1].content
-
-
-async def achat(
-    message: str,
-    thread_id: str = "main",
-):
-    """Async version of chat for use in async contexts.
-
-    Args:
-        message: The user's message
-        thread_id: Conversation thread for persistence
-
-    Yields:
-        Response chunks as they're generated
-    """
-    agent = create_career_agent()
-    config = get_agent_config(thread_id=thread_id)
-
-    input_message: Any = {"messages": [HumanMessage(content=message)]}
-
-    async for chunk, metadata in agent.astream(
-        input_message,
-        cast(RunnableConfig, config),
-        stream_mode="messages",
-    ):
-        # chunk can be AIMessageChunk or str depending on stream mode
-        if hasattr(chunk, "content") and chunk.content:  # type: ignore[union-attr]
-            yield chunk.content  # type: ignore[union-attr]

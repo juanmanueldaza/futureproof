@@ -78,8 +78,6 @@ def remember_decision(
             episodic_fn=create_decision,
             episodic_args=(decision, context, outcome),
         )
-    except ImportError:
-        logger.warning("ChromaDB not available - episodic memory disabled")
     except Exception as e:
         logger.exception("Error storing decision to ChromaDB")
         return f"Could not store decision: {e}"
@@ -127,8 +125,6 @@ def remember_job_application(
             episodic_fn=remember_application,
             episodic_args=(company, role, status, notes),
         )
-    except ImportError:
-        logger.warning("ChromaDB not available")
     except Exception as e:
         logger.exception("Error storing application to ChromaDB")
         return f"Could not store application: {e}"
@@ -169,8 +165,6 @@ def recall_memories(
                 if mem.context:
                     result_parts.append(f"  Context: {mem.context}")
 
-    except ImportError:
-        logger.debug("ChromaDB not available")
     except Exception:
         logger.exception("Error recalling from ChromaDB")
 
@@ -200,23 +194,16 @@ def get_memory_stats() -> str:
     Use this to see an overview of stored memories, including counts
     by type (decisions, applications, conversations, etc.).
     """
-    try:
-        from futureproof.memory.episodic import get_episodic_store
+    from futureproof.memory.episodic import get_episodic_store
 
-        store = get_episodic_store()
-        stats = store.stats()
+    store = get_episodic_store()
+    stats = store.stats()
 
-        result_parts = ["Long-term memory statistics:"]
-        result_parts.append(f"\nTotal memories: {stats['total_memories']}")
-        result_parts.append("\nBy type:")
-        for mem_type, count in stats["by_type"].items():
-            if count > 0:
-                result_parts.append(f"  - {mem_type}: {count}")
+    result_parts = ["Long-term memory statistics:"]
+    result_parts.append(f"\nTotal memories: {stats['total_memories']}")
+    result_parts.append("\nBy type:")
+    for mem_type, count in stats["by_type"].items():
+        if count > 0:
+            result_parts.append(f"  - {mem_type}: {count}")
 
-        return "\n".join(result_parts)
-
-    except ImportError:
-        return "Note: Long-term memory is not available (ChromaDB not installed)."
-    except Exception as e:
-        logger.exception("Error getting memory stats")
-        return f"Could not get memory stats: {e}"
+    return "\n".join(result_parts)

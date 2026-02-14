@@ -1,14 +1,11 @@
 """CV generation tools for the career agent."""
 
-import logging
 from typing import Literal
 
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 
 from futureproof.memory.profile import load_profile
-
-logger = logging.getLogger(__name__)
 
 
 @tool
@@ -17,16 +14,19 @@ def generate_cv(
     language: Literal["en", "es"] = "en",
     format: Literal["ats", "creative"] = "ats",
 ) -> str:
-    """Generate a CV/resume tailored for a specific role.
+    """Generate a CV/resume for the user.
 
     Args:
-        target_role: Optional role to tailor the CV for
+        target_role: Optional role context for the confirmation prompt
         language: Output language - 'en' for English, 'es' for Spanish
         format: CV format - 'ats' for ATS-friendly, 'creative' for visual
 
     Use this when the user wants to create or update their CV.
     Returns the path to the generated CV file.
+    Note: target_role is shown in the confirmation but does not yet tailor
+    the CV content. Use the knowledge base and profile to guide CV content.
     """
+    # TODO: Pass target_role through to GenerationService for CV tailoring
     # Human-in-the-loop: confirm before generating
     role_note = f" for '{target_role}'" if target_role else ""
     lang_name = "English" if language == "en" else "Spanish"
@@ -39,23 +39,18 @@ def generate_cv(
     if not approved:
         return "CV generation cancelled."
 
-    try:
-        from futureproof.services import GenerationService
+    from futureproof.services import GenerationService
 
-        service = GenerationService()
-        output_path = service.generate_cv(language=language, format=format)
+    service = GenerationService()
+    output_path = service.generate_cv(language=language, format=format)
 
-        return (
-            f"CV generated successfully{role_note}!\n\n"
-            f"**Format:** {format.upper()}\n"
-            f"**Language:** {lang_name}\n"
-            f"**Output:** {output_path}\n\n"
-            "The CV has been saved. You can review and edit it as needed."
-        )
-
-    except Exception as e:
-        logger.exception("Error generating CV")
-        return f"Error generating CV: {e}"
+    return (
+        f"CV generated successfully{role_note}!\n\n"
+        f"**Format:** {format.upper()}\n"
+        f"**Language:** {lang_name}\n"
+        f"**Output:** {output_path}\n\n"
+        "The CV has been saved. You can review and edit it as needed."
+    )
 
 
 @tool

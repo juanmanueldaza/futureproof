@@ -1,11 +1,18 @@
 """Knowledge base (RAG) tools for the career agent."""
 
-import logging
-
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 
-logger = logging.getLogger(__name__)
+
+def _parse_source(source: str):
+    """Parse and validate a KnowledgeSource string."""
+    from futureproof.memory.knowledge import KnowledgeSource
+
+    try:
+        return KnowledgeSource(source)
+    except ValueError:
+        valid = ", ".join(s.value for s in KnowledgeSource)
+        raise ValueError(f"Invalid source '{source}'. Valid sources: {valid}")
 
 
 @tool
@@ -28,33 +35,26 @@ def search_career_knowledge(
     - "leadership" to find management or leadership experience
     - "recent contributions" for recent activity
     """
-    try:
-        from futureproof.services.knowledge_service import KnowledgeService
+    from futureproof.services.knowledge_service import KnowledgeService
 
-        service = KnowledgeService()
-        results = service.search(query, limit=limit, sources=sources)
+    service = KnowledgeService()
+    results = service.search(query, limit=limit, sources=sources)
 
-        if not results:
-            return (
-                f"No results found for '{query}'. "
-                "Try a different query or check if career data has been indexed."
-            )
+    if not results:
+        return (
+            f"No results found for '{query}'. "
+            "Try a different query or check if career data has been indexed."
+        )
 
-        parts = [f"Found {len(results)} relevant results for '{query}':"]
-        for i, result in enumerate(results, 1):
-            source = result.get("source", "unknown")
-            section = result.get("section", "")
-            content = result.get("content", "")[:500]  # Truncate for display
-            parts.append(f"\n**{i}. [{source}] {section}**")
-            parts.append(content)
+    result_parts = [f"Found {len(results)} relevant results for '{query}':"]
+    for i, result in enumerate(results, 1):
+        source = result.get("source", "unknown")
+        section = result.get("section", "")
+        content = result.get("content", "")[:500]
+        result_parts.append(f"\n**{i}. [{source}] {section}**")
+        result_parts.append(content)
 
-        return "\n".join(parts)
-
-    except ImportError:
-        return "Knowledge base not available (ChromaDB not installed)."
-    except Exception as e:
-        logger.exception("Error searching knowledge base")
-        return f"Error searching knowledge base: {e}"
+    return "\n".join(result_parts)
 
 
 @tool
@@ -64,33 +64,23 @@ def get_knowledge_stats() -> str:
     Shows what career data is indexed and available for search.
     Use this to see if the knowledge base has been populated.
     """
-    try:
-        from futureproof.services.knowledge_service import KnowledgeService
+    from futureproof.services.knowledge_service import KnowledgeService
 
-        service = KnowledgeService()
-        stats = service.get_stats()
+    service = KnowledgeService()
+    stats = service.get_stats()
 
-        total = stats.get("total_chunks", 0)
-        if total == 0:
-            return (
-                "Career knowledge base is empty. "
-                "Ask me to index your career data, or run `futureproof index` from the CLI."
-            )
+    total = stats.get("total_chunks", 0)
+    if total == 0:
+        return "Career knowledge base is empty. Ask me to index your career data."
 
-        parts = ["Career Knowledge Base Statistics:"]
-        parts.append(f"\nTotal chunks indexed: {total}")
-        parts.append("\nBy source:")
-        for source, count in stats.get("by_source", {}).items():
-            if count > 0:
-                parts.append(f"  - {source}: {count} chunks")
+    result_parts = ["Career Knowledge Base Statistics:"]
+    result_parts.append(f"\nTotal chunks indexed: {total}")
+    result_parts.append("\nBy source:")
+    for source, count in stats.get("by_source", {}).items():
+        if count > 0:
+            result_parts.append(f"  - {source}: {count} chunks")
 
-        return "\n".join(parts)
-
-    except ImportError:
-        return "Knowledge base not available (ChromaDB not installed)."
-    except Exception as e:
-        logger.exception("Error getting knowledge stats")
-        return f"Error getting stats: {e}"
+    return "\n".join(result_parts)
 
 
 @tool
@@ -104,36 +94,23 @@ def index_career_knowledge(source: str = "") -> str:
     This creates embeddings from gathered career data so it can be searched
     semantically. Run this after gathering new data to make it searchable.
     """
-    try:
-        from futureproof.memory.knowledge import KnowledgeSource
-        from futureproof.services.knowledge_service import KnowledgeService
+    from futureproof.services.knowledge_service import KnowledgeService
 
-        service = KnowledgeService()
+    service = KnowledgeService()
 
-        if source:
-            ks = KnowledgeSource(source)
-            chunks = service.index_source(ks, verbose=False)
-            return f"Indexed {chunks} chunks from '{source}' into the knowledge base."
-        else:
-            results = service.index_all(verbose=False)
-            total = sum(results.values())
-            indexed = sum(1 for c in results.values() if c > 0)
-            parts = [f"Indexed {total} chunks from {indexed} sources:"]
-            for src, count in results.items():
-                if count > 0:
-                    parts.append(f"  - {src}: {count} chunks")
-            return "\n".join(parts)
-
-    except ValueError:
-        from futureproof.memory.knowledge import KnowledgeSource
-
-        valid = ", ".join(s.value for s in KnowledgeSource)
-        return f"Invalid source '{source}'. Valid sources: {valid}"
-    except ImportError:
-        return "Knowledge base not available (ChromaDB not installed)."
-    except Exception as e:
-        logger.exception("Error indexing knowledge base")
-        return f"Error indexing knowledge base: {e}"
+    if source:
+        ks = _parse_source(source)
+        chunks = service.index_source(ks, verbose=False)
+        return f"Indexed {chunks} chunks from '{source}' into the knowledge base."
+    else:
+        results = service.index_all(verbose=False)
+        total = sum(results.values())
+        indexed = sum(1 for c in results.values() if c > 0)
+        result_parts = [f"Indexed {total} chunks from {indexed} sources:"]
+        for src, count in results.items():
+            if count > 0:
+                result_parts.append(f"  - {src}: {count} chunks")
+        return "\n".join(result_parts)
 
 
 @tool
@@ -157,28 +134,16 @@ def clear_career_knowledge(source: str = "") -> str:
     if not approved:
         return "Knowledge base clear cancelled."
 
-    try:
-        from futureproof.memory.knowledge import KnowledgeSource, get_knowledge_store
+    from futureproof.memory.knowledge import KnowledgeSource, get_knowledge_store
 
-        store = get_knowledge_store()
+    store = get_knowledge_store()
 
-        if source:
-            ks = KnowledgeSource(source)
-            deleted = store.clear_source(ks)
-            return f"Cleared {deleted} chunks for '{source}' from the knowledge base."
-        else:
-            total_deleted = 0
-            for ks in KnowledgeSource:
-                total_deleted += store.clear_source(ks)
-            return f"Cleared {total_deleted} chunks from the knowledge base."
-
-    except ValueError:
-        from futureproof.memory.knowledge import KnowledgeSource as KS
-
-        valid = ", ".join(s.value for s in KS)
-        return f"Invalid source '{source}'. Valid sources: {valid}"
-    except ImportError:
-        return "Knowledge base not available (ChromaDB not installed)."
-    except Exception as e:
-        logger.exception("Error clearing knowledge base")
-        return f"Error clearing knowledge base: {e}"
+    if source:
+        ks = _parse_source(source)
+        deleted = store.clear_source(ks)
+        return f"Cleared {deleted} chunks for '{source}' from the knowledge base."
+    else:
+        total_deleted = 0
+        for ks in KnowledgeSource:
+            total_deleted += store.clear_source(ks)
+        return f"Cleared {total_deleted} chunks from the knowledge base."

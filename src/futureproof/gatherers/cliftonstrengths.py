@@ -20,6 +20,20 @@ from .base import BaseGatherer
 
 logger = logging.getLogger(__name__)
 
+# Filename indicators for detecting Gallup CliftonStrengths PDFs
+GALLUP_PDF_INDICATORS = [
+    "top_5",
+    "top_10",
+    "all_34",
+    "action_planning",
+    "leadership_insight",
+    "discovery_development",
+    "sf_top",
+    "cliftonstrengths",
+    "strengthsfinder",
+    "gallup",
+]
+
 # CliftonStrengths domains
 DOMAINS = {
     "EXECUTING": [
@@ -167,18 +181,7 @@ class CliftonStrengthsGatherer(BaseGatherer):
     def _is_gallup_pdf(self, path: Path) -> bool:
         """Check if a PDF is a Gallup CliftonStrengths report."""
         name = path.name.lower()
-        gallup_indicators = [
-            "top_5",
-            "top_10",
-            "all_34",
-            "action_planning",
-            "leadership_insight",
-            "discovery_development",
-            "sf_top",
-            "cliftonstrengths",
-            "strengthsfinder",
-        ]
-        return any(indicator in name for indicator in gallup_indicators)
+        return any(indicator in name for indicator in GALLUP_PDF_INDICATORS)
 
     def _extract_text(self, pdf_path: Path) -> str:
         """Extract text from PDF using pdftotext."""
