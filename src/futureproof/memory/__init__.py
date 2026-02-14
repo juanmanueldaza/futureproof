@@ -1,10 +1,9 @@
 """Memory module for FutureProof persistent state management.
 
-This module provides four-tier memory architecture:
-- Short-term: LangGraph SqliteSaver for conversation state
+Three-tier memory architecture:
+- Conversations: LangGraph SqliteSaver for conversation state
 - Profile: YAML-based user identity and goals
-- Episodic: ChromaDB for long-term semantic memory (decisions, applications)
-- Knowledge: ChromaDB for career data RAG retrieval
+- ChromaDB: Episodic memory (decisions, applications) + career knowledge RAG
 """
 
 from futureproof.memory.checkpointer import get_checkpointer

@@ -5,7 +5,7 @@ analysis, CV generation, data gathering, knowledge search, market
 intelligence, and memory.
 
 Uses LangChain's create_agent() with SummarizationMiddleware for automatic
-context management and InMemoryStore for cross-thread episodic memory.
+context management. Episodic memory is persisted via ChromaDB.
 
 Usage:
     from futureproof.agents.career_agent import create_career_agent, get_agent_config
@@ -28,7 +28,6 @@ from futureproof.agents.tools import get_all_tools
 from futureproof.llm.fallback import get_model_with_fallback
 from futureproof.memory.checkpointer import get_checkpointer
 from futureproof.memory.profile import load_profile
-from futureproof.memory.store import get_memory_store
 from futureproof.prompts.system import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,6 @@ def _get_user_profile_context() -> str:
 def create_career_agent(
     model=None,
     checkpointer=None,
-    store=None,
     profile_context=None,
 ):
     """Create the career intelligence agent (cached singleton).
@@ -69,21 +67,19 @@ def create_career_agent(
     Args:
         model: Optional LLM model override
         checkpointer: Optional checkpointer override
-        store: Optional InMemoryStore override
         profile_context: Optional profile context string override
 
     Returns:
         A compiled agent with all career intelligence tools
     """
     global _cached_agent
-    using_defaults = all(arg is None for arg in (model, checkpointer, store, profile_context))
+    using_defaults = all(arg is None for arg in (model, checkpointer, profile_context))
 
     if _cached_agent is not None and using_defaults:
         return _cached_agent
 
     model = model or get_model()
     checkpointer = checkpointer or get_checkpointer()
-    store = store or get_memory_store()
     profile_context = profile_context or _get_user_profile_context()
 
     summarization = SummarizationMiddleware(
@@ -95,7 +91,6 @@ def create_career_agent(
     agent = create_agent(
         model=model,
         tools=get_all_tools(),
-        store=store,
         system_prompt=SYSTEM_PROMPT.format(user_profile=profile_context),
         middleware=[summarization],
         checkpointer=checkpointer,

@@ -21,9 +21,3 @@ class AnalysisError(ServiceError):
     """Raised when analysis fails."""
 
     pass
-
-
-class GenerationError(ServiceError):
-    """Raised when CV generation fails."""
-
-    pass

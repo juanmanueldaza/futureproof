@@ -33,7 +33,6 @@ src/futureproof/
 ├── generators/          # CV generation (Markdown + PDF via WeasyPrint)
 ├── llm/                 # FallbackLLMManager with init_chat_model()
 ├── memory/
-│   ├── store.py         # LangGraph InMemoryStore (runtime semantic search)
 │   ├── knowledge.py     # ChromaDB knowledge store (RAG)
 │   ├── episodic.py      # ChromaDB episodic memory store
 │   ├── chunker.py       # Markdown text chunker for indexing
@@ -77,7 +76,7 @@ All functionality is accessible through the **chat interface** via a single agen
 - **Single agent**: One agent with all 36 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 8k tokens, keeps last 20 messages)
-- **Memory**: Dual-write to `InMemoryStore` (runtime, cross-thread semantic search) + ChromaDB (persistent)
+- **Memory**: ChromaDB for persistent episodic memory (decisions, applications) and career knowledge RAG
 - **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, portfolio)
 - **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for career analysis workflows (used by `AnalysisService`)
 - **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — Azure OpenAI only
@@ -115,7 +114,7 @@ Uses `init_chat_model()` with `azure_openai` provider.
 - **Hacker News**: `hn_client.py` (Algolia API — stories, hiring trends, job postings with salary parsing)
 - **Job boards**: `jobspy_client.py` (LinkedIn/Indeed/Glassdoor/ZipRecruiter via python-jobspy), `remoteok_client.py`, `himalayas_client.py`, `jobicy_client.py`, `weworkremotely_client.py`, `remotive_client.py`
 - **Content trends**: `devto_client.py`, `stackoverflow_client.py`
-- **Infrastructure**: `base.py` (abstract base), `http_client.py` (shared httpx client), `job_schema.py` (unified job model), `salary_parser.py`
+- **Infrastructure**: `base.py` (abstract base `MCPClient`), `http_client.py` (shared httpx client for 9 API-based clients), `job_schema.py` (unified job model), `salary_parser.py`
 
 ## Security
 
@@ -192,7 +191,7 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 ## Key Modules
 
 ### `agents/career_agent.py`
-Single agent with `create_agent()`, unified system prompt, `SummarizationMiddleware`. Cached singleton pattern. Functions: `create_career_agent()`, `chat()`, `achat()`, `get_agent_config()`, `reset_career_agent()`.
+Single agent with `create_agent()`, unified system prompt, `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `chat()`, `achat()`, `get_agent_config()`, `reset_career_agent()`.
 
 ### `agents/orchestrator.py`
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).
@@ -206,9 +205,6 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 ### `memory/episodic.py`
 `EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION, CONVERSATION, MILESTONE, LEARNING, FEEDBACK. Methods: `remember()`, `recall()`, `get_recent()`, `forget()`, `stats()`.
 
-### `memory/store.py`
-`InMemoryStore` with Azure OpenAI semantic search embeddings. Used by the agent for runtime cross-thread memory. Passed to `create_agent()` as `store` param.
-
 ### `memory/chunker.py`
 `MarkdownChunker` — splits markdown by `##` headers while preserving section hierarchy. Configurable max/min token limits. Merges small chunks, splits large ones.
 
@@ -219,7 +215,7 @@ Security utilities: `detect_prompt_injection()`, `sanitize_user_input()`, `anony
 Thin wrapper around `KnowledgeService.get_all_content()`. Functions: `load_career_data()` → dict, `load_career_data_for_cv()` → formatted string, `combine_career_data()` → combined string. No file I/O — all data comes from ChromaDB.
 
 ### `services/`
-Business logic layer: `GathererService` (registry-based gathering + auto-indexing), `AnalysisService` (LangGraph orchestrator invocation), `GenerationService` (CV generation), `KnowledgeService` (indexing/search), `CareerService` (facade).
+Business logic layer: `GathererService` (gathering + auto-indexing), `AnalysisService` (LangGraph orchestrator invocation), `KnowledgeService` (indexing/search). CV generation is called directly via `CVGenerator` from agent tools.
 
 ### `gatherers/portfolio/`
 Decomposed portfolio scraper (SRP): `PortfolioFetcher` (SSRF-protected HTTP), `HTMLExtractor` (BeautifulSoup), `JSExtractor` (JavaScript content), `MarkdownWriter` (output formatting).

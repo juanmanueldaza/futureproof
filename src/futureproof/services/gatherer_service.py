@@ -5,7 +5,6 @@ Database-first: gatherers return content strings, indexed directly to ChromaDB.
 LinkedIn is the exception (external CLI writes files).
 """
 
-import importlib
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,14 +16,6 @@ if TYPE_CHECKING:
     from .knowledge_service import KnowledgeService
 
 logger = logging.getLogger(__name__)
-
-# Registry mapping gatherer names to (module_path, class_name).
-# To add a new gatherer, add an entry here — no code changes needed elsewhere.
-_GATHERER_REGISTRY: dict[str, tuple[str, str]] = {
-    "portfolio": ("futureproof.gatherers", "PortfolioGatherer"),
-    "linkedin": ("futureproof.gatherers", "LinkedInGatherer"),
-    "assessment": ("futureproof.gatherers.cliftonstrengths", "CliftonStrengthsGatherer"),
-}
 
 
 class GathererService:
@@ -50,14 +41,20 @@ class GathererService:
         if name in self._gatherers:
             return self._gatherers[name]
 
-        entry = _GATHERER_REGISTRY.get(name)
-        if entry is None:
-            raise ValueError(f"Unknown gatherer: {name}")
+        if name == "portfolio":
+            from ..gatherers import PortfolioGatherer
 
-        module_path, class_name = entry
-        module = importlib.import_module(module_path)
-        gatherer_cls = getattr(module, class_name)
-        return gatherer_cls()
+            return PortfolioGatherer()
+        if name == "linkedin":
+            from ..gatherers import LinkedInGatherer
+
+            return LinkedInGatherer()
+        if name == "assessment":
+            from ..gatherers.cliftonstrengths import CliftonStrengthsGatherer
+
+            return CliftonStrengthsGatherer()
+
+        raise ValueError(f"Unknown gatherer: {name}")
 
     def _get_knowledge_service(self) -> "KnowledgeService":
         """Get or create the knowledge service."""
