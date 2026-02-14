@@ -43,8 +43,15 @@ _cached_agent = None
 
 def get_model():
     """Get the LLM model for the agent with automatic fallback."""
-    model, config = get_model_with_fallback()
+    model, config = get_model_with_fallback(purpose="agent")
     logger.info(f"Career agent using: {config.description}")
+    return model
+
+
+def _get_summary_model():
+    """Get a (potentially cheaper) model for summarization."""
+    model, config = get_model_with_fallback(purpose="summary")
+    logger.info(f"Summarization using: {config.description}")
     return model
 
 
@@ -82,8 +89,9 @@ def create_career_agent(
     checkpointer = checkpointer or get_checkpointer()
     profile_context = profile_context or _get_user_profile_context()
 
+    summary_model = _get_summary_model()
     summarization = SummarizationMiddleware(
-        model=model,
+        model=summary_model,
         trigger=("tokens", 8000),
         keep=("messages", 20),
     )

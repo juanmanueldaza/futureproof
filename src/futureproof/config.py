@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     azure_chat_deployment: str = ""  # e.g. "gpt-4.1"
     azure_embedding_deployment: str = ""  # e.g. "text-embedding-3-small"
 
+    # Purpose-specific model deployments (optional, empty = use default chain)
+    azure_agent_deployment: str = ""  # Tool calling (e.g. "gpt-5")
+    azure_analysis_deployment: str = ""  # Analysis/CV generation (e.g. "gpt-4.1")
+    azure_summary_deployment: str = ""  # Summarization (e.g. "gpt-4.1-mini")
+
     # User profiles
     portfolio_url: str = "https://daza.ar"
 

@@ -79,7 +79,7 @@ All functionality is accessible through the **chat interface** via a single agen
 - **Memory**: ChromaDB for persistent episodic memory (decisions, applications) and career knowledge RAG
 - **Auto-profile**: After gathering, the agent auto-populates an empty profile from knowledge base data (LinkedIn, portfolio)
 - **Orchestrator**: LangGraph Functional API (`@entrypoint`/`@task`) in `orchestrator.py` for career analysis workflows (used by `AnalysisService`)
-- **LLM**: Unified on `FallbackLLMManager` using `init_chat_model()` — Azure OpenAI only
+- **LLM**: `FallbackLLMManager` with purpose-based model routing — agent (tool calling), analysis, summarization can each use a different Azure deployment
 - **Caching**: Agent singleton (`_cached_agent`), checkpointer singleton, embedding function singleton
 
 ### Agent Tools (36 tools in `agents/tools/`)
@@ -96,7 +96,7 @@ All functionality is accessible through the **chat interface** via a single agen
 
 Shared async helper: `_async.py` with `run_async()` for sync tool → async service bridge.
 
-## LLM Fallback Chain
+## LLM Fallback Chain & Model Routing
 
 `FallbackLLMManager` in `llm/fallback.py` tries models in order, auto-skipping on rate limits or errors:
 
@@ -104,6 +104,14 @@ Shared async helper: `_async.py` with `run_async()` for sync tool → async serv
 2. Azure GPT-4.1 Mini
 
 Uses `init_chat_model()` with `azure_openai` provider.
+
+**Purpose-based routing**: Each LLM call site declares its purpose (`"agent"`, `"analysis"`, `"summary"`). If a purpose-specific deployment is configured (e.g., `AZURE_AGENT_DEPLOYMENT=gpt-5`), that model is prepended to the fallback chain for that purpose. Unconfigured purposes use the default chain. This allows using the best model for tool calling while using cheaper models for analysis, CV generation, and summarization.
+
+| Purpose | Call Sites | Config Var | Recommended Model |
+|---|---|---|---|
+| `agent` | `create_agent()` | `AZURE_AGENT_DEPLOYMENT` | Best available (GPT-5/5.2) |
+| `analysis` | `invoke_llm()`, `CVGenerator` | `AZURE_ANALYSIS_DEPLOYMENT` | GPT-4.1 |
+| `summary` | `SummarizationMiddleware` | `AZURE_SUMMARY_DEPLOYMENT` | GPT-4.1 Mini |
 
 ## MCP Clients (`mcp/`)
 
@@ -164,6 +172,11 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `LLM_TEMPERATURE` — Generation temperature (default: `0.3`)
 - `CV_TEMPERATURE` — CV generation temperature (default: `0.2`)
 
+### Model Routing (optional)
+- `AZURE_AGENT_DEPLOYMENT` — Deployment for tool calling (e.g. `gpt-5`). Empty = use default chain.
+- `AZURE_ANALYSIS_DEPLOYMENT` — Deployment for analysis/CV generation (e.g. `gpt-4.1`). Empty = use default chain.
+- `AZURE_SUMMARY_DEPLOYMENT` — Deployment for summarization (e.g. `gpt-4.1-mini`). Empty = use default chain.
+
 ### Data Sources
 - `PORTFOLIO_URL` — Portfolio website URL
 - `DEFAULT_LANGUAGE` — `en` or `es` (default: `en`)
@@ -197,7 +210,7 @@ Single agent with `create_agent()`, unified system prompt, `SummarizationMiddlew
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).
 
 ### `llm/fallback.py`
-`FallbackLLMManager` with 2-model Azure chain. Uses `init_chat_model()` with `azure_openai` provider. Auto-detects rate limits and model errors via string matching, marks failed models, tries next in chain.
+`FallbackLLMManager` with 2-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
 ### `memory/knowledge.py`
 `CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Database-first: `index_content()` accepts raw strings (no file I/O). `get_all_content()` retrieves all chunks for a source. `KnowledgeSource` enum: linkedin, portfolio, assessment. Also has `index_markdown_file()` (for LinkedIn CLI files), `search()`, `clear_source()`, `get_stats()`.

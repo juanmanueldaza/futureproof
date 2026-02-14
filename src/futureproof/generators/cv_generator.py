@@ -122,7 +122,7 @@ class CVGenerator:
         format: Literal["ats", "creative"],
     ) -> str:
         """Generate CV content using LLM."""
-        model, _config = self._llm_factory(temperature=settings.cv_temperature)
+        model, _config = self._llm_factory(temperature=settings.cv_temperature, purpose="analysis")
 
         lang_instruction = {
             "en": "Generate the CV in English.",

@@ -127,12 +127,19 @@ class FallbackLLMManager:
             if settings.has_azure and self._model_key(config) not in self._failed_models
         ]
 
-    def get_model(self, temperature: float | None = None) -> tuple[BaseChatModel, ModelConfig]:
+    def get_model(
+        self,
+        temperature: float | None = None,
+        chain: list[ModelConfig] | None = None,
+    ) -> tuple[BaseChatModel, ModelConfig]:
         """Get the best available model.
 
         Args:
             temperature: Optional per-call temperature override. If None,
                 uses the manager's default temperature.
+            chain: Optional chain override for purpose-specific routing.
+                If provided, uses this chain instead of the default.
+                Failed-model tracking still applies globally.
 
         Returns:
             Tuple of (model instance, model config)
@@ -140,13 +147,22 @@ class FallbackLLMManager:
         Raises:
             RuntimeError: If no models are available
         """
-        available = self.get_available_models()
+        effective_chain = chain or self._chain
+        available = [
+            config
+            for config in effective_chain
+            if settings.has_azure and self._model_key(config) not in self._failed_models
+        ]
 
         if not available:
             # Reset failed models and try again
             logger.warning("All models failed, resetting failure state")
             self._failed_models.clear()
-            available = self.get_available_models()
+            available = [
+                config
+                for config in effective_chain
+                if settings.has_azure and self._model_key(config) not in self._failed_models
+            ]
 
         if not available:
             raise RuntimeError(
@@ -219,8 +235,47 @@ def get_fallback_manager() -> FallbackLLMManager:
     return _fallback_manager
 
 
+def _build_purpose_chain(deployment: str, description: str) -> list[ModelConfig]:
+    """Build a fallback chain with a purpose-specific model prepended.
+
+    The purpose model is tried first; if it fails, the default chain
+    models are tried in order (skipping any duplicate).
+    """
+    purpose_model = ModelConfig("azure", deployment, description)
+    return [purpose_model] + [c for c in DEFAULT_FALLBACK_CHAIN if c.model != deployment]
+
+
+def get_model_for_purpose(
+    purpose: str,
+    temperature: float | None = None,
+) -> tuple[BaseChatModel, ModelConfig]:
+    """Get a model optimized for a specific purpose.
+
+    Builds a purpose-specific fallback chain by prepending the configured
+    deployment for that purpose. If no deployment is configured, falls
+    back to the default chain.
+
+    Args:
+        purpose: One of "agent", "analysis", "summary".
+        temperature: Optional per-call temperature override.
+
+    Returns:
+        Tuple of (model instance, model config)
+    """
+    deployment_map = {
+        "agent": (settings.azure_agent_deployment, "Agent"),
+        "analysis": (settings.azure_analysis_deployment, "Analysis"),
+        "summary": (settings.azure_summary_deployment, "Summary"),
+    }
+
+    deployment, desc = deployment_map.get(purpose, ("", ""))
+    chain = _build_purpose_chain(deployment, desc) if deployment else None
+    return get_fallback_manager().get_model(temperature=temperature, chain=chain)
+
+
 def get_model_with_fallback(
     temperature: float | None = None,
+    purpose: str | None = None,
 ) -> tuple[BaseChatModel, ModelConfig]:
     """Get a model with automatic fallback support.
 
@@ -233,8 +288,13 @@ def get_model_with_fallback(
     Args:
         temperature: Optional per-call temperature override. If None, uses the
             manager's default temperature from config.
+        purpose: Optional purpose for model routing. One of "agent",
+            "analysis", "summary". If set and a deployment is configured
+            for this purpose, that model is tried first.
 
     Returns:
         Tuple of (model instance, model config)
     """
+    if purpose:
+        return get_model_for_purpose(purpose, temperature)
     return get_fallback_manager().get_model(temperature=temperature)

@@ -22,7 +22,7 @@ def invoke_llm(
     from ...llm.fallback import get_model_with_fallback
 
     try:
-        model, _config = get_model_with_fallback()
+        model, _config = get_model_with_fallback(purpose="analysis")
         response = model.invoke(prompt)
         content = response.content if isinstance(response.content, str) else str(response.content)
         return {result_key: content}
