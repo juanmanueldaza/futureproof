@@ -25,43 +25,26 @@ from .helpers import advice_pipeline, default_pipeline, get_result_key, invoke_l
 # ============================================================================
 
 
-@task
-def gather_github_task() -> dict[str, Any]:
-    """Gather GitHub data."""
-    from ..gatherers import GitHubGatherer
+def _make_gather_task(gatherer_module_attr: str, data_key: str, label: str):
+    """Create a gather task for a specific data source."""
 
-    try:
-        github = GitHubGatherer()
-        path = github.gather()
-        return {"github_data": path.read_text()}
-    except Exception as e:
-        return {"error": f"GitHub: {e}"}
+    @task
+    def _gather() -> dict[str, Any]:
+        from .. import gatherers
 
+        try:
+            cls = getattr(gatherers, gatherer_module_attr)
+            path = cls().gather()
+            return {data_key: path.read_text()}
+        except Exception as e:
+            return {"error": f"{label}: {e}"}
 
-@task
-def gather_gitlab_task() -> dict[str, Any]:
-    """Gather GitLab data."""
-    from ..gatherers import GitLabGatherer
-
-    try:
-        gitlab = GitLabGatherer()
-        path = gitlab.gather()
-        return {"gitlab_data": path.read_text()}
-    except Exception as e:
-        return {"error": f"GitLab: {e}"}
+    return _gather
 
 
-@task
-def gather_portfolio_task() -> dict[str, Any]:
-    """Gather Portfolio data."""
-    from ..gatherers import PortfolioGatherer
-
-    try:
-        portfolio = PortfolioGatherer()
-        path = portfolio.gather()
-        return {"portfolio_data": path.read_text()}
-    except Exception as e:
-        return {"error": f"Portfolio: {e}"}
+gather_github_task = _make_gather_task("GitHubGatherer", "github_data", "GitHub")
+gather_gitlab_task = _make_gather_task("GitLabGatherer", "gitlab_data", "GitLab")
+gather_portfolio_task = _make_gather_task("PortfolioGatherer", "portfolio_data", "Portfolio")
 
 
 @task
@@ -163,28 +146,20 @@ def _handle_gather(state: dict[str, Any]) -> dict[str, Any]:
     return {**state, **updates}
 
 
-def _handle_analyze_market(state: dict[str, Any]) -> dict[str, Any]:
-    """Analyze career data against market intelligence."""
-    result = analyze_market_task(state).result()
-    return {**state, **result}
+def _make_handler(task_fn):
+    """Create a handler that runs a task and merges results into state."""
+
+    def handler(state: dict[str, Any]) -> dict[str, Any]:
+        result = task_fn(state).result()
+        return {**state, **result}
+
+    return handler
 
 
-def _handle_analyze(state: dict[str, Any]) -> dict[str, Any]:
-    """General career analysis."""
-    result = analyze_task(state).result()
-    return {**state, **result}
-
-
-def _handle_generate(state: dict[str, Any]) -> dict[str, Any]:
-    """CV generation."""
-    result = generate_task(state).result()
-    return {**state, **result}
-
-
-def _handle_advise(state: dict[str, Any]) -> dict[str, Any]:
-    """Career advice generation."""
-    result = advise_task(state).result()
-    return {**state, **result}
+_handle_analyze_market = _make_handler(analyze_market_task)
+_handle_analyze = _make_handler(analyze_task)
+_handle_generate = _make_handler(generate_task)
+_handle_advise = _make_handler(advise_task)
 
 
 # Dispatch tables — add new actions here without modifying execute_workflow.
