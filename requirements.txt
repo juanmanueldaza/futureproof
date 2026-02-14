@@ -1,0 +1,34 @@
+# Core
+typer>=0.15
+pydantic-settings>=2
+rich>=14
+
+# AI/LLM
+langchain>=0.3
+langgraph>=0.3
+langchain-openai>=0.3
+
+# Data gathering
+httpx>=0.28
+beautifulsoup4>=4
+
+# MCP (Model Context Protocol)
+mcp>=1.26
+nest-asyncio>=1.6
+
+# Generation
+jinja2>=3
+weasyprint>=62
+markdown>=3.10.1
+
+# Job scraping
+python-jobspy>=1.1.82
+
+# Persistence
+langgraph-checkpoint-sqlite>=3.0.3
+
+# UI
+prompt-toolkit>=3.0.52
+
+# Vector DB
+chromadb>=1.4.1

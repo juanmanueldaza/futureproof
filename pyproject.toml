@@ -50,12 +50,3 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-
-[dependency-groups]
-dev = [
-    "pyright>=1.1.408",
-    "pytest>=8",
-    "ruff>=0.9",
-    "types-beautifulsoup4>=4.12.0.20250516",
-    "types-pyyaml>=6.0.12.20250915",
-]

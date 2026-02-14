@@ -20,7 +20,10 @@ FutureProof aggregates data from LinkedIn, GitHub, GitLab, portfolio websites, a
 
 ```bash
 cd futureproof
-uv sync
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
 
 cp .env.example .env
 # Edit .env with your API keys
@@ -29,11 +32,6 @@ cp .env.example .env
 ### Prerequisites
 
 - Python 3.13+
-- [uv](https://docs.astral.sh/uv/) package manager
-
-### External tools (optional)
-
-- [linkedin2md](https://github.com/juanmanueldaza/linkedin2md) — LinkedIn export ZIP to markdown
 
 ## Usage
 
@@ -182,6 +180,9 @@ src/futureproof/
 ## Development
 
 ```bash
+pip install -r requirements-dev.txt
+pip install -e .
+
 pytest tests/ -q              # Run tests
 pyright src/futureproof       # Type checking
 ruff check .                  # Lint
@@ -197,7 +198,7 @@ ruff check . --fix            # Auto-fix lint issues
 - **Typer + Rich** — CLI and terminal UI
 - **httpx** — async HTTP client
 - **WeasyPrint** — PDF generation
-- **uv** — package management
+- **pip** — package management
 
 ## License
 
