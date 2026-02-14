@@ -12,7 +12,14 @@ Also provides market intelligence clients:
 - Remotive: Remote jobs API with tags and location data
 """
 
-from .base import MCPClient, MCPClientError, MCPConnectionError, MCPToolError, MCPToolResult
+from .base import (
+    MCPClient,
+    MCPClientError,
+    MCPConnectionError,
+    MCPToolError,
+    MCPToolResult,
+    SessionMCPClient,
+)
 from .devto_client import DevToMCPClient
 from .factory import MCPClientFactory, MCPServerType
 from .github_client import GitHubMCPClient
@@ -41,6 +48,7 @@ __all__ = [
     "MCPConnectionError",
     "MCPToolError",
     "MCPToolResult",
+    "SessionMCPClient",
     # Type aliases
     "MCPServerType",
     # Job schema utilities

@@ -182,6 +182,40 @@ class CliftonStrengthsGatherer(BaseGatherer):
         name = path.name.lower()
         return any(indicator in name for indicator in GALLUP_PDF_INDICATORS)
 
+    def _extract_ranked_strengths(self, text: str, max_rank: int = 34) -> list[StrengthInsight]:
+        """Extract ranked strengths from text into StrengthInsight objects.
+
+        Parses "N. StrengthName" patterns, filters valid CliftonStrengths names,
+        deduplicates by rank, and returns sorted results.
+
+        Args:
+            text: Text containing ranked strength patterns
+            max_rank: Maximum rank to include (5 for top_5, 10 for top_10, etc.)
+
+        Returns:
+            Sorted list of StrengthInsight objects
+        """
+        pattern = r"(\d{1,2})\.\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)"
+        matches = re.findall(pattern, text)
+        seen: set[int] = set()
+        results: list[StrengthInsight] = []
+
+        for rank_str, name in matches:
+            rank = int(rank_str)
+            name = name.strip()
+            if name in STRENGTH_TO_DOMAIN and rank not in seen and rank <= max_rank:
+                seen.add(rank)
+                results.append(
+                    StrengthInsight(
+                        rank=rank,
+                        name=name,
+                        domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
+                    )
+                )
+
+        results.sort(key=lambda x: x.rank)
+        return results
+
     def _extract_text(self, pdf_path: Path) -> str:
         """Extract text from PDF using pdftotext."""
         try:
@@ -253,44 +287,15 @@ class CliftonStrengthsGatherer(BaseGatherer):
 
     def _parse_all_34(self, text: str, data: CliftonStrengthsData) -> None:
         """Parse the All 34 report for complete strength ranking."""
-        # Look for the ranked list pattern
-        # Pattern: number. StrengthName
-        strength_pattern = r"(\d{1,2})\.\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)"
-
-        matches = re.findall(strength_pattern, text)
-
-        # Build ordered list
-        strengths_found: dict[int, str] = {}
-        for rank_str, name in matches:
-            rank = int(rank_str)
-            # Normalize strength name
-            name = name.strip()
-            if name in STRENGTH_TO_DOMAIN and rank not in strengths_found:
-                strengths_found[rank] = name
-
-        # Sort by rank and store
-        data.all_34 = [
-            strengths_found[i] for i in sorted(strengths_found.keys()) if i in strengths_found
-        ]
+        all_strengths = self._extract_ranked_strengths(text)
+        data.all_34 = [s.name for s in all_strengths]
 
         # Also populate top_5 and top_10 if not already done
         if not data.top_5 and len(data.all_34) >= 5:
-            for i, name in enumerate(data.all_34[:5], 1):
-                insight = StrengthInsight(
-                    rank=i,
-                    name=name,
-                    domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
-                )
-                data.top_5.append(insight)
+            data.top_5 = list(all_strengths[:5])
 
         if not data.top_10 and len(data.all_34) >= 10:
-            for i, name in enumerate(data.all_34[:10], 1):
-                insight = StrengthInsight(
-                    rank=i,
-                    name=name,
-                    domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
-                )
-                data.top_10.append(insight)
+            data.top_10 = list(all_strengths[:10])
 
         # Parse detailed insights for each strength
         self._parse_strength_details(text, data)
@@ -298,28 +303,9 @@ class CliftonStrengthsGatherer(BaseGatherer):
     def _parse_top_5(self, text: str, data: CliftonStrengthsData) -> None:
         """Parse Top 5 report."""
         if data.top_5:
-            # Already parsed from ALL_34
             return
 
-        # Pattern for top 5 list
-        strength_pattern = r"(\d)\.\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)\s*®?"
-
-        matches = re.findall(strength_pattern, text)
-        seen_ranks: set[int] = set()
-
-        for rank_str, name in matches:
-            rank = int(rank_str)
-            name = name.strip()
-            if name in STRENGTH_TO_DOMAIN and rank not in seen_ranks and rank <= 5:
-                seen_ranks.add(rank)
-                insight = StrengthInsight(
-                    rank=rank,
-                    name=name,
-                    domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
-                )
-                data.top_5.append(insight)
-
-        data.top_5.sort(key=lambda x: x.rank)
+        data.top_5 = self._extract_ranked_strengths(text, max_rank=5)
         self._parse_strength_details(text, data)
 
     def _parse_top_10(self, text: str, data: CliftonStrengthsData) -> None:
@@ -327,24 +313,7 @@ class CliftonStrengthsGatherer(BaseGatherer):
         if data.top_10:
             return
 
-        strength_pattern = r"(\d{1,2})\.\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)"
-
-        matches = re.findall(strength_pattern, text)
-        seen_ranks: set[int] = set()
-
-        for rank_str, name in matches:
-            rank = int(rank_str)
-            name = name.strip()
-            if name in STRENGTH_TO_DOMAIN and rank not in seen_ranks and rank <= 10:
-                seen_ranks.add(rank)
-                insight = StrengthInsight(
-                    rank=rank,
-                    name=name,
-                    domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
-                )
-                data.top_10.append(insight)
-
-        data.top_10.sort(key=lambda x: x.rank)
+        data.top_10 = self._extract_ranked_strengths(text, max_rank=10)
         self._parse_strength_details(text, data)
 
     # -----------------------------------------------------------------
@@ -355,22 +324,7 @@ class CliftonStrengthsGatherer(BaseGatherer):
         """Populate top_10 from a ranked list in text if not already done."""
         if data.top_10:
             return
-        strength_pattern = r"(\d{1,2})\.\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)"
-        matches = re.findall(strength_pattern, text)
-        seen: set[int] = set()
-        for rank_str, name in matches:
-            rank = int(rank_str)
-            name = name.strip()
-            if name in STRENGTH_TO_DOMAIN and rank not in seen and rank <= 10:
-                seen.add(rank)
-                data.top_10.append(
-                    StrengthInsight(
-                        rank=rank,
-                        name=name,
-                        domain=STRENGTH_TO_DOMAIN.get(name, "Unknown"),
-                    )
-                )
-        data.top_10.sort(key=lambda x: x.rank)
+        data.top_10 = self._extract_ranked_strengths(text, max_rank=10)
         if not data.top_5 and len(data.top_10) >= 5:
             data.top_5 = list(data.top_10[:5])
 

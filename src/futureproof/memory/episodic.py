@@ -114,11 +114,12 @@ class EpisodicStore(ChromaDBStore):
 
     def stats(self) -> dict[str, Any]:
         """Get statistics about the episodic store."""
-        return {
-            "total_memories": self.collection.count(),
-            "by_type": self._count_by_values("memory_type", [mt.value for mt in MemoryType]),
-            "persist_dir": str(self.persist_dir),
-        }
+        return self._get_stats(
+            total_label="total_memories",
+            group_field="memory_type",
+            group_values=[mt.value for mt in MemoryType],
+            group_label="by_type",
+        )
 
 
 # =============================================================================

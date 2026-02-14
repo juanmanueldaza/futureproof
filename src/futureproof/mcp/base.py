@@ -8,6 +8,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from mcp import types
+from mcp.client.session import ClientSession
+
 
 @dataclass
 class MCPToolResult:
@@ -110,3 +113,54 @@ class MCPClient(ABC):
     ) -> None:
         """Async context manager exit."""
         await self.disconnect()
+
+
+class SessionMCPClient(MCPClient):
+    """Base for MCP clients that use ClientSession (stdio or HTTP transport).
+
+    Provides shared call_tool/list_tools/is_connected implementations
+    used by GitHub and GitLab MCP clients. Subclasses only need to
+    implement connect() and disconnect() for their specific transport.
+    """
+
+    SERVER_NAME: str = "MCP"  # Override in subclasses for error messages
+
+    def __init__(self) -> None:
+        self._session: ClientSession | None = None
+
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> MCPToolResult:
+        """Call an MCP tool via the session."""
+        if self._session is None:
+            raise MCPConnectionError(f"Not connected to {self.SERVER_NAME} server")
+
+        try:
+            result = await self._session.call_tool(tool_name, arguments)
+
+            content_parts = []
+            for content in result.content:
+                if isinstance(content, types.TextContent):
+                    content_parts.append(content.text)
+
+            is_error = getattr(result, "isError", False)
+
+            return MCPToolResult(
+                content="\n".join(content_parts),
+                raw_response=result,
+                tool_name=tool_name,
+                is_error=is_error,
+            )
+
+        except Exception as e:
+            raise MCPToolError(f"{self.SERVER_NAME} tool '{tool_name}' failed: {e}") from e
+
+    async def list_tools(self) -> list[str]:
+        """List available MCP tools."""
+        if self._session is None:
+            raise MCPConnectionError(f"Not connected to {self.SERVER_NAME} server")
+
+        tools = await self._session.list_tools()
+        return [tool.name for tool in tools.tools]
+
+    def is_connected(self) -> bool:
+        """Check connection status."""
+        return self._session is not None

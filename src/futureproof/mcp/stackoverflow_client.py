@@ -19,10 +19,6 @@ class StackOverflowMCPClient(HTTPMCPClient):
     """
 
     BASE_URL = "https://api.stackexchange.com/2.3"
-    DEFAULT_HEADERS = {
-        "User-Agent": "FutureProof Career Intelligence/1.0",
-        "Accept": "application/json",
-    }
 
     def __init__(self, api_key: str | None = None) -> None:
         super().__init__(api_key=api_key)

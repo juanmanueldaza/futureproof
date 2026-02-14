@@ -136,21 +136,14 @@ class CareerDataLoader:
 
     def _load_file(self, path: Path) -> str:
         """Load a single file if it exists and is safe."""
-        resolved = path.resolve()
-
-        # Check it's within processed_dir
-        processed_resolved = settings.processed_dir.resolve()
-        if not str(resolved).startswith(str(processed_resolved)):
-            logger.warning("Path traversal attempt blocked: %s", path)
+        try:
+            rel = str(path.relative_to(settings.processed_dir))
+        except ValueError:
+            logger.warning("Path outside processed_dir: %s", path)
             return ""
-
-        # Block symlinks
-        if path.is_symlink():
-            logger.warning("Symlink access blocked: %s", path)
-            return ""
-
-        if resolved.exists():
-            return resolved.read_text()
+        safe = self._safe_path(settings.processed_dir, rel)
+        if safe and safe.exists():
+            return safe.read_text()
         return ""
 
     def clear_cache(self) -> None:

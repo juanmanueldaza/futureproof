@@ -7,17 +7,16 @@ with the official GitHub MCP server.
 import logging
 from typing import Any
 
-from mcp import types
 from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from ..config import settings
-from .base import MCPClient, MCPConnectionError, MCPToolError, MCPToolResult
+from .base import MCPConnectionError, MCPToolResult, SessionMCPClient
 
 logger = logging.getLogger(__name__)
 
 
-class GitHubMCPClient(MCPClient):
+class GitHubMCPClient(SessionMCPClient):
     """MCP client for GitHub MCP Server.
 
     Uses stdio transport with Docker (default) or native binary.
@@ -32,8 +31,10 @@ class GitHubMCPClient(MCPClient):
         settings.github_mcp_command: Native binary command
     """
 
+    SERVER_NAME = "GitHub MCP"
+
     def __init__(self) -> None:
-        self._session: ClientSession | None = None
+        super().__init__()
         self._stdio_context: Any = None
         self._read_stream: Any = None
         self._write_stream: Any = None
@@ -116,44 +117,6 @@ class GitHubMCPClient(MCPClient):
 
         self._read_stream = None
         self._write_stream = None
-
-    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> MCPToolResult:
-        """Call a GitHub MCP tool."""
-        if self._session is None:
-            raise MCPConnectionError("Not connected to GitHub MCP server")
-
-        try:
-            result = await self._session.call_tool(tool_name, arguments)
-
-            # Extract text content from result
-            content_parts = []
-            for content in result.content:
-                if isinstance(content, types.TextContent):
-                    content_parts.append(content.text)
-
-            is_error = getattr(result, "isError", False)
-
-            return MCPToolResult(
-                content="\n".join(content_parts),
-                raw_response=result,
-                tool_name=tool_name,
-                is_error=is_error,
-            )
-
-        except Exception as e:
-            raise MCPToolError(f"GitHub MCP tool '{tool_name}' failed: {e}") from e
-
-    async def list_tools(self) -> list[str]:
-        """List available GitHub MCP tools."""
-        if self._session is None:
-            raise MCPConnectionError("Not connected to GitHub MCP server")
-
-        tools = await self._session.list_tools()
-        return [tool.name for tool in tools.tools]
-
-    def is_connected(self) -> bool:
-        """Check connection status."""
-        return self._session is not None
 
     # High-level convenience methods for career data gathering
 

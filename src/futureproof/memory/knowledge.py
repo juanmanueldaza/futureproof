@@ -206,11 +206,12 @@ class CareerKnowledgeStore(ChromaDBStore):
 
     def get_stats(self) -> dict[str, Any]:
         """Get statistics about the knowledge store."""
-        return {
-            "total_chunks": self.collection.count(),
-            "by_source": self._count_by_values("source", [src.value for src in KnowledgeSource]),
-            "persist_dir": str(self.persist_dir),
-        }
+        return self._get_stats(
+            total_label="total_chunks",
+            group_field="source",
+            group_values=[src.value for src in KnowledgeSource],
+            group_label="by_source",
+        )
 
 
 # =============================================================================

@@ -108,3 +108,27 @@ class ChromaDBStore:
             ids = self._get_by_filter({field: value})
             counts[value] = len(ids)
         return counts
+
+    def _get_stats(
+        self,
+        total_label: str,
+        group_field: str,
+        group_values: list[str],
+        group_label: str = "by_group",
+    ) -> dict[str, Any]:
+        """Build standard stats dict for ChromaDB stores.
+
+        Args:
+            total_label: Key for the total count (e.g., "total_chunks")
+            group_field: Metadata field to group by (e.g., "source")
+            group_values: Possible values for the group field
+            group_label: Key for the grouped counts (e.g., "by_source")
+
+        Returns:
+            Stats dict with total, grouped counts, and persist_dir
+        """
+        return {
+            total_label: self.collection.count(),
+            group_label: self._count_by_values(group_field, group_values),
+            "persist_dir": str(self.persist_dir),
+        }

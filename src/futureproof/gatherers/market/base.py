@@ -172,6 +172,20 @@ class MarketGatherer(ABC):
 
         return data
 
+    @staticmethod
+    def _parse_mcp_content(content: Any, default: str = "{}") -> Any:
+        """Parse MCP tool result content into a Python object.
+
+        Args:
+            content: Raw content from MCPToolResult (str or already parsed)
+            default: Default JSON string if content is falsy
+
+        Returns:
+            Parsed Python object (dict, list, etc.)
+        """
+        raw = content or default
+        return json.loads(raw) if isinstance(raw, str) else raw
+
     async def _gather_from_source(
         self,
         source_name: MCPServerType,
@@ -211,8 +225,7 @@ class MarketGatherer(ABC):
                 result = await client.call_tool(tool_name, tool_args)
 
                 if not result.is_error:
-                    content = result.content or "{}"
-                    parsed = json.loads(content) if isinstance(content, str) else content
+                    parsed = self._parse_mcp_content(result.content)
 
                     # Extract items using provided extractor or default
                     if extractor is not None:

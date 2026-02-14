@@ -48,7 +48,10 @@ class HTTPMCPClient(MCPClient):
 
     BASE_URL: str = ""
     DEFAULT_TIMEOUT: float = 30.0
-    DEFAULT_HEADERS: dict[str, str] = {}
+    DEFAULT_HEADERS: dict[str, str] = {
+        "User-Agent": "FutureProof Career Intelligence/1.0",
+        "Accept": "application/json",
+    }
 
     def __init__(self, api_key: str | None = None) -> None:
         """Initialize the HTTP MCP client.

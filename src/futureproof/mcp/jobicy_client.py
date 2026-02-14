@@ -27,7 +27,7 @@ class JobicyMCPClient(HTTPMCPClient):
     BASE_URL = "https://jobicy.com/api/v2/remote-jobs"
     RSS_URL = "https://jobicy.com/feed/newjobs"
     DEFAULT_HEADERS = {
-        "User-Agent": "FutureProof Career Intelligence/1.0",
+        **HTTPMCPClient.DEFAULT_HEADERS,
         "Accept": "application/json, application/rss+xml",
     }
 

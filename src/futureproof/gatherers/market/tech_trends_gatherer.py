@@ -4,7 +4,6 @@ Collects trending technology discussions and hiring patterns
 from Hacker News to understand market demands.
 """
 
-import json
 import logging
 from typing import Any
 
@@ -80,8 +79,7 @@ class TechTrendsGatherer(MarketGatherer):
                     )
 
                 if not stories_result.is_error:
-                    content = stories_result.content or "[]"
-                    stories = json.loads(content) if isinstance(content, str) else content
+                    stories = self._parse_mcp_content(stories_result.content, "[]")
                     # Extract list from wrapped response (e.g. {"results": [...]})
                     if isinstance(stories, dict):
                         stories = stories.get("results", stories.get("hits", []))
@@ -99,8 +97,7 @@ class TechTrendsGatherer(MarketGatherer):
                 )
 
                 if not hiring_result.is_error:
-                    content = hiring_result.content or "{}"
-                    hiring = json.loads(content) if isinstance(content, str) else content
+                    hiring = self._parse_mcp_content(hiring_result.content)
                     results["hiring_trends"] = hiring
                     total_jobs = hiring.get("total_job_postings", 0)
                     threads = hiring.get("threads_analyzed", 0)
@@ -117,8 +114,7 @@ class TechTrendsGatherer(MarketGatherer):
                 )
 
                 if not jobs_result.is_error:
-                    content = jobs_result.content or "{}"
-                    jobs_data = json.loads(content) if isinstance(content, str) else content
+                    jobs_data = self._parse_mcp_content(jobs_result.content)
                     results["hn_job_postings"] = jobs_data.get("postings", [])
 
                     # Log stats

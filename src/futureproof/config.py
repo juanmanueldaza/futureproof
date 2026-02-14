@@ -89,15 +89,20 @@ class Settings(BaseSettings):
         "certifications.md,languages.md,projects.md,recommendations.md"
     )
 
+    @staticmethod
+    def _split_csv(value: str) -> list[str]:
+        """Split a comma-separated string into a trimmed list."""
+        return [item.strip() for item in value.split(",") if item.strip()]
+
     @property
     def linkedin_profile_files_list(self) -> list[str]:
         """Get LinkedIn profile files as a list."""
-        return [f.strip() for f in self.linkedin_profile_files.split(",") if f.strip()]
+        return self._split_csv(self.linkedin_profile_files)
 
     @property
     def linkedin_cv_files_list(self) -> list[str]:
         """Get LinkedIn CV files as a list."""
-        return [f.strip() for f in self.linkedin_cv_files.split(",") if f.strip()]
+        return self._split_csv(self.linkedin_cv_files)
 
     @property
     def gitlab_groups_list(self) -> list[str]:
@@ -111,9 +116,7 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If any group name contains invalid characters
         """
-        if not self.gitlab_groups:
-            return []
-        groups = [g.strip() for g in self.gitlab_groups.split(",") if g.strip()]
+        groups = self._split_csv(self.gitlab_groups)
         for group in groups:
             if not GITLAB_GROUP_PATTERN.match(group):
                 raise ValueError(

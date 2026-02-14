@@ -26,10 +26,6 @@ class RemotiveMCPClient(HTTPMCPClient):
     """
 
     BASE_URL = "https://remotive.com/api/remote-jobs"
-    DEFAULT_HEADERS = {
-        "User-Agent": "FutureProof Career Intelligence/1.0",
-        "Accept": "application/json",
-    }
 
     async def list_tools(self) -> list[str]:
         """List available tools."""

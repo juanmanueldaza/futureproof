@@ -4,11 +4,11 @@ Uses JobSpy to aggregate jobs from LinkedIn, Indeed, Glassdoor, ZipRecruiter.
 MIT licensed, no authentication required.
 """
 
-import hashlib
 import json
 from typing import Any
 
 from .base import MCPClient, MCPToolError, MCPToolResult
+from .job_schema import generate_job_id
 
 
 class JobSpyMCPClient(MCPClient):
@@ -152,8 +152,7 @@ class JobSpyMCPClient(MCPClient):
                     # Generate unique ID from site + job_url
                     job_url = job.get("job_url", "") or ""
                     site = job.get("site", "") or ""
-                    unique_str = f"{site}:{job_url}"
-                    job_id = hashlib.md5(unique_str.encode()).hexdigest()[:12]
+                    job_id = generate_job_id(site, job_url)
 
                     cleaned_jobs.append(
                         {

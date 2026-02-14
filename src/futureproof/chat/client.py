@@ -23,6 +23,7 @@ from futureproof.agents.career_agent import (
     reset_career_agent,
 )
 from futureproof.chat.ui import (
+    console,
     display_error,
     display_goals,
     display_help,
@@ -31,8 +32,6 @@ from futureproof.chat.ui import (
 )
 from futureproof.llm.fallback import get_fallback_manager
 from futureproof.memory.checkpointer import get_data_dir
-
-console = Console()
 
 # Known section headers from SummarizationMiddleware output.
 # The LLM sometimes echoes these verbatim at the start of a response.
@@ -127,6 +126,11 @@ def _strip_summary_echo(text: str) -> str:
     return ""
 
 
+def _make_input(content: str) -> dict[str, Any]:
+    """Build the agent input dict from user text."""
+    return {"messages": [HumanMessage(content=content)]}
+
+
 def get_history_path() -> Path:
     """Get the path for command history file."""
     return get_data_dir() / "chat_history"
@@ -202,16 +206,21 @@ class _ChunkAccumulator:
         return content
 
 
+def _update_live_from_chunk(chunk: Any, acc: _ChunkAccumulator, live: Live) -> None:
+    """Process a single chunk: accumulate and update the Live widget."""
+    if getattr(chunk, "type", None) == "tool":
+        return
+    if acc.accumulate(chunk):
+        display_text = _strip_summary_echo(acc.msg_buf)
+        if display_text:
+            live.update(Markdown(display_text))
+
+
 def _stream_to_live(stream_iter, acc: _ChunkAccumulator, con: Console) -> None:
     """Stream chunks to a Rich Live widget, stripping summary echoes."""
     with Live(Markdown(""), console=con, refresh_per_second=10) as live:
         for chunk, metadata in stream_iter:
-            if getattr(chunk, "type", None) == "tool":
-                continue
-            if acc.accumulate(chunk):
-                display_text = _strip_summary_echo(acc.msg_buf)
-                if display_text:
-                    live.update(Markdown(display_text))
+            _update_live_from_chunk(chunk, acc, live)
     con.print()
 
 
@@ -353,7 +362,7 @@ def run_chat(thread_id: str = "main", verbose: bool = False) -> None:
             # Send to agent and stream response
             console.print()  # Blank line before response
 
-            input_message = {"messages": [HumanMessage(content=user_input)]}
+            input_message = _make_input(user_input)
 
             # Collect full response for markdown rendering
             full_response = ""
@@ -450,14 +459,14 @@ async def run_chat_async(thread_id: str = "main") -> None:
             # Send to agent and stream response
             console.print()
 
-            input_message: Any = {"messages": [HumanMessage(content=user_input)]}
+            input_message = _make_input(user_input)
 
             try:
                 acc = _ChunkAccumulator()
 
                 async def _astream():
                     async for item in agent.astream(
-                        input_message,
+                        cast(Any, input_message),
                         cast(RunnableConfig, config),
                         stream_mode="messages",
                     ):
@@ -466,12 +475,7 @@ async def run_chat_async(thread_id: str = "main") -> None:
                 # Collect chunks async, render via Live
                 with Live(Markdown(""), console=console, refresh_per_second=10) as live:
                     async for chunk, metadata in _astream():
-                        if getattr(chunk, "type", None) == "tool":
-                            continue
-                        if acc.accumulate(chunk):
-                            display_text = _strip_summary_echo(acc.msg_buf)
-                            if display_text:
-                                live.update(Markdown(display_text))
+                        _update_live_from_chunk(chunk, acc, live)
 
                 console.print()
 
@@ -501,11 +505,11 @@ def ask(question: str, thread_id: str = "main") -> str:
     agent = create_career_agent()
     config = get_agent_config(thread_id=thread_id)
 
-    input_message: Any = {"messages": [HumanMessage(content=question)]}
+    input_message = _make_input(question)
     acc = _ChunkAccumulator()
 
     stream_iter = agent.stream(
-        input_message,
+        cast(Any, input_message),
         cast(RunnableConfig, config),
         stream_mode="messages",
     )

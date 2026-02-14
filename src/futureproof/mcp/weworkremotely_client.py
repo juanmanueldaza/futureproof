@@ -9,15 +9,18 @@ RSS feeds provide structured data including:
 - Salary info embedded in descriptions
 """
 
-import hashlib
-import re
 import xml.etree.ElementTree as ET
 from html import unescape
 from typing import Any
 
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
-from .job_schema import attach_salary
+from .job_schema import (
+    attach_salary,
+    clean_html_description,
+    generate_job_id,
+    parse_company_title,
+)
 from .salary_parser import extract_salary_from_html
 
 
@@ -39,7 +42,7 @@ class WeWorkRemotelyMCPClient(HTTPMCPClient):
 
     BASE_URL = "https://weworkremotely.com"
     DEFAULT_HEADERS = {
-        "User-Agent": "FutureProof Career Intelligence/1.0",
+        **HTTPMCPClient.DEFAULT_HEADERS,
         "Accept": "application/rss+xml, application/xml, text/xml",
     }
 
@@ -110,10 +113,10 @@ class WeWorkRemotelyMCPClient(HTTPMCPClient):
             return None
 
         # Parse company and title from "Company: Job Title" format
-        company, title = self._parse_title(title_raw)
+        company, title = parse_company_title(title_raw)
 
         # Generate unique ID from guid
-        job_id = hashlib.md5(guid.encode()).hexdigest()[:12]
+        job_id = generate_job_id("weworkremotely", guid)
 
         # Unescape HTML in description
         description_text = unescape(description) if description else ""
@@ -129,7 +132,7 @@ class WeWorkRemotelyMCPClient(HTTPMCPClient):
             "region": region or "Remote",
             "category": category,
             "date_posted": pub_date,
-            "description": self._clean_description(description_text)[:500],
+            "description": clean_html_description(description_text),
             "site": "weworkremotely",
         }
 
@@ -137,27 +140,3 @@ class WeWorkRemotelyMCPClient(HTTPMCPClient):
         attach_salary(job, salary_data)
 
         return job
-
-    def _parse_title(self, title_raw: str) -> tuple[str, str]:
-        """Parse 'Company: Job Title' into (company, title).
-
-        Args:
-            title_raw: Raw title string like "Acme Inc: Senior Developer"
-
-        Returns:
-            Tuple of (company, title)
-        """
-        if ": " in title_raw:
-            parts = title_raw.split(": ", 1)
-            return parts[0].strip(), parts[1].strip()
-        return "", title_raw.strip()
-
-    def _clean_description(self, html: str) -> str:
-        """Clean HTML description to plain text."""
-        # Remove HTML tags
-        text = re.sub(r"<[^>]+>", " ", html)
-        # Normalize whitespace
-        text = re.sub(r"\s+", " ", text)
-        # Unescape HTML entities
-        text = unescape(text)
-        return text.strip()

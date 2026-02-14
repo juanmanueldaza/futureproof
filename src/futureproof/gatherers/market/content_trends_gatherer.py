@@ -9,7 +9,6 @@ Sources:
 - Hacker News: Tech discussions (via existing TechTrendsGatherer)
 """
 
-import json
 import logging
 from typing import Any
 
@@ -97,10 +96,7 @@ class ContentTrendsGatherer(MarketGatherer):
                             )
 
                             if not topic_result.is_error:
-                                content = topic_result.content or "{}"
-                                parsed = (
-                                    json.loads(content) if isinstance(content, str) else content
-                                )
+                                parsed = self._parse_mcp_content(topic_result.content)
                                 articles = parsed.get("articles", [])
                                 for article in articles:
                                     article["searched_topic"] = topic
@@ -148,8 +144,7 @@ class ContentTrendsGatherer(MarketGatherer):
                     )
 
                     if not popularity_result.is_error:
-                        content = popularity_result.content or "{}"
-                        parsed = json.loads(content) if isinstance(content, str) else content
+                        parsed = self._parse_mcp_content(popularity_result.content)
                         tags_found = parsed.get("tags", [])
                         results["stackoverflow_trends"]["topic_popularity"] = tags_found
                         results["summary"]["stackoverflow_quota_remaining"] = parsed.get(
@@ -171,8 +166,7 @@ class ContentTrendsGatherer(MarketGatherer):
                     )
 
                     if not trending_result.is_error:
-                        content = trending_result.content or "{}"
-                        parsed = json.loads(content) if isinstance(content, str) else content
+                        parsed = self._parse_mcp_content(trending_result.content)
                         top_tags = parsed.get("tags", [])
                         results["stackoverflow_trends"]["top_tags"] = top_tags
                         logger.info(f"Stack Overflow: Retrieved top {len(top_tags)} trending tags")
