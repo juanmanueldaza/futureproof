@@ -4,7 +4,7 @@ import logging
 
 from langchain_core.tools import tool
 
-from futureproof.memory.profile import CareerGoal, load_profile, save_profile
+from futureproof.memory.profile import CareerGoal, edit_profile, load_profile
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +37,8 @@ def update_user_goal(goal_description: str, priority: str = "medium") -> str:
 
     Use this when the user mentions a new career goal or aspiration.
     """
-    profile = load_profile()
-
-    new_goal = CareerGoal(
-        description=goal_description,
-        priority=priority,
-    )
-    profile.goals.append(new_goal)
-    save_profile(profile)
+    new_goal = CareerGoal(description=goal_description, priority=priority)
+    edit_profile(lambda p: p.goals.append(new_goal))
 
     return f"Added career goal: '{goal_description}' with {priority} priority."
 
@@ -59,18 +53,18 @@ def update_user_skills(skills: list[str], skill_type: str = "technical") -> str:
 
     Use this when the user mentions skills they have or want to track.
     """
-    profile = load_profile()
 
-    if skill_type == "technical":
-        existing = set(profile.technical_skills)
-        existing.update(skills)
-        profile.technical_skills = sorted(existing)
-    else:
-        existing = set(profile.soft_skills)
-        existing.update(skills)
-        profile.soft_skills = sorted(existing)
+    def _update(p):
+        if skill_type == "technical":
+            existing = set(p.technical_skills)
+            existing.update(skills)
+            p.technical_skills = sorted(existing)
+        else:
+            existing = set(p.soft_skills)
+            existing.update(skills)
+            p.soft_skills = sorted(existing)
 
-    save_profile(profile)
+    profile = edit_profile(_update)
     merged = profile.technical_skills if skill_type == "technical" else profile.soft_skills
     return f"Updated {skill_type} skills. Current {skill_type} skills: {', '.join(merged)}"
 
@@ -84,9 +78,7 @@ def set_target_roles(roles: list[str]) -> str:
 
     Use this when the user mentions roles they're interested in.
     """
-    profile = load_profile()
-    profile.target_roles = roles
-    save_profile(profile)
+    edit_profile(lambda p: setattr(p, "target_roles", roles))
 
     return f"Set target roles to: {', '.join(roles)}"
 
@@ -100,9 +92,7 @@ def update_user_name(name: str) -> str:
 
     Use this when the user introduces themselves or wants to update their name.
     """
-    profile = load_profile()
-    profile.name = name
-    save_profile(profile)
+    edit_profile(lambda p: setattr(p, "name", name))
     return f"Updated profile name to: {name}"
 
 
@@ -116,11 +106,13 @@ def update_current_role(role: str, years_experience: int | None = None) -> str:
 
     Use this when the user mentions their current position.
     """
-    profile = load_profile()
-    profile.current_role = role
-    if years_experience is not None:
-        profile.years_experience = years_experience
-    save_profile(profile)
+
+    def _update(p):
+        p.current_role = role
+        if years_experience is not None:
+            p.years_experience = years_experience
+
+    edit_profile(_update)
 
     exp_str = f" ({years_experience} years)" if years_experience else ""
     return f"Updated current role to: {role}{exp_str}"

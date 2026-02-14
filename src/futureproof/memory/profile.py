@@ -7,6 +7,8 @@ This is the "semantic memory" layer - persistent facts about the user that
 should be available across all conversations.
 """
 
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +17,9 @@ from typing import Any
 import yaml
 
 from futureproof.memory.checkpointer import get_data_dir
+
+# Serialize concurrent profile reads/writes (parallel tool calls)
+_profile_lock = threading.Lock()
 
 
 @dataclass
@@ -179,6 +184,10 @@ def load_profile() -> UserProfile:
 
     Returns:
         UserProfile instance. Returns empty profile if file doesn't exist.
+
+    Note:
+        For read-modify-write operations, use ``edit_profile`` instead
+        to avoid race conditions when tools run in parallel.
     """
     path = get_profile_path()
 
@@ -200,6 +209,10 @@ def save_profile(profile: UserProfile) -> None:
 
     Args:
         profile: The UserProfile instance to save.
+
+    Note:
+        For read-modify-write operations, use ``edit_profile`` instead
+        to avoid race conditions when tools run in parallel.
     """
     path = get_profile_path()
     profile.last_updated = datetime.now().isoformat()
@@ -216,3 +229,21 @@ def save_profile(profile: UserProfile) -> None:
 
     # Set file permissions to 0600 (owner read/write only)
     path.chmod(0o600)
+
+
+def edit_profile(modifier: Callable[["UserProfile"], None]) -> "UserProfile":
+    """Atomically load, modify, and save the profile.
+
+    Holds a lock so that parallel tool calls don't clobber each other.
+
+    Args:
+        modifier: A callable that mutates the profile in place.
+
+    Returns:
+        The modified profile (after saving).
+    """
+    with _profile_lock:
+        profile = load_profile()
+        modifier(profile)
+        save_profile(profile)
+        return profile
