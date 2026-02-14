@@ -55,7 +55,7 @@ class KnowledgeChunk:
 
     def to_document(self) -> str:
         """Convert to searchable document string."""
-        return f"[{self.source.value}] {self.section}: {self.content}"
+        return self.content
 
     def to_metadata(self) -> dict[str, str]:
         """Convert to ChromaDB metadata format (all values must be strings)."""
@@ -74,31 +74,22 @@ class KnowledgeChunk:
         metadata: dict[str, Any],
     ) -> "KnowledgeChunk":
         """Create from ChromaDB query result."""
-        # Extract content from document (remove prefix)
-        content = document
-        if ": " in document:
-            # Remove "[source] section: " prefix if present
-            parts = document.split(": ", 1)
-            if len(parts) > 1:
-                content = parts[1]
-
         source_str = metadata.get("source", "github")
         try:
             source = KnowledgeSource(source_str)
         except ValueError:
             source = KnowledgeSource.GITHUB
 
+        reserved = {"source", "section", "indexed_at"}
         return cls(
             id=id,
-            content=content,
+            content=document,
             source=source,
             section=metadata.get("section", ""),
             indexed_at=datetime.fromisoformat(
                 metadata.get("indexed_at", datetime.now().isoformat())
             ),
-            metadata={
-                k: v for k, v in metadata.items() if k not in ("source", "section", "indexed_at")
-            },
+            metadata={k: v for k, v in metadata.items() if k not in reserved},
         )
 
 

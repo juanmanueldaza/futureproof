@@ -7,7 +7,7 @@ Supports dependency injection for testing.
 import importlib
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..config import settings
 
@@ -180,80 +180,40 @@ class GathererService:
 
         return results
 
-    def gather_github(self, username: str | None = None, verbose: bool = False) -> Path:
-        """Gather data from GitHub.
+    def _gather_and_index(self, name: str, *args: Any, verbose: bool = False) -> Path:
+        """Gather data from a source and auto-index if enabled.
 
         Args:
-            username: GitHub username (defaults to config)
+            name: Gatherer name (github, gitlab, portfolio, linkedin, assessment)
+            *args: Arguments to pass to gatherer.gather()
             verbose: If True, print progress to console
 
         Returns:
             Path to generated file
         """
-        gatherer = self._get_gatherer("github")
-        path = gatherer.gather(username)
-        self._index_if_enabled("github", verbose=verbose)
+        gatherer = self._get_gatherer(name)
+        path = gatherer.gather(*args)
+        self._index_if_enabled(name, verbose=verbose)
         return path
+
+    def gather_github(self, username: str | None = None, verbose: bool = False) -> Path:
+        """Gather data from GitHub."""
+        return self._gather_and_index("github", username, verbose=verbose)
 
     def gather_gitlab(self, username: str | None = None, verbose: bool = False) -> Path:
-        """Gather data from GitLab.
-
-        Args:
-            username: GitLab username (defaults to config)
-            verbose: If True, print progress to console
-
-        Returns:
-            Path to generated file
-        """
-        gatherer = self._get_gatherer("gitlab")
-        path = gatherer.gather(username)
-        self._index_if_enabled("gitlab", verbose=verbose)
-        return path
+        """Gather data from GitLab."""
+        return self._gather_and_index("gitlab", username, verbose=verbose)
 
     def gather_portfolio(self, url: str | None = None, verbose: bool = False) -> Path:
-        """Gather data from portfolio website.
-
-        Args:
-            url: Portfolio URL (defaults to config)
-            verbose: If True, print progress to console
-
-        Returns:
-            Path to generated file
-        """
-        gatherer = self._get_gatherer("portfolio")
-        path = gatherer.gather(url)
-        self._index_if_enabled("portfolio", verbose=verbose)
-        return path
+        """Gather data from portfolio website."""
+        return self._gather_and_index("portfolio", url, verbose=verbose)
 
     def gather_linkedin(
         self, zip_path: Path, output_dir: Path | None = None, verbose: bool = False
     ) -> Path:
-        """Gather data from LinkedIn export.
-
-        Args:
-            zip_path: Path to LinkedIn export ZIP file
-            output_dir: Output directory (optional)
-            verbose: If True, print progress to console
-
-        Returns:
-            Path to generated file
-        """
-        gatherer = self._get_gatherer("linkedin")
-        path = gatherer.gather(zip_path, output_dir)
-        self._index_if_enabled("linkedin", verbose=verbose)
-        return path
+        """Gather data from LinkedIn export."""
+        return self._gather_and_index("linkedin", zip_path, output_dir, verbose=verbose)
 
     def gather_assessment(self, input_dir: Path | None = None, verbose: bool = False) -> Path:
-        """Gather CliftonStrengths assessment data from PDFs.
-
-        Args:
-            input_dir: Directory containing Gallup PDF files (defaults to data/raw)
-            verbose: If True, print progress to console
-
-        Returns:
-            Path to generated markdown file
-        """
-        gatherer = self._get_gatherer("assessment")
-        path = gatherer.gather(input_dir)
-        self._index_if_enabled("assessment", verbose=verbose)
-        return path
+        """Gather CliftonStrengths assessment data from PDFs."""
+        return self._gather_and_index("assessment", input_dir, verbose=verbose)

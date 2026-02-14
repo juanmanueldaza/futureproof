@@ -183,34 +183,20 @@ def load_career_data_for_cv() -> str:
     if not data:
         return ""
 
-    # Format with headers for CV context
+    # Use cached data instead of re-reading files from disk
+    source_names = {
+        "linkedin_data": "LinkedIn",
+        "github_data": "GitHub",
+        "gitlab_data": "GitLab",
+        "portfolio_data": "Portfolio",
+        "assessment_data": "CliftonStrengths Assessment",
+    }
+
     parts = []
-    linkedin_dir = settings.processed_dir / "linkedin"
-
-    # LinkedIn files with headers
-    if linkedin_dir.exists():
-        for filename in settings.linkedin_cv_files_list:
-            filepath = linkedin_dir / filename
-            if filepath.exists():
-                parts.append(f"### LinkedIn {filepath.stem}\n{filepath.read_text()}")
-
-    # Other sources
-    github_file = settings.processed_dir / "github" / settings.github_output_filename
-    if github_file.exists():
-        parts.append(f"### GitHub\n{github_file.read_text()}")
-
-    gitlab_file = settings.processed_dir / "gitlab" / settings.gitlab_output_filename
-    if gitlab_file.exists():
-        parts.append(f"### GitLab\n{gitlab_file.read_text()}")
-
-    portfolio_file = settings.processed_dir / "portfolio" / settings.portfolio_output_filename
-    if portfolio_file.exists():
-        parts.append(f"### Portfolio\n{portfolio_file.read_text()}")
-
-    # CliftonStrengths Assessment
-    assessment_file = settings.processed_dir / "assessment" / "cliftonstrengths.md"
-    if assessment_file.exists():
-        parts.append(f"### CliftonStrengths Assessment\n{assessment_file.read_text()}")
+    for key, name in source_names.items():
+        value = data.get(key)
+        if value:
+            parts.append(f"### {name}\n{value}")
 
     return "\n\n".join(parts) if parts else ""
 

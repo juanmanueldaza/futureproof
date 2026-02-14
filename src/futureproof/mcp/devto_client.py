@@ -32,14 +32,11 @@ class DevToMCPClient(HTTPMCPClient):
 
     async def _tool_search_articles(self, args: dict[str, Any]) -> MCPToolResult:
         """Search Dev.to articles."""
-        return await self._search_articles(
-            query=args.get("query", ""),
-            per_page=args.get("per_page", 30),
-        )
+        return await self._get_top_articles(per_page=args.get("per_page", 30))
 
     async def _tool_get_trending(self, args: dict[str, Any]) -> MCPToolResult:
         """Get trending Dev.to articles."""
-        return await self._get_trending(per_page=args.get("per_page", 30))
+        return await self._get_top_articles(per_page=args.get("per_page", 30))
 
     async def _tool_get_by_tag(self, args: dict[str, Any]) -> MCPToolResult:
         """Get Dev.to articles by tag."""
@@ -48,46 +45,14 @@ class DevToMCPClient(HTTPMCPClient):
             per_page=args.get("per_page", 30),
         )
 
-    async def _search_articles(
-        self,
-        query: str,
-        per_page: int = 30,
-    ) -> MCPToolResult:
-        """Search Dev.to articles.
+    async def _get_top_articles(self, per_page: int = 30) -> MCPToolResult:
+        """Get top Dev.to articles from the last 7 days.
 
         Args:
-            query: Search query
             per_page: Number of articles to return
 
         Returns:
             MCPToolResult with article listings
-        """
-        client = self._ensure_client()
-
-        # Dev.to doesn't have a search endpoint, use tag-based filtering
-        # For general search, we fetch top articles
-        params = {
-            "per_page": min(per_page, 100),
-            "top": 7,  # Top articles from last 7 days
-        }
-
-        response = await client.get(self.BASE_URL, params=params)
-        response.raise_for_status()
-
-        articles = response.json()
-        return self._format_articles(articles, "search_articles")
-
-    async def _get_trending(
-        self,
-        per_page: int = 30,
-    ) -> MCPToolResult:
-        """Get trending Dev.to articles.
-
-        Args:
-            per_page: Number of articles to return
-
-        Returns:
-            MCPToolResult with trending articles
         """
         client = self._ensure_client()
 

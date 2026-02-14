@@ -59,12 +59,13 @@ class EpisodicMemory:
 
     def to_document(self) -> str:
         """Convert to searchable document string."""
-        return f"{self.content}. Context: {self.context}"
+        return self.content
 
     def to_metadata(self) -> dict[str, Any]:
         """Convert to ChromaDB metadata format."""
         return {
             "memory_type": self.memory_type.value,
+            "context": self.context,
             "timestamp": self.timestamp.isoformat(),
             **{k: str(v) for k, v in self.metadata.items()},  # ChromaDB needs string values
         }
@@ -77,20 +78,14 @@ class EpisodicMemory:
         metadata: dict[str, Any],
     ) -> "EpisodicMemory":
         """Create from ChromaDB query result."""
-        # Parse content and context from document
-        if ". Context: " in document:
-            content, context = document.rsplit(". Context: ", 1)
-        else:
-            content = document
-            context = ""
-
+        reserved = {"memory_type", "context", "timestamp"}
         return cls(
             id=id,
             memory_type=MemoryType(metadata.get("memory_type", "decision")),
-            content=content,
-            context=context,
+            content=document,
+            context=metadata.get("context", ""),
             timestamp=datetime.fromisoformat(metadata.get("timestamp", datetime.now().isoformat())),
-            metadata={k: v for k, v in metadata.items() if k not in ("memory_type", "timestamp")},
+            metadata={k: v for k, v in metadata.items() if k not in reserved},
         )
 
 
