@@ -252,44 +252,6 @@ Type your message below, or use these commands:
     console.print()
 
 
-def display_response(content: str, streaming: bool = False) -> None:
-    """Display an agent response with markdown formatting.
-
-    Args:
-        content: The response content (supports markdown)
-        streaming: If True, content is being streamed (no panel wrapper)
-    """
-    if streaming:
-        # During streaming, just print raw content (caller handles live display)
-        console.print(content, end="")
-    else:
-        # Complete response - render as markdown
-        console.print(Markdown(content))
-        console.print()
-
-
-def display_insights(insights: list[str]) -> None:
-    """Display queued insights from background jobs.
-
-    Args:
-        insights: List of insight messages to display
-    """
-    if not insights:
-        return
-
-    insight_text = "\n".join(f"• {insight}" for insight in insights)
-
-    console.print(
-        Panel(
-            insight_text,
-            title="[bold yellow]Since you've been away[/bold yellow]",
-            border_style="yellow",
-            box=box.ROUNDED,
-        )
-    )
-    console.print()
-
-
 def display_error(message: str) -> None:
     """Display an error message.
 
@@ -305,30 +267,6 @@ def display_error(message: str) -> None:
         )
     )
     console.print()
-
-
-def display_tool_call(tool_name: str, status: str = "running") -> None:
-    """Display a tool call notification.
-
-    Args:
-        tool_name: Name of the tool being called
-        status: Status of the tool call (running, complete, error)
-    """
-    icons = {
-        "running": "⏳",
-        "complete": "✓",
-        "error": "✗",
-    }
-    colors = {
-        "running": "yellow",
-        "complete": "green",
-        "error": "red",
-    }
-
-    icon = icons.get(status, "•")
-    color = colors.get(status, "white")
-
-    console.print(f"[{color}]{icon} {tool_name}[/{color}]", end="\r")
 
 
 def display_help() -> None:

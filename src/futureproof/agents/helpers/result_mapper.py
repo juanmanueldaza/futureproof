@@ -7,8 +7,6 @@ Eliminates duplication between orchestrator nodes and service layer.
 # Centralized mapping of actions to their result keys
 ACTION_RESULT_KEYS: dict[str, str] = {
     # Career analysis actions
-    "analyze_goals": "goals",
-    "analyze_reality": "reality",
     "analyze_gaps": "gaps",
     "analyze_full": "analysis",
     # Market analysis actions

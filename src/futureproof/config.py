@@ -1,7 +1,6 @@
 """Configuration management using pydantic-settings."""
 
 from pathlib import Path
-from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,11 +29,7 @@ class Settings(BaseSettings):
     # User profiles
     portfolio_url: str = "https://daza.ar"
 
-    # Defaults
-    default_language: Literal["en", "es"] = "en"
-
     # LLM Configuration
-    llm_model: str = ""  # Empty = use provider default
     llm_temperature: float = 0.3
     cv_temperature: float = 0.2  # Lower for more consistent CV output
 
@@ -97,11 +92,6 @@ class Settings(BaseSettings):
     def market_cache_dir(self) -> Path:
         """Get the market data cache directory."""
         return self.data_dir / "cache" / "market"
-
-    @property
-    def market_output_dir(self) -> Path:
-        """Get the market data output directory."""
-        return self.processed_dir / "market"
 
     # Paths (computed from project root)
     @property

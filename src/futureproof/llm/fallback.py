@@ -210,11 +210,6 @@ class FallbackLLMManager:
                 logger.warning("Model error detected, no fallback models available")
         return False
 
-    def reset(self) -> None:
-        """Reset all failure states."""
-        self._failed_models.clear()
-        self._current_model = None
-
     def get_status(self) -> dict[str, Any]:
         """Get current status of the fallback manager."""
         return {

@@ -28,9 +28,6 @@ class MemoryType(Enum):
 
     DECISION = "decision"  # Career decisions made
     APPLICATION = "application"  # Job applications
-    CONVERSATION = "conversation"  # Conversation summaries
-    MILESTONE = "milestone"  # Career milestones
-    LEARNING = "learning"  # Skills learned or courses taken
 
 
 @dataclass

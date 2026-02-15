@@ -15,8 +15,6 @@ from .exceptions import AnalysisError, NoDataError
 # Type alias for analysis actions
 AnalysisAction = Literal[
     "analyze_full",
-    "analyze_goals",
-    "analyze_reality",
     "analyze_gaps",
     "analyze_market",
     "analyze_skills",

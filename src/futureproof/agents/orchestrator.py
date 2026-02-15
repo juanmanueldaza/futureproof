@@ -26,18 +26,6 @@ from .helpers import advice_pipeline, default_pipeline, get_result_key, invoke_l
 
 
 @task
-def gather_portfolio_task() -> dict[str, Any]:
-    """Gather portfolio data. Returns content string directly."""
-    from .. import gatherers
-
-    try:
-        content = gatherers.PortfolioGatherer().gather()
-        return {"portfolio_data": content}
-    except Exception as e:
-        return {"error": f"Portfolio: {e}"}
-
-
-@task
 def analyze_task(state: dict[str, Any]) -> dict[str, Any]:
     """Analyze career data using LLM."""
     prompt_builder = get_prompt_builder()
@@ -75,20 +63,6 @@ def analyze_market_task(state: dict[str, Any]) -> dict[str, Any]:
 
 
 @task
-def generate_task(state: dict[str, Any]) -> dict[str, Any]:
-    """Generate CV using LLM."""
-    from ..generators import CVGenerator
-
-    try:
-        generator = CVGenerator()
-        cv_en = generator.generate(language="en", format="ats", state=state)
-        cv_es = generator.generate(language="es", format="ats", state=state)
-        return {"cv_en": str(cv_en), "cv_es": str(cv_es)}
-    except Exception as e:
-        return {"error": f"Generation failed: {e}"}
-
-
-@task
 def advise_task(state: dict[str, Any]) -> dict[str, Any]:
     """Provide strategic career advice."""
     prompt_builder = get_prompt_builder()
@@ -112,19 +86,6 @@ def advise_task(state: dict[str, Any]) -> dict[str, Any]:
 # ============================================================================
 
 
-def _handle_gather(state: dict[str, Any]) -> dict[str, Any]:
-    """Execute portfolio data gathering."""
-    portfolio_result = gather_portfolio_task().result()
-
-    updates: dict[str, Any] = {}
-    if "error" in portfolio_result and portfolio_result["error"]:
-        updates["error"] = portfolio_result["error"]
-    else:
-        updates.update(portfolio_result)
-
-    return {**state, **updates}
-
-
 def _make_handler(task_fn):
     """Create a handler that runs a task and merges results into state."""
 
@@ -137,7 +98,6 @@ def _make_handler(task_fn):
 
 _handle_analyze_market = _make_handler(analyze_market_task)
 _handle_analyze = _make_handler(analyze_task)
-_handle_generate = _make_handler(generate_task)
 _handle_advise = _make_handler(advise_task)
 
 
@@ -145,10 +105,8 @@ _handle_advise = _make_handler(advise_task)
 # Only canonical actions used by callers. Unregistered analyze_* variants
 # fall through to _handle_analyze via the startswith("analyze") fallback.
 _EXACT_HANDLERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
-    "gather": _handle_gather,
     "analyze_market": _handle_analyze_market,
     "analyze_skills": _handle_analyze_market,
-    "generate": _handle_generate,
     "advise": _handle_advise,
 }
 
