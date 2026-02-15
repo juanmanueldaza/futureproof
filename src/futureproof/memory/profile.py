@@ -17,9 +17,11 @@ from typing import Any
 import yaml
 
 from futureproof.memory.checkpointer import get_data_dir
+from futureproof.utils.logging import get_logger
 
 # Serialize concurrent profile reads/writes (parallel tool calls)
 _profile_lock = threading.Lock()
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -200,7 +202,7 @@ def load_profile() -> UserProfile:
         return UserProfile.from_dict(data)
     except (yaml.YAMLError, OSError) as e:
         # Log error but return empty profile to avoid breaking the app
-        print(f"Warning: Could not load profile: {e}")
+        logger.warning("Could not load profile: %s", e)
         return UserProfile()
 
 

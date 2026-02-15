@@ -5,6 +5,18 @@ description = "Career intelligence system - gather professional data, generate C
 readme = "README.md"
 requires-python = ">=3.13"
 license = "GPL-2.0-only"
+authors = [
+    {name = "Juan Manuel Daza"},
+]
+keywords = ["career", "cv", "resume", "AI", "LLM", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     # Core
     "typer>=0.15",
@@ -29,6 +41,11 @@ dependencies = [
     "prompt-toolkit>=3.0.52",
     "chromadb>=1.4.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/juanmanueldaza/futureproof"
+Repository = "https://github.com/juanmanueldaza/futureproof"
+"Bug Tracker" = "https://github.com/juanmanueldaza/futureproof/issues"
 
 [project.scripts]
 futureproof = "futureproof.cli:app"
