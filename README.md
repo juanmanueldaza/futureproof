@@ -4,133 +4,102 @@
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
-Career intelligence system that gathers your professional data, analyzes your career trajectory, and generates optimized CVs — all through a conversational AI agent.
+Career intelligence agent — 36 tools, 12 MCP clients, 12.7k lines of Python across 85 files. Gathers career data from 5 sources, searches 7+ job boards, and generates ATS-optimized CVs through conversational chat. Built with LangChain, LangGraph, and ChromaDB.
 
-## Description
+## Architecture at a Glance
 
-FutureProof aggregates data from LinkedIn, GitHub, GitLab, portfolio websites, and CliftonStrengths assessments into a searchable knowledge base. It uses AI to identify skill gaps, assess market fit, track tech trends, and generate ATS-optimized CVs. Everything happens through an interactive chat interface powered by a single LangChain agent with 36 specialized tools.
+```mermaid
+graph LR
+    User <-->|Rich UI, HITL| Chat[Chat Client]
+    Chat <--> Agent[Single Agent<br/>36 tools]
 
-### Key capabilities
+    Agent --> Gather[Gatherers]
+    Agent --> MCP[12 MCP Clients]
+    Agent --> Analysis[Career Analysis]
+    Agent --> Gen[CV Generator]
 
-- **Data gathering** from GitHub, GitLab, LinkedIn exports, portfolio sites, and CliftonStrengths PDFs
-- **Knowledge base** with RAG-powered semantic search over all your career data
-- **Career analysis** — skill gaps, career alignment, market fit, strategic advice
-- **Market intelligence** — job search across 7+ boards, tech trends from Hacker News, salary insights
-- **CV generation** in English/Spanish, ATS or creative format (Markdown + PDF)
-- **Episodic memory** — remembers your decisions, job applications, and preferences across sessions
-- **Privacy protection** — PII anonymization before sending data to external LLMs
+    Gather -->|LinkedIn CSV, Portfolio,<br/>CliftonStrengths| ChromaDB[(ChromaDB)]
+    MCP -->|GitHub, 7 job boards,<br/>HN, Tavily, Dev.to, SO| Agent
+    Analysis --> LLM[LLM Fallback Chain<br/>4 Azure models]
+    Gen -->|Markdown + PDF| Output[CV Output]
 
-## Installation
+    ChromaDB -->|RAG search| Agent
+    ChromaDB -->|Episodic memory| Agent
+    LLM -->|Purpose-based routing| Agent
+```
+
+- **Single agent** with `create_agent()` + 36 tools — no multi-agent routing
+- **Database-first pipeline** — gatherers index directly to ChromaDB, no intermediate files
+- **Purpose-based LLM routing** — different models for tool calling, analysis, and summarization
+- **Custom `ToolCallRepairMiddleware`** — fixes orphaned parallel tool results after HITL resume
+- **4-model fallback chain** with automatic rate-limit recovery
+
+## Architecture Decisions
+
+### Multi-agent → Single agent
+
+GPT-4.1 over-delegated across agents, approximated with wrong tools, and didn't continue after handoff returns. Collapsed to a single agent with all 36 tools. Result: reliable tool selection, simpler state management, no routing logic.
+
+### File-based → Database-first pipeline
+
+The markdown chunker merged small entries (2-20 tokens each) into oversized chunks, making individual items unsearchable. Eliminated the entire file I/O layer — gatherers now return strings and index directly to ChromaDB via `index_content()`. No intermediate files, no `linkedin2md` dependency.
+
+### Systematic deletion
+
+Removed ~2,800 lines across multiple commits — the daemon module, 5 non-Azure LLM providers, the multi-agent handoff system, file-based data loading, and pass-through service wrappers. Each removal motivated by SOLID/DRY/YAGNI principles.
+
+## Key Engineering
+
+| What | Where | Why it matters |
+|------|-------|----------------|
+| `ToolCallRepairMiddleware` | [`agents/middleware.py`](src/futureproof/agents/middleware.py) | Detects orphaned `tool_calls` after HITL resume and injects synthetic ToolMessages — fixes a LangChain Send API edge case |
+| `FallbackLLMManager` | [`llm/fallback.py`](src/futureproof/llm/fallback.py) | 4-model chain with rate-limit detection, automatic failover, and purpose-based routing (`agent`/`analysis`/`summary`) |
+| LinkedIn CSV parser | [`gatherers/linkedin.py`](src/futureproof/gatherers/linkedin.py) | Parses 17 CSV files directly from LinkedIn ZIP — no external dependencies, 3-tier priority system |
+| MCP client registry | [`mcp/factory.py`](src/futureproof/mcp/factory.py) | OCP-compliant factory with availability checkers — add a new job board by adding one dict entry |
+| Security layers | [`utils/security.py`](src/futureproof/utils/security.py) | 13 prompt injection patterns, PII anonymization, SSRF protection, command injection prevention |
+| `SummarizationMiddleware` tuning | [`agents/career_agent.py`](src/futureproof/agents/career_agent.py) | Trigger at 32k tokens (not 8k default) — aggressive summarization causes models to lose multi-step instructions |
+
+## What It Does
+
+- **Data gathering** — `"Gather all my career data"` — LinkedIn, GitHub, GitLab, portfolio, CliftonStrengths
+- **Knowledge base** — `"Search my knowledge base for Python projects"` — RAG search over ChromaDB
+- **Career analysis** — `"Analyze my skill gaps for Staff Engineer"` — skill gaps, alignment, market fit
+- **Market intelligence** — `"Search for remote Python developer jobs"` — 7+ job boards, HN trends, salary data
+- **CV generation** — `"Generate my CV in ATS format"` — English/Spanish, ATS/creative, Markdown + PDF
+- **Episodic memory** — `"What job applications have I tracked?"` — decisions, applications across sessions
+
+## Quick Start
 
 ```bash
+git clone https://github.com/juanmanueldaza/futureproof.git
 cd futureproof
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
-
 cp .env.example .env
-# Edit .env with your API keys
 ```
 
-### Prerequisites
-
-- Python 3.13+
-
-## Usage
-
-### Interactive chat
+Minimum configuration (edit `.env`):
 
 ```bash
-futureproof chat                    # Start chat session (verbose by default)
-futureproof chat --debug            # Also show debug logs in terminal
-futureproof chat --thread work      # Use a named thread
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_CHAT_DEPLOYMENT=gpt-4.1
+AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 ```
 
-### Quick questions
+Then start chatting:
 
 ```bash
-futureproof ask "What are my top skills?"
-futureproof ask "Analyze my gaps for ML Engineer"
-```
-
-### Memory management
-
-```bash
+futureproof chat                    # Interactive session
+futureproof ask "Analyze my gaps"   # One-off question
 futureproof memory --threads        # List conversation threads
-futureproof memory --clear          # Clear all history
 ```
 
-### What you can ask
+See [docs/SOURCES.md](docs/SOURCES.md) for the complete configuration guide — GitHub, GitLab, market intelligence, model routing, and more.
 
-**Data gathering:**
-- "Gather my GitHub data"
-- "Import my LinkedIn export"
-- "Gather all my data" (auto-detects configured sources)
-
-**Knowledge & analysis:**
-- "Search my knowledge base for Python projects"
-- "Analyze my skill gaps for Staff Engineer"
-- "How do I fit the current job market?"
-
-**Market intelligence:**
-- "Search for remote Python developer jobs"
-- "What are the latest tech trends?"
-- "Get salary insights for ML Engineer"
-
-**CV generation:**
-- "Generate my CV in ATS format"
-- "Generate a CV draft for DevOps Engineer"
-
-### Data sources setup
-
-Place data exports in `data/raw/`:
-- **LinkedIn**: Download your data export ZIP from LinkedIn Settings > Data Privacy
-- **CliftonStrengths**: Download Gallup PDF reports (Top 5, All 34, etc.)
-
-Configure environment variables for live sources:
-```bash
-GITHUB_USERNAME=your_username
-GITLAB_USERNAME=your_username
-PORTFOLIO_URL=https://your-site.com
-```
-
-See [docs/SOURCES.md](docs/SOURCES.md) for the complete setup guide.
-
-## Configuration
-
-Copy `.env.example` and set your keys:
-
-```bash
-cp .env.example .env
-```
-
-**Minimum:**
-```bash
-AZURE_OPENAI_API_KEY=abc123...
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_CHAT_DEPLOYMENT=gpt-4.1
-AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
-```
-
-**Recommended:**
-```bash
-AZURE_OPENAI_API_KEY=abc123...                  # LLM + embeddings
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_CHAT_DEPLOYMENT=gpt-4.1
-AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
-AZURE_AGENT_DEPLOYMENT=gpt-4o                   # Best model for tool calling
-AZURE_ANALYSIS_DEPLOYMENT=gpt-4.1               # Analysis & CV generation
-AZURE_SUMMARY_DEPLOYMENT=gpt-4o-mini            # Cheap model for summarization
-GITHUB_USERNAME=your_username
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...            # GitHub data via MCP
-PORTFOLIO_URL=https://your-site.com
-TAVILY_API_KEY=tvly-...                         # Market research
-```
-
-The LLM fallback chain tries Azure models in order: GPT-4.1 → GPT-4o → GPT-4.1 Mini → GPT-4o Mini, auto-switching on rate limits. Purpose-based model routing lets you assign different models to agent tool calling, analysis, and summarization via env vars.
-
-## Project structure
+## Project Structure
 
 ```
 src/futureproof/
@@ -138,76 +107,40 @@ src/futureproof/
 ├── config.py               # Pydantic settings from env vars
 ├── agents/
 │   ├── career_agent.py     # Single agent with create_agent()
-│   ├── orchestrator.py     # LangGraph Functional API for analysis workflows
+│   ├── middleware.py        # ToolCallRepairMiddleware
+│   ├── orchestrator.py     # LangGraph Functional API for analysis
 │   ├── state.py            # TypedDict state definitions
-│   ├── helpers/            # Orchestrator support (data pipeline, LLM invoker)
-│   └── tools/              # 36 agent tools organized by domain
-│       ├── profile.py      # User profile management (6 tools)
-│       ├── gathering.py    # Data collection (5 tools)
-│       ├── github.py       # Live GitHub queries via MCP (3 tools)
-│       ├── gitlab.py       # Live GitLab queries via glab CLI (3 tools)
-│       ├── knowledge.py    # RAG search & indexing (4 tools)
-│       ├── analysis.py     # Career analysis (3 tools)
-│       ├── market.py       # Market intelligence (6 tools)
-│       ├── generation.py   # CV generation (2 tools)
-│       └── memory.py       # Episodic memory (4 tools)
-├── chat/                   # Streaming chat client with HITL support
+│   ├── helpers/            # Orchestrator support
+│   └── tools/              # 36 tools by domain
+├── chat/                   # Streaming client with HITL, Rich UI
 ├── gatherers/
-│   ├── linkedin.py         # LinkedIn ZIP direct CSV parser
+│   ├── linkedin.py         # LinkedIn ZIP → CSV parser
 │   ├── cliftonstrengths.py # CliftonStrengths PDF parser
-│   ├── portfolio/          # Website scraper (fetcher, HTML/JS extractors)
-│   └── market/             # Job market, tech trends, content trends
-├── generators/             # CV generation (Markdown + PDF via WeasyPrint)
-├── llm/                    # FallbackLLMManager with purpose-based model routing
-├── memory/
-│   ├── knowledge.py        # ChromaDB knowledge store (RAG)
-│   ├── episodic.py         # ChromaDB episodic memory
-│   ├── chunker.py          # Markdown chunker for indexing
-│   ├── embeddings.py       # Azure OpenAI embedding functions
-│   ├── checkpointer.py     # SQLite conversation persistence
-│   └── profile.py          # User profile (YAML)
-├── mcp/                    # 12 MCP clients (GitHub, HN, Tavily, job boards)
+│   ├── portfolio/          # Website scraper (SSRF-protected)
+│   └── market/             # Job market, tech trends
+├── generators/             # CV generation (Markdown + PDF)
+├── llm/                    # FallbackLLMManager, purpose-based routing
+├── memory/                 # ChromaDB knowledge + episodic memory
+├── mcp/                    # 12 MCP clients (GitHub, job boards, HN, etc.)
 ├── prompts/                # LLM prompt templates
 ├── services/               # Business logic layer
 └── utils/                  # Security, data loading, logging
 ```
 
-## Security
-
-- **Prompt injection protection** — user inputs screened for 13 injection patterns
-- **PII anonymization** — emails, phones, addresses redacted before external LLM calls
-- **SSRF protection** — portfolio scraper blocks private IP ranges
-- **Path traversal protection** — file operations validated within base directory
-- **Command injection protection** — external tools invoked without shell expansion
-- **Secure file permissions** — sensitive files created with 0600 permissions
-
 ## Development
 
 ```bash
 pip install -r requirements-dev.txt
-pip install -e .
 
-pytest tests/ -q              # Run tests
+pytest tests/ -q              # 93 tests in ~1s
 pyright src/futureproof       # Type checking
 ruff check .                  # Lint
-ruff check . --fix            # Auto-fix lint issues
 ```
 
-## Tech stack
+## Tech Stack
 
-- **Python 3.13+** with type hints
-- **LangChain + LangGraph** — agent orchestration, `create_agent()`, `SummarizationMiddleware`
-- **ChromaDB** — vector storage for knowledge base and episodic memory
-- **Pydantic** — settings management
-- **Typer + Rich** — CLI and terminal UI
-- **httpx** — async HTTP client
-- **WeasyPrint** — PDF generation
-- **pip** — package management
+**Python 3.13+** · [LangChain](https://python.langchain.com/) + [LangGraph](https://langchain-ai.github.io/langgraph/) · [ChromaDB](https://www.trychroma.com/) · [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) · [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) · [WeasyPrint](https://weasyprint.org/) · [httpx](https://www.python-httpx.org/)
 
-## Contributing
+---
 
-Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on how to contribute to this project.
-
-## License
-
-[GPL-2.0](LICENSE)
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under [GPL-2.0](LICENSE).
