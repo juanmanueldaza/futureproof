@@ -24,16 +24,16 @@
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>
-            FutureProof - Career Intelligence System for AI-Powered CV
-            Generation
+            FutureProof - AI Career Intelligence Agent with Knowledge Base &amp;
+            CV Generation
         </title>
         <meta
             name="description"
-            content="Aggregate professional data from LinkedIn, GitHub, GitLab, and portfolios. Generate AI-optimized CVs and get strategic career analysis with Gemini AI."
+            content="Conversational AI agent that gathers career data from LinkedIn, GitHub, GitLab, and portfolios into a ChromaDB knowledge base. Analyzes skill gaps, tracks market trends, and generates ATS-optimized CVs — all through chat."
         />
         <meta
             name="keywords"
-            content="career intelligence, CV generator, resume builder, AI career analysis, LinkedIn, GitHub, GitLab, portfolio, LangChain, Gemini AI"
+            content="career intelligence, AI agent, CV generator, resume builder, skill gap analysis, market intelligence, LangChain, LangGraph, ChromaDB, Azure OpenAI, knowledge base, RAG"
         />
 
         <link rel="canonical" href="https://futureproof.daza.ar/" />
@@ -43,11 +43,11 @@
         <!-- Open Graph -->
         <meta
             property="og:title"
-            content="FutureProof - Career Intelligence System for AI-Powered CV Generation"
+            content="FutureProof - AI Career Intelligence Agent"
         />
         <meta
             property="og:description"
-            content="Know thyself through your data. Aggregate professional data from LinkedIn, GitHub, GitLab, and portfolios. Generate AI-optimized CVs and get strategic career analysis."
+            content="Conversational AI agent with 36 tools. Gathers career data, builds a knowledge base, analyzes skill gaps, tracks market trends, and generates optimized CVs — all through chat."
         />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://futureproof.daza.ar" />
@@ -62,11 +62,11 @@
         <meta name="twitter:card" content="summary_large_image" />
         <meta
             name="twitter:title"
-            content="FutureProof - Career Intelligence System"
+            content="FutureProof - AI Career Intelligence Agent"
         />
         <meta
             name="twitter:description"
-            content="Know thyself through your data. Aggregate professional data, generate AI-optimized CVs, and get strategic career analysis."
+            content="Conversational AI agent with 36 tools. Gathers career data, builds a knowledge base, analyzes skill gaps, and generates optimized CVs."
         />
         <meta
             name="twitter:image"
@@ -143,14 +143,16 @@
                 border-radius: 8px;
                 padding: 1rem 1.5rem;
                 margin: 2rem auto;
-                max-width: 500px;
+                max-width: 580px;
                 position: relative;
             }
 
             .install-box code {
                 font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
-                font-size: 1rem;
+                font-size: 0.85rem;
                 color: var(--text);
+                display: block;
+                line-height: 1.8;
             }
 
             .install-box .prompt {
@@ -209,7 +211,7 @@
 
             .features {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
                 gap: 1.5rem;
             }
 
@@ -245,13 +247,7 @@
                 background: var(--code-bg);
                 border: 1px solid var(--border);
                 border-radius: 6px;
-                text-decoration: none;
                 color: var(--text);
-                transition: border-color 0.2s;
-            }
-
-            .source:hover {
-                border-color: var(--accent);
             }
 
             .source-icon {
@@ -303,6 +299,14 @@
             .workflow-step p {
                 font-size: 0.9rem;
                 color: var(--text-muted);
+            }
+
+            .workflow-step .chat-example {
+                font-family: "SF Mono", Monaco, monospace;
+                font-size: 0.8rem;
+                color: var(--accent);
+                margin-top: 0.5rem;
+                font-style: italic;
             }
 
             .commands {
@@ -386,14 +390,14 @@
                 font-weight: bold;
             }
 
-            .ecosystem {
+            .tech-stack {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 1rem;
                 justify-content: center;
             }
 
-            .ecosystem-link {
+            .tech-item {
                 display: inline-flex;
                 align-items: center;
                 gap: 0.5rem;
@@ -407,7 +411,7 @@
                 transition: border-color 0.2s;
             }
 
-            .ecosystem-link:hover {
+            .tech-item:hover {
                 border-color: var(--accent);
             }
 
@@ -514,7 +518,7 @@
                 "@context": "https://schema.org",
                 "@type": "SoftwareApplication",
                 "name": "FutureProof",
-                "description": "Career Intelligence System - Aggregate professional data from LinkedIn, GitHub, GitLab, and portfolios. Generate AI-optimized CVs and get strategic career analysis.",
+                "description": "AI career intelligence agent — gathers professional data from LinkedIn, GitHub, GitLab, and portfolios into a ChromaDB knowledge base. Analyzes skill gaps, tracks market trends, and generates ATS-optimized CVs through a conversational chat interface.",
                 "url": "https://futureproof.daza.ar",
                 "applicationCategory": "DeveloperApplication",
                 "operatingSystem": "Cross-platform",
@@ -539,16 +543,18 @@
             <header>
                 <h1>Future<span>Proof</span></h1>
                 <p class="tagline">
-                    Career Intelligence System - Aggregate professional data and
-                    generate AI-optimized CVs
+                    Career intelligence system — gather data, analyze
+                    trajectories, and generate optimized CVs through a
+                    conversational AI agent
                 </p>
                 <p class="motto">Know thyself through your data.</p>
 
-                <div class="install-box" style="max-width: 580px">
+                <div class="install-box">
                     <code
                         ><span class="prompt">$</span> git clone
-                        https://github.com/juanmanueldaza/futureproof && cd
-                        futureproof && uv sync</code
+                        https://github.com/juanmanueldaza/futureproof<br />
+                        <span class="prompt">$</span> cd futureproof && pip
+                        install -r requirements.txt && pip install -e .</code
                     >
                 </div>
 
@@ -569,42 +575,65 @@
                         </svg>
                         GitHub
                     </a>
+                    <a
+                        href="https://github.com/juanmanueldaza/futureproof/blob/main/docs/SOURCES.md"
+                        class="btn btn-secondary"
+                    >
+                        Setup Guide
+                    </a>
                 </div>
             </header>
 
             <section>
                 <h2>What is FutureProof?</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1.5rem">
-                    A Python CLI that aggregates your professional footprint and
-                    uses AI to generate strategic career outputs.
+                    A single LangChain agent with 36 specialized tools that
+                    gathers your professional footprint, indexes it into a
+                    searchable knowledge base, and uses AI to analyze your
+                    career and generate strategic outputs. Everything happens
+                    through interactive chat.
                 </p>
                 <div class="features">
                     <div class="feature">
-                        <h3>Data Aggregation</h3>
+                        <h3>Data Gathering</h3>
                         <p>
-                            Pull data from LinkedIn, GitHub, GitLab, and
-                            portfolio sites into normalized markdown
+                            Pull data from LinkedIn exports, GitHub, GitLab,
+                            portfolio sites, and CliftonStrengths PDFs
                         </p>
                     </div>
                     <div class="feature">
-                        <h3>CV Generation</h3>
+                        <h3>Knowledge Base</h3>
                         <p>
-                            Produce ATS-optimized and creative CVs in English
-                            and Spanish (MD + PDF)
+                            ChromaDB-powered RAG search over all your career
+                            data with semantic retrieval
                         </p>
                     </div>
                     <div class="feature">
                         <h3>Career Analysis</h3>
                         <p>
-                            Compare stated goals vs actual behavior. Identify
-                            gaps and blind spots
+                            Skill gap identification, career alignment scoring,
+                            and strategic advice
                         </p>
                     </div>
                     <div class="feature">
-                        <h3>Strategic Advice</h3>
+                        <h3>Market Intelligence</h3>
                         <p>
-                            Get actionable recommendations powered by Gemini AI
-                            for your target role
+                            Job search across 7+ boards, tech trends from Hacker
+                            News, salary insights
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <h3>CV Generation</h3>
+                        <p>
+                            ATS-optimized and creative CVs in English and
+                            Spanish (Markdown + PDF)
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <h3>Episodic Memory</h3>
+                        <p>
+                            Remembers your decisions, job applications, and
+                            preferences across sessions
                         </p>
                     </div>
                 </div>
@@ -613,69 +642,74 @@
             <section>
                 <h2>Data Sources</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1.5rem">
-                    FutureProof aggregates your professional presence from
-                    multiple platforms.
+                    FutureProof connects to multiple platforms. None are
+                    required — the system works with whatever you configure.
                 </p>
                 <div class="sources-grid">
-                    <a
-                        href="https://linkedin2md.daza.ar"
-                        class="source"
-                        target="_blank"
-                    >
+                    <div class="source">
                         <span class="source-icon">in</span>
                         <div>
                             <div class="source-name">LinkedIn</div>
-                            <div class="source-type">via linkedin2md</div>
+                            <div class="source-type">ZIP data export</div>
                         </div>
-                    </a>
-                    <a
-                        href="https://github2md.daza.ar"
-                        class="source"
-                        target="_blank"
-                    >
+                    </div>
+                    <div class="source">
                         <span class="source-icon">GH</span>
                         <div>
                             <div class="source-name">GitHub</div>
-                            <div class="source-type">via github2md</div>
+                            <div class="source-type">Live via MCP server</div>
                         </div>
-                    </a>
-                    <a
-                        href="https://gitlab2md.daza.ar"
-                        class="source"
-                        target="_blank"
-                    >
+                    </div>
+                    <div class="source">
                         <span class="source-icon">GL</span>
                         <div>
                             <div class="source-name">GitLab</div>
-                            <div class="source-type">via gitlab2md</div>
+                            <div class="source-type">Live via glab CLI</div>
                         </div>
-                    </a>
+                    </div>
                     <div class="source">
                         <span class="source-icon">WEB</span>
                         <div>
                             <div class="source-name">Portfolio</div>
-                            <div class="source-type">Any website</div>
+                            <div class="source-type">Web scraper</div>
+                        </div>
+                    </div>
+                    <div class="source">
+                        <span class="source-icon">CS</span>
+                        <div>
+                            <div class="source-name">CliftonStrengths</div>
+                            <div class="source-type">PDF parser</div>
                         </div>
                     </div>
                 </div>
             </section>
 
             <section>
-                <h2>Workflow</h2>
+                <h2>How It Works</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem">
+                    Everything happens through natural language chat. Just tell
+                    the agent what you need.
+                </p>
                 <div class="workflow">
                     <div class="workflow-step" data-step="1">
                         <h3>Gather</h3>
                         <p>
-                            Pull data from all your professional sources into
-                            structured markdown
+                            The agent collects and indexes your career data into
+                            a searchable knowledge base
                         </p>
+                        <div class="chat-example">
+                            "Gather all my career data"
+                        </div>
                     </div>
                     <div class="workflow-step" data-step="2">
                         <h3>Analyze</h3>
                         <p>
-                            AI examines your goals, reality, and identifies the
-                            gaps between them
+                            AI examines your profile, identifies skill gaps, and
+                            assesses market fit
                         </p>
+                        <div class="chat-example">
+                            "Analyze my gaps for Staff Engineer"
+                        </div>
                     </div>
                     <div class="workflow-step" data-step="3">
                         <h3>Generate</h3>
@@ -683,13 +717,19 @@
                             Create optimized CVs tailored for ATS systems or
                             creative presentation
                         </p>
+                        <div class="chat-example">
+                            "Generate my CV in ATS format"
+                        </div>
                     </div>
                     <div class="workflow-step" data-step="4">
                         <h3>Advise</h3>
                         <p>
-                            Get strategic recommendations for your specific
-                            career target
+                            Get strategic recommendations based on market data
+                            and your career trajectory
                         </p>
+                        <div class="chat-example">
+                            "What should I focus on for ML Engineer?"
+                        </div>
                     </div>
                 </div>
             </section>
@@ -706,60 +746,67 @@
                     </div>
                     <div class="command-item">
                         <span class="prompt">$</span>
-                        <span class="cmd">cd futureproof && uv sync</span>
+                        <span class="cmd"
+                            >cd futureproof && pip install -r requirements.txt
+                            && pip install -e .</span
+                        >
                     </div>
                     <div class="command-item">
                         <span class="prompt">$</span>
                         <span class="cmd">cp .env.example .env</span>
-                        <span class="comment"># Add your GEMINI_API_KEY</span>
+                        <span class="comment"
+                            ># Add your Azure OpenAI keys</span
+                        >
                     </div>
                     <div class="command-item">
                         <span class="prompt">$</span>
-                        <span class="cmd">futureproof gather all</span>
-                        <span class="comment"># Gather from all sources</span>
+                        <span class="cmd">futureproof chat</span>
+                        <span class="comment"># Start chatting</span>
                     </div>
                     <div class="command-item">
                         <span class="prompt">$</span>
-                        <span class="cmd">futureproof analyze full</span>
-                        <span class="comment"># Comprehensive analysis</span>
-                    </div>
-                    <div class="command-item">
-                        <span class="prompt">$</span>
-                        <span class="cmd">futureproof generate cv --all</span>
-                        <span class="comment"># Generate all CV versions</span>
+                        <span class="cmd"
+                            >futureproof ask "Analyze my skill gaps"</span
+                        >
+                        <span class="comment"># Quick question</span>
                     </div>
                 </div>
             </section>
 
             <section>
-                <h2>Output Deliverables</h2>
+                <h2>What You Get</h2>
                 <div class="output-grid">
                     <div class="output-card">
-                        <h3>ATS CV (EN/ES)</h3>
+                        <h3>Knowledge Base</h3>
                         <p>
-                            Clean, keyword-optimized format for applicant
-                            tracking systems
+                            Semantic search over all your career data via
+                            ChromaDB vectors
                         </p>
-                    </div>
-                    <div class="output-card">
-                        <h3>Creative CV (EN/ES)</h3>
-                        <p>Visually appealing format for direct submissions</p>
                     </div>
                     <div class="output-card">
                         <h3>Career Analysis</h3>
                         <p>
-                            Goals vs reality comparison with gap identification
+                            Skill gaps, career alignment, and market fit reports
                         </p>
                     </div>
                     <div class="output-card">
-                        <h3>Strategic Advice</h3>
-                        <p>Actionable steps toward your target role</p>
+                        <h3>Optimized CVs</h3>
+                        <p>
+                            ATS and creative formats in EN/ES (Markdown + PDF)
+                        </p>
+                    </div>
+                    <div class="output-card">
+                        <h3>Market Intel</h3>
+                        <p>
+                            Job listings, tech trends, and salary data from 7+
+                            sources
+                        </p>
                     </div>
                 </div>
             </section>
 
             <section>
-                <h2>Privacy & Security</h2>
+                <h2>Privacy &amp; Security</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1.5rem">
                     FutureProof implements security best practices to protect
                     your data.
@@ -768,46 +815,71 @@
                     <li>PII anonymization before external API calls</li>
                     <li>Prompt injection detection and blocking</li>
                     <li>SSRF protection for portfolio scraping</li>
-                    <li>Path traversal prevention</li>
+                    <li>Command injection prevention</li>
                     <li>Input validation via Pydantic</li>
                     <li>Secure file permissions (0600)</li>
                 </ul>
             </section>
 
             <section>
-                <h2>Ecosystem</h2>
+                <h2>Tech Stack</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1.5rem">
-                    FutureProof builds on top of specialized data extraction
-                    tools.
+                    Built with Python 3.13+ and modern AI tooling.
                 </p>
-                <div class="ecosystem">
+                <div class="tech-stack">
                     <a
-                        href="https://linkedin2md.daza.ar"
-                        class="ecosystem-link"
+                        href="https://python.langchain.com/"
+                        class="tech-item"
                         target="_blank"
                     >
-                        linkedin2md
+                        LangChain
                     </a>
                     <a
-                        href="https://github2md.daza.ar"
-                        class="ecosystem-link"
+                        href="https://langchain-ai.github.io/langgraph/"
+                        class="tech-item"
                         target="_blank"
                     >
-                        github2md
+                        LangGraph
                     </a>
                     <a
-                        href="https://gitlab2md.daza.ar"
-                        class="ecosystem-link"
+                        href="https://www.trychroma.com/"
+                        class="tech-item"
                         target="_blank"
                     >
-                        gitlab2md
+                        ChromaDB
+                    </a>
+                    <a
+                        href="https://azure.microsoft.com/en-us/products/ai-services/openai-service"
+                        class="tech-item"
+                        target="_blank"
+                    >
+                        Azure OpenAI
+                    </a>
+                    <a
+                        href="https://typer.tiangolo.com/"
+                        class="tech-item"
+                        target="_blank"
+                    >
+                        Typer
+                    </a>
+                    <a
+                        href="https://rich.readthedocs.io/"
+                        class="tech-item"
+                        target="_blank"
+                    >
+                        Rich
                     </a>
                 </div>
             </section>
 
             <footer>
                 <p>
-                    Open source (GPL-2.0) · Built by
+                    Open source (GPL-2.0) ·
+                    <a
+                        href="https://github.com/juanmanueldaza/futureproof/blob/main/CONTRIBUTING.md"
+                        >Contributing</a
+                    >
+                    · Built by
                     <a href="https://github.com/juanmanueldaza"
                         >Juan Manuel Daza</a
                     >
