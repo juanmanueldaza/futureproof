@@ -111,31 +111,6 @@ class CareerKnowledgeStore(ChromaDBStore):
             )
         return self._chunker
 
-    def _index_document(
-        self,
-        source: KnowledgeSource,
-        content: str,
-        section: str,
-        metadata: dict[str, Any] | None = None,
-    ) -> str:
-        """Index a single document chunk."""
-        chunk = KnowledgeChunk(
-            id=str(uuid.uuid4()),
-            content=content,
-            source=source,
-            section=section,
-            metadata=metadata or {},
-        )
-
-        self._add(
-            ids=[chunk.id],
-            documents=[chunk.to_document()],
-            metadatas=[chunk.to_metadata()],
-        )
-
-        logger.debug("Indexed chunk: %s (%s/%s)", chunk.id, source.value, section)
-        return chunk.id
-
     def index_content(
         self,
         source: KnowledgeSource,

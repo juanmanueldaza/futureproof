@@ -131,7 +131,7 @@ class GathererService:
         results["portfolio"] = _timed_gather("portfolio", self.gather_portfolio, verbose=verbose)
 
         # Auto-detect LinkedIn ZIP in data/raw/
-        raw_dir = Path("data/raw")
+        raw_dir = settings.raw_dir
         if raw_dir.exists():
             linkedin_zips = list(raw_dir.glob("*[Ll]inked[Ii]n*.zip"))
             if linkedin_zips:

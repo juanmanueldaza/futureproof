@@ -23,29 +23,6 @@ class PromptBuilder:
     """
 
     # Analysis prompt templates for different actions
-    GOALS_TEMPLATE = """\
-Based on the following career data, extract and list all STATED career goals,
-aspirations, and targets mentioned. Look for:
-- Headlines and taglines that indicate desired roles
-- About sections mentioning goals
-- Any explicit career objectives
-
-{career_data}
-
-Provide a clear, bulleted list of stated career goals."""
-
-    REALITY_TEMPLATE = """\
-Based on the following career data, analyze what this person is ACTUALLY doing.
-Look at:
-- Technologies and languages used in repositories
-- Types of projects built
-- Activity patterns
-- Skills demonstrated vs claimed
-
-{career_data}
-
-Provide an honest assessment of actual activities and demonstrated skills."""
-
     GAPS_TEMPLATE = """\
 Based on the following career data, identify GAPS between:
 1. What this person SAYS they want (stated goals, headline, aspirations)
@@ -61,8 +38,6 @@ Provide:
 5. Actionable recommendations to close the gaps"""
 
     ANALYSIS_TEMPLATES = {
-        "analyze_goals": GOALS_TEMPLATE,
-        "analyze_reality": REALITY_TEMPLATE,
         "analyze_gaps": GAPS_TEMPLATE,
     }
 

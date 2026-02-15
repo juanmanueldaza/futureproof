@@ -129,17 +129,6 @@ class KnowledgeService:
             for chunk in chunks
         ]
 
-    def get_source_content(self, source: KnowledgeSource) -> str:
-        """Get all content for a source from the knowledge base.
-
-        Args:
-            source: The knowledge source
-
-        Returns:
-            Combined content string, or empty string if no data
-        """
-        return self.store.get_all_content(source)
-
     def get_all_content(self) -> dict[str, str]:
         """Get all career content from the knowledge base.
 

@@ -18,7 +18,6 @@ class TestSettings:
     def test_default_values(self) -> None:
         """Test that settings have expected defaults."""
         settings = make_settings(azure_openai_api_key="test-key")
-        assert settings.default_language == "en"
         assert settings.azure_openai_api_key == "test-key"
 
     def test_directory_paths_are_paths(self) -> None:
@@ -63,11 +62,6 @@ class TestSettings:
         assert raw_dir.exists()
         assert processed_dir.exists()
         assert output_dir.exists()
-
-    def test_default_language_options(self) -> None:
-        """Test default_language accepts valid options."""
-        assert make_settings(default_language="en").default_language == "en"
-        assert make_settings(default_language="es").default_language == "es"
 
     def test_portfolio_url_default(self) -> None:
         """Test portfolio_url has a default value."""

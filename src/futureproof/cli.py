@@ -173,5 +173,71 @@ def memory_command(
         console.print(f"Career goals: {len(profile.goals)}")
 
 
+@app.command("reset")
+def reset_command(
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
+) -> None:
+    """Factory reset — delete all generated data, keep raw input files.
+
+    Removes conversations, profile, knowledge base, episodic memory,
+    generated CVs, market cache, and logs. Raw input files in data/raw/
+    (LinkedIn ZIPs, CliftonStrengths PDFs) are preserved.
+    """
+    import shutil
+
+    from .memory.checkpointer import get_data_dir
+
+    home_dir = get_data_dir()  # ~/.futureproof
+    data_dir = settings.data_dir  # <project>/data
+
+    targets = [
+        ("Conversations & checkpoints", home_dir / "memory.db"),
+        ("User profile", home_dir / "profile.yaml"),
+        ("Knowledge base & episodic memory", home_dir / "episodic"),
+        ("Log file (home)", home_dir / "futureproof.log"),
+        ("Generated CVs", data_dir / "output"),
+        ("Processed data", data_dir / "processed"),
+        ("Market cache", data_dir / "cache"),
+        ("Log file (data)", data_dir / "futureproof.log"),
+    ]
+
+    console.print("[bold red]Factory Reset[/bold red]\n")
+    console.print("This will delete:")
+    for label, path in targets:
+        exists = path.exists()
+        status = "" if exists else " [dim](not found)[/dim]"
+        console.print(f"  - {label}: {path}{status}")
+    console.print("\n[green]Preserved:[/green] data/raw/ (LinkedIn ZIPs, PDFs)")
+
+    if not yes:
+        typer.confirm("\nProceed with factory reset?", abort=True)
+
+    deleted = 0
+    for label, path in targets:
+        if not path.exists():
+            continue
+        if path.is_dir():
+            # For output/ and processed/, keep .gitkeep files
+            if path.name in ("output", "processed"):
+                for item in path.iterdir():
+                    if item.name == ".gitkeep":
+                        continue
+                    if item.is_dir():
+                        shutil.rmtree(item, ignore_errors=True)
+                    else:
+                        item.unlink()
+            else:
+                shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink()
+        deleted += 1
+
+    settings.ensure_directories()
+    console.print(f"\n[green]Factory reset complete.[/green] Cleared {deleted} items.")
+
+
 if __name__ == "__main__":
     app()
