@@ -1,5 +1,9 @@
 # FutureProof
 
+[![CI](https://github.com/juanmanueldaza/futureproof/actions/workflows/ci.yml/badge.svg)](https://github.com/juanmanueldaza/futureproof/actions/workflows/ci.yml)
+[![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+
 Career intelligence system that gathers your professional data, analyzes your career trajectory, and generates optimized CVs — all through a conversational AI agent.
 
 ## Description
@@ -199,6 +203,10 @@ ruff check . --fix            # Auto-fix lint issues
 - **httpx** — async HTTP client
 - **WeasyPrint** — PDF generation
 - **pip** — package management
+
+## Contributing
+
+Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on how to contribute to this project.
 
 ## License
 
