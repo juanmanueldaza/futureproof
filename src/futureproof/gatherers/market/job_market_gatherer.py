@@ -102,12 +102,7 @@ class JobMarketGatherer(MarketGatherer):
 
                 results["job_listings"].extend(jobs)
 
-                # Track sources (handle JobSpy's multi-source results)
-                if source_config.source_name == "jobspy":
-                    jobspy_sources = list({j.get("site", "unknown") for j in jobs})
-                    results["summary"]["sources"].extend(jobspy_sources)
-                else:
-                    results["summary"]["sources"].append(source_config.source_name)
+                results["summary"]["sources"].append(source_config.source_name)
 
         # Update summary stats
         results["summary"]["total_jobs"] = len(results["job_listings"])
@@ -166,7 +161,7 @@ class JobMarketGatherer(MarketGatherer):
             for job in jobs[:20]:  # Limit display
                 title = job.get("title", "Unknown Title")
                 company = job.get("company", "Unknown Company")
-                job_location = job.get("location", location)
+                job_location = job.get("location") or "Remote"
                 salary = job.get("salary", "")
 
                 lines.append(f"### {title}")

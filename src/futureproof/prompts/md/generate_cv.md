@@ -5,8 +5,10 @@ Generate a professional, ATS-optimized CV in clean Markdown format for a tech pr
 Include only information with an explicit source in the career data. Every bullet point must trace to provided data. When in doubt, omit rather than invent.
 
 - Copy job titles, company names, and dates exactly as provided
-- Use the person's own words from their summaries and descriptions
-- Copy responsibilities and achievements verbatim from the source
+- Base content on the person's own words from their summaries and descriptions
+- Preserve the meaning and specifics of responsibilities and achievements from the source
+
+**Language**: The source data may contain text in multiple languages. ALL output must be in the target language specified below. Translate any foreign-language content while preserving its meaning — do not include text in other languages.
 
 If a standard CV section has no source data, omit that section entirely.
 

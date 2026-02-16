@@ -95,6 +95,74 @@ class JobSpyMCPClient(MCPClient):
         except Exception as e:
             raise MCPToolError(f"Tool call failed: {e}") from e
 
+    # City → country mapping for common cities
+    _CITY_TO_COUNTRY: dict[str, str] = {
+        "paris": "france",
+        "london": "uk",
+        "berlin": "germany",
+        "munich": "germany",
+        "amsterdam": "netherlands",
+        "barcelona": "spain",
+        "madrid": "spain",
+        "malaga": "spain",
+        "valencia": "spain",
+        "seville": "spain",
+        "bilbao": "spain",
+        "lisbon": "portugal",
+        "milan": "italy",
+        "rome": "italy",
+        "vienna": "austria",
+        "zurich": "switzerland",
+        "geneva": "switzerland",
+        "brussels": "belgium",
+        "copenhagen": "denmark",
+        "stockholm": "sweden",
+        "oslo": "norway",
+        "helsinki": "finland",
+        "dublin": "ireland",
+        "prague": "czech republic",
+        "warsaw": "poland",
+        "bucharest": "romania",
+        "budapest": "hungary",
+        "buenos aires": "argentina",
+        "sydney": "australia",
+        "melbourne": "australia",
+        "toronto": "canada",
+        "vancouver": "canada",
+        "tokyo": "japan",
+        "singapore": "singapore",
+        "dubai": "united arab emirates",
+    }
+
+    @classmethod
+    def _resolve_country(cls, location: str) -> str:
+        """Resolve location to a JobSpy country_indeed value.
+
+        Indeed/Glassdoor/Google use country-specific domains, so passing the
+        right country is critical for relevant results. Tries:
+        1. Direct match against JobSpy's Country enum
+        2. City → country lookup
+        3. Falls back to "worldwide"
+        """
+        if not location or location.lower() == "remote":
+            return "worldwide"
+
+        from jobspy.model import Country  # type: ignore[import-not-found]
+
+        # Try direct country match
+        try:
+            Country.from_string(location)
+            return location.lower()
+        except ValueError:
+            pass
+
+        # Try city → country mapping
+        loc_lower = location.lower().strip()
+        if loc_lower in cls._CITY_TO_COUNTRY:
+            return cls._CITY_TO_COUNTRY[loc_lower]
+
+        return "worldwide"
+
     async def _search_jobs(
         self,
         search_term: str,
@@ -111,12 +179,15 @@ class JobSpyMCPClient(MCPClient):
 
         sites = site_names or ["linkedin", "indeed"]
 
+        # Resolve country for Indeed/Glassdoor/Google (they use country-specific domains)
+        country = self._resolve_country(location)
+
         # Build search parameters
         search_params: dict[str, Any] = {
             "site_name": sites,
             "search_term": search_term,
             "results_wanted": results_wanted,
-            "country_indeed": "USA",  # Default to USA
+            "country_indeed": country,
         }
 
         if location:
