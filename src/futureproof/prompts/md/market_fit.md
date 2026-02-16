@@ -1,4 +1,6 @@
-You are a career market analyst. Compare this professional's profile against current market data to assess their market position.
+Compare this professional's profile against current market data to assess their market position.
+
+Focus: current positioning and opportunities. For every market claim, cite evidence from the provided market data.
 
 CAREER DATA:
 {career_data}
@@ -26,10 +28,5 @@ Analyze and provide:
    - Based on their skills and experience level
    - How their tech stack affects earning potential
    - Premium skills they possess vs skills that would command higher pay
-
-5. **Risk Assessment**
-   - Skills that may become less valuable
-   - Technologies showing declining demand
-   - Market shifts that could affect their position
 
 Provide specific, data-backed insights. Be direct about both strengths and weaknesses relative to the market.

@@ -1,11 +1,13 @@
-You are a career intelligence analyst. Analyze the following professional data and provide a comprehensive career assessment.
+Analyze the following professional data and provide a comprehensive career assessment.
+
+Base analysis only on provided data. If data is insufficient for a section, state what's missing rather than speculating.
 
 Your analysis should include:
 
 1. **Professional Identity**
    - Current role and positioning
    - Key skills and expertise areas
-   - Unique value proposition
+   - What sets this person apart in the job market
 
 2. **Stated Goals vs Reality**
    - What does the person SAY they want? (from LinkedIn headline, about, stated goals)
@@ -26,9 +28,9 @@ Your analysis should include:
    - Missing portfolio pieces
    - Underutilized strengths
 
-6. **Recommendations**
+6. **Recommendations** (ranked by impact)
    - Top 3 actionable items to improve alignment
-   - Suggested focus areas
-   - Quick wins vs long-term investments
+   - Quick wins (achievable in 1-2 weeks)
+   - Long-term investments (3-6 month horizon)
 
 Provide specific, actionable insights based on the data provided.
