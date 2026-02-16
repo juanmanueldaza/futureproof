@@ -13,23 +13,37 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
+from rich.theme import Theme
 
-# Global console instance
-console = Console()
+# ── Nautical theme (inspired by daza.ar) ─────────────────────────────────
+
+_THEME = Theme(
+    {
+        "gold": "bold #ffd700",
+        "sand": "#e0d8c0",
+        "parchment": "bold #f5f0e1",
+        "teal": "#415a77",
+        "success": "#10b981",
+        "warning": "#ffd700",
+        "error": "#ff6b6b",
+    }
+)
+
+console = Console(theme=_THEME)
 
 # ── Tool category styling ────────────────────────────────────────────────
 
 _TOOL_CATEGORIES: dict[str, tuple[str, str]] = {
     # category: (icon, color)
-    "profile": ("\u2139", "bright_cyan"),  # ℹ
-    "gathering": ("\u2b07", "bright_green"),  # ⬇
-    "github": ("\u2b22", "bright_white"),  # ⬢
-    "gitlab": ("\u2b22", "bright_magenta"),  # ⬢
-    "knowledge": ("\u25c6", "bright_yellow"),  # ◆
-    "analysis": ("\u25b2", "bright_blue"),  # ▲
-    "generation": ("\u2605", "bright_red"),  # ★
-    "market": ("\u25cf", "bright_green"),  # ●
-    "memory": ("\u25a0", "bright_magenta"),  # ■
+    "profile": ("\u2139", "#5bc0be"),  # ℹ  soft teal
+    "gathering": ("\u2b07", "#10b981"),  # ⬇  emerald
+    "github": ("\u2b22", "#e0d8c0"),  # ⬢  sand
+    "gitlab": ("\u2b22", "#c084fc"),  # ⬢  lavender
+    "knowledge": ("\u25c6", "#ffd700"),  # ◆  gold
+    "analysis": ("\u25b2", "#60a5fa"),  # ▲  sky blue
+    "generation": ("\u2605", "#fbbf24"),  # ★  amber
+    "market": ("\u25cf", "#34d399"),  # ●  mint
+    "memory": ("\u25a0", "#a78bfa"),  # ■  violet
 }
 
 _TOOL_TO_CATEGORY: dict[str, str] = {
@@ -96,9 +110,9 @@ def display_model_info(model_name: str) -> None:
     """Show which LLM model is active at session start."""
     console.print(
         Text.assemble(
-            _badge("MODEL", "bright_blue"),
+            _badge("MODEL", "#60a5fa"),
             (" ", ""),
-            (model_name, "bold bright_blue"),
+            (model_name, "bold #60a5fa"),
         )
     )
     console.print()
@@ -123,7 +137,7 @@ def display_tool_start(tool_name: str, args: dict) -> None:
             val_str = str(v)
             if len(val_str) > 200:
                 val_str = val_str[:200] + "..."
-            console.print(Text(f"       {k}: {val_str}", style="dim"))
+            console.print(Text(f"       {k}: {val_str}", style="#415a77"))
 
 
 def display_tool_result(tool_name: str, content: str, elapsed: float | None = None) -> None:
@@ -143,11 +157,12 @@ def display_tool_result(tool_name: str, content: str, elapsed: float | None = No
 
     console.print(
         Panel(
-            Text(display_content, style="dim"),
+            Text(display_content, style="#415a77"),
             title=f"[{color}]{tool_name}[/{color}]",
-            subtitle=f"[dim italic]{subtitle}[/dim italic]" if subtitle else None,
+            subtitle=f"[italic #415a77]{subtitle}[/italic #415a77]" if subtitle else None,
+            subtitle_align="right",
             border_style=color,
-            box=box.SIMPLE_HEAVY,
+            box=box.ROUNDED,
             padding=(0, 1),
         )
     )
@@ -163,8 +178,8 @@ def display_node_transition(node_name: str) -> None:
     label = labels.get(node_name, node_name)
     console.print(
         Text.assemble(
-            ("  >> ", "dim"),
-            (label, "dim italic"),
+            ("  \u203a ", "#415a77"),
+            (label, "italic #415a77"),
         )
     )
 
@@ -173,8 +188,8 @@ def display_timing(elapsed: float) -> None:
     """Show total response time."""
     console.print(
         Text.assemble(
-            _badge("DONE", "green"),
-            (f" {elapsed:.1f}s", "green"),
+            _badge("DONE", "#10b981"),
+            (f" {elapsed:.1f}s", "#10b981"),
         )
     )
     console.print()
@@ -184,9 +199,9 @@ def display_model_switch(model_name: str) -> None:
     """Show when the fallback manager switches to a different model."""
     console.print(
         Text.assemble(
-            _badge("FALLBACK", "yellow"),
+            _badge("FALLBACK", "#ffd700"),
             (" ", ""),
-            (model_name, "bold yellow"),
+            (model_name, "bold #ffd700"),
         )
     )
 
@@ -195,10 +210,10 @@ def display_indexing_result(source: str, chunks: int, elapsed: float) -> None:
     """Show indexing progress for a knowledge source."""
     console.print(
         Text.assemble(
-            _badge("INDEX", "bright_yellow"),
-            (f" {source}", "bold bright_yellow"),
-            (f" -- {chunks} chunks indexed", ""),
-            (f" ({elapsed:.1f}s)", "dim italic"),
+            _badge("INDEX", "#ffd700"),
+            (f" {source}", "bold #ffd700"),
+            (f" \u2014 {chunks} chunks indexed", "#e0d8c0"),
+            (f" ({elapsed:.1f}s)", "italic #415a77"),
         )
     )
 
@@ -208,45 +223,47 @@ def display_gather_result(source: str, elapsed: float, success: bool = True) -> 
     if success:
         console.print(
             Text.assemble(
-                _badge("GATHER", "bright_green"),
-                (f" {source}", "bold bright_green"),
-                (f" ({elapsed:.1f}s)", "dim italic"),
+                _badge("GATHER", "#10b981"),
+                (f" {source}", "bold #10b981"),
+                (f" ({elapsed:.1f}s)", "italic #415a77"),
             )
         )
     else:
         console.print(
             Text.assemble(
-                _badge("FAILED", "red"),
-                (f" {source}", "bold red"),
-                (f" ({elapsed:.1f}s)", "dim italic"),
+                _badge("FAILED", "#ff6b6b"),
+                (f" {source}", "bold #ff6b6b"),
+                (f" ({elapsed:.1f}s)", "italic #415a77"),
             )
         )
 
 
 def display_welcome() -> None:
     """Display welcome message when starting a chat session."""
-    welcome_text = """
-# FutureProof
-
-Your AI career intelligence assistant. I can help you:
-
-- **Analyze** your skills and identify gaps
-- **Search** for relevant job opportunities
-- **Generate** tailored CVs and cover letters
-- **Advise** on career strategy and decisions
-
-Type your message below, or use these commands:
-- `/help` - Show available commands
-- `/profile` - View/edit your profile
-- `/quit` or `/q` - Exit chat
-"""
+    content = Text.assemble(
+        ("AI Career Intelligence Agent\n\n", "#e0d8c0"),
+        (" \u25c6 ", "#ffd700"),
+        ("Analyze skills and identify gaps\n", "#e0d8c0"),
+        (" \u25c6 ", "#ffd700"),
+        ("Search for job opportunities\n", "#e0d8c0"),
+        (" \u25c6 ", "#ffd700"),
+        ("Generate tailored CVs\n", "#e0d8c0"),
+        (" \u25c6 ", "#ffd700"),
+        ("Get career strategy advice\n\n", "#e0d8c0"),
+        (" /help", "#415a77"),
+        (" \u00b7 ", "#415a77"),
+        ("/profile", "#415a77"),
+        (" \u00b7 ", "#415a77"),
+        ("/quit", "#415a77"),
+    )
 
     console.print(
         Panel(
-            Markdown(welcome_text),
-            title="[bold cyan]Welcome[/bold cyan]",
-            border_style="cyan",
-            box=box.ROUNDED,
+            content,
+            title="[bold #ffd700]FUTUREPROOF[/bold #ffd700]",
+            border_style="#ffd700",
+            box=box.DOUBLE,
+            padding=(1, 2),
         )
     )
     console.print()
@@ -260,9 +277,9 @@ def display_error(message: str) -> None:
     """
     console.print(
         Panel(
-            Text(message, style="red"),
-            title="[bold red]Error[/bold red]",
-            border_style="red",
+            Text(message, style="#ff6b6b"),
+            title="[bold #ff6b6b]Error[/bold #ff6b6b]",
+            border_style="#ff6b6b",
             box=box.ROUNDED,
         )
     )
@@ -293,8 +310,8 @@ def display_help() -> None:
     console.print(
         Panel(
             Markdown(help_text),
-            title="[bold cyan]Help[/bold cyan]",
-            border_style="cyan",
+            title="[bold #5bc0be]Help[/bold #5bc0be]",
+            border_style="#415a77",
             box=box.ROUNDED,
         )
     )
@@ -311,8 +328,8 @@ def display_profile_summary() -> None:
         console.print(
             Panel(
                 "No profile configured yet. Tell me about yourself to get started!",
-                title="[bold cyan]Your Profile[/bold cyan]",
-                border_style="cyan",
+                title="[bold #5bc0be]Your Profile[/bold #5bc0be]",
+                border_style="#5bc0be",
                 box=box.ROUNDED,
             )
         )
@@ -338,8 +355,8 @@ def display_profile_summary() -> None:
     console.print(
         Panel(
             Markdown("\n".join(profile_parts)),
-            title="[bold cyan]Your Profile[/bold cyan]",
-            border_style="cyan",
+            title="[bold #5bc0be]Your Profile[/bold #5bc0be]",
+            border_style="#5bc0be",
             box=box.ROUNDED,
         )
     )
@@ -356,8 +373,8 @@ def display_goals() -> None:
         console.print(
             Panel(
                 "No goals set yet. Tell me about your career aspirations!",
-                title="[bold cyan]Your Goals[/bold cyan]",
-                border_style="cyan",
+                title="[bold #5bc0be]Your Goals[/bold #5bc0be]",
+                border_style="#5bc0be",
                 box=box.ROUNDED,
             )
         )
@@ -372,8 +389,8 @@ def display_goals() -> None:
     console.print(
         Panel(
             "\n".join(goal_parts),
-            title="[bold cyan]Your Goals[/bold cyan]",
-            border_style="cyan",
+            title="[bold #5bc0be]Your Goals[/bold #5bc0be]",
+            border_style="#5bc0be",
             box=box.ROUNDED,
         )
     )
