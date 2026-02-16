@@ -14,7 +14,9 @@ from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style as PTStyle
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
@@ -43,6 +45,11 @@ from futureproof.llm.fallback import get_fallback_manager
 from futureproof.memory.checkpointer import get_data_dir
 
 logger = logging.getLogger(__name__)
+
+# ── Prompt styling ────────────────────────────────────────────────────────
+
+_PROMPT_STYLE = PTStyle.from_dict({"prompt": "#ffd700 bold"})
+_PROMPT_MSG = HTML("<prompt>\u25b6 </prompt>")
 
 # Known section headers from SummarizationMiddleware output.
 # The LLM sometimes echoes these verbatim at the start of a response.
@@ -170,7 +177,7 @@ def handle_command(command: str) -> bool:
     cmd = command.lower().strip()
 
     if cmd in ("/quit", "/q", "/exit"):
-        console.print("[dim]Goodbye! Your conversation is saved.[/dim]")
+        console.print("[#415a77]Goodbye! Your conversation is saved.[/#415a77]")
         return True
 
     if cmd in ("/help", "/h"):
@@ -189,10 +196,10 @@ def handle_command(command: str) -> bool:
         from futureproof.memory.checkpointer import clear_thread_history
 
         clear_thread_history("main")
-        console.print("[dim]Conversation history cleared.[/dim]")
+        console.print("[#415a77]Conversation history cleared.[/#415a77]")
         return False
 
-    console.print(f"[yellow]Unknown command: {cmd}. Type /help for available commands.[/yellow]")
+    console.print(f"[#ffd700]Unknown command: {cmd}. Type /help for available commands.[/#ffd700]")
     return False
 
 
@@ -329,11 +336,13 @@ def _stream_response(
         question = interrupt_data.get("question", "Proceed?")
         details = interrupt_data.get("details", "")
 
-        console.print(f"[yellow bold]{question}[/yellow bold]")
+        console.print(f"[bold #ffd700]{question}[/bold #ffd700]")
         if details:
-            console.print(f"[dim]{details}[/dim]")
+            console.print(f"[#415a77]{details}[/#415a77]")
 
-        answer = session.prompt("[Y/n]: ").strip().lower()
+        answer = (
+            session.prompt(HTML("<prompt>[Y/n]: </prompt>"), style=_PROMPT_STYLE).strip().lower()
+        )
         approved = answer in ("", "y", "yes")
 
         logger.info("HITL resume: approved=%s", approved)
@@ -395,7 +404,7 @@ def run_chat(thread_id: str = "main") -> None:
     while True:
         try:
             # Get user input
-            user_input = session.prompt("You: ").strip()
+            user_input = session.prompt(_PROMPT_MSG, style=_PROMPT_STYLE).strip()
 
             if not user_input:
                 continue
@@ -432,7 +441,7 @@ def run_chat(thread_id: str = "main") -> None:
                             "Tool state error (attempt %d/%d), retrying", attempt + 1, max_retries
                         )
                         console.print(
-                            "[yellow]Recovering from tool state error, retrying...[/yellow]"
+                            "[#ffd700]Recovering from tool state error, retrying...[/#ffd700]"
                         )
                         continue
 
@@ -461,10 +470,10 @@ def run_chat(thread_id: str = "main") -> None:
                         break
 
         except KeyboardInterrupt:
-            console.print("\n[dim]Use /quit to exit[/dim]")
+            console.print("\n[#415a77]Use /quit to exit[/#415a77]")
             continue
         except EOFError:
-            console.print("\n[dim]Goodbye![/dim]")
+            console.print("\n[#415a77]Goodbye![/#415a77]")
             break
         except Exception as e:
             # Catch unhandled exceptions from event loop / nest_asyncio
@@ -475,7 +484,7 @@ def run_chat(thread_id: str = "main") -> None:
             else:
                 # Bare Exception() with no message — typically from
                 # nest_asyncio/prompt_toolkit event loop conflicts
-                console.print("\n[dim]Press ENTER to continue...[/dim]")
+                console.print("\n[#415a77]Press ENTER to continue...[/#415a77]")
             continue
 
 
