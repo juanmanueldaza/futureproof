@@ -6,13 +6,7 @@ building logic into a dedicated service.
 
 from typing import Any
 
-from .templates import (
-    ANALYZE_CAREER_PROMPT,
-    MARKET_FIT_PROMPT,
-    MARKET_SKILL_GAP_PROMPT,
-    STRATEGIC_ADVICE_PROMPT,
-    TRENDING_SKILLS_PROMPT,
-)
+from .loader import load_prompt
 
 
 class PromptBuilder:
@@ -22,29 +16,15 @@ class PromptBuilder:
     orchestrator.py and provides a single point for prompt customization.
     """
 
-    # Analysis prompt templates for different actions
-    GAPS_TEMPLATE = """\
-Based on the following career data, identify GAPS between:
-1. What this person SAYS they want (stated goals, headline, aspirations)
-2. What they're ACTUALLY doing (projects, languages, activity)
-
-{career_data}
-
-Provide:
-1. A list of stated goals
-2. A summary of actual activities
-3. Specific gaps identified
-4. An alignment score (0-100)
-5. Actionable recommendations to close the gaps"""
-
-    ANALYSIS_TEMPLATES = {
-        "analyze_gaps": GAPS_TEMPLATE,
+    # Maps action names to prompt file stems in md/
+    ANALYSIS_TEMPLATES: dict[str, str] = {
+        "analyze_gaps": "analyze_gaps",
     }
 
-    MARKET_PROMPT_MAP = {
-        "analyze_market_fit": MARKET_FIT_PROMPT,
-        "analyze_skill_gaps": MARKET_SKILL_GAP_PROMPT,
-        "analyze_trends": TRENDING_SKILLS_PROMPT,
+    MARKET_PROMPT_MAP: dict[str, str] = {
+        "analyze_market_fit": "market_fit",
+        "analyze_skill_gaps": "market_skill_gap",
+        "analyze_trends": "trending_skills",
     }
 
     def build_analysis_prompt(self, action: str, career_data: str) -> str:
@@ -57,13 +37,13 @@ Provide:
         Returns:
             Formatted prompt ready for LLM invocation
         """
-        template = self.ANALYSIS_TEMPLATES.get(action)
+        name = self.ANALYSIS_TEMPLATES.get(action)
 
-        if template:
-            return template.format(career_data=career_data)
+        if name:
+            return load_prompt(name).format(career_data=career_data)
 
         # Default: full analysis
-        return f"{ANALYZE_CAREER_PROMPT}\n\n{career_data}"
+        return f"{load_prompt('analyze_career')}\n\n{career_data}"
 
     def build_market_context(self, state: dict[str, Any]) -> str:
         """Build market context string from state.
@@ -105,8 +85,8 @@ Provide:
         Returns:
             Formatted prompt ready for LLM invocation
         """
-        template = self.MARKET_PROMPT_MAP.get(action, MARKET_FIT_PROMPT)
-        return template.format(career_data=career_data, market_data=market_data)
+        name = self.MARKET_PROMPT_MAP.get(action, "market_fit")
+        return load_prompt(name).format(career_data=career_data, market_data=market_data)
 
     def build_advice_prompt(
         self, target: str, career_data: str, market_context: str | None = None
@@ -125,7 +105,7 @@ Provide:
         if market_context:
             data_section = f"{career_data}\n\n## Market Context\n{market_context}"
 
-        return f"""{STRATEGIC_ADVICE_PROMPT}
+        return f"""{load_prompt("strategic_advice")}
 
 TARGET GOAL: {target}
 

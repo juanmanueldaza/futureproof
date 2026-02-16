@@ -29,7 +29,7 @@ from futureproof.agents.tools import get_all_tools
 from futureproof.llm.fallback import get_model_with_fallback
 from futureproof.memory.checkpointer import get_checkpointer
 from futureproof.memory.profile import load_profile
-from futureproof.prompts.system import SYSTEM_PROMPT
+from futureproof.prompts import load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def create_career_agent(
     agent = create_agent(
         model=model,
         tools=get_all_tools(),
-        system_prompt=SYSTEM_PROMPT.format(user_profile=profile_context),
+        system_prompt=load_prompt("system").format(user_profile=profile_context),
         middleware=[repair, summarization],  # repair runs before summarization
         checkpointer=checkpointer,
     )
