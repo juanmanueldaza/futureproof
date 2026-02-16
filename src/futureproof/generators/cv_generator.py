@@ -16,6 +16,36 @@ from ..utils.security import anonymize_career_data
 logger = logging.getLogger(__name__)
 
 
+def _clean_llm_output(text: str) -> str:
+    """Clean LLM-generated CV content for PDF rendering.
+
+    Strips code fences and trailing disclaimers that LLMs add on their own.
+    """
+    import re
+
+    stripped = text.strip()
+
+    # Strip wrapping code fences (```markdown ... ```)
+    if stripped.startswith("```"):
+        first_newline = stripped.index("\n")
+        stripped = stripped[first_newline + 1 :]
+        if stripped.rstrip().endswith("```"):
+            stripped = stripped.rstrip()[:-3].rstrip()
+
+    # Remove trailing LLM disclaimers (italic or plain text about accuracy/assumptions)
+    stripped = re.sub(
+        r"\n+\*?This CV[^*\n]*\*?\s*$",
+        "",
+        stripped,
+        flags=re.IGNORECASE,
+    )
+
+    # Remove stray trailing code fences (``` on its own line near end)
+    stripped = re.sub(r"\n```\s*$", "", stripped)
+
+    return stripped.rstrip()
+
+
 def render_pdf(markdown_path: Path) -> Path:
     """Convert markdown to styled PDF.
 
@@ -41,46 +71,109 @@ def render_pdf(markdown_path: Path) -> Path:
 <html>
 <head>
     <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <style>
+        @page {{
+            size: A4;
+            margin: 1.8cm 2.2cm;
+        }}
         body {{
-            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Cormorant Garamond', Georgia, serif;
             font-size: 11pt;
             line-height: 1.5;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px;
-            color: #333;
+            color: #2c2416;
+            margin: 0;
+            padding: 0;
         }}
         h1 {{
             font-size: 24pt;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+            font-weight: 700;
+            color: #0d1b2a;
+            margin: 0 0 4px 0;
+            letter-spacing: -0.5px;
+        }}
+        h1 + p {{
+            color: #415a77;
+            font-size: 11pt;
+            margin-top: 0;
+            margin-bottom: 2px;
+        }}
+        h1 + p + p {{
+            color: #6b5c4c;
+            font-size: 9.5pt;
+            margin-top: 0;
+        }}
+        hr {{
+            border: none;
+            border-top: 1.5px solid #b8860b;
+            margin: 14px 0;
         }}
         h2 {{
-            font-size: 14pt;
-            color: #555;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
-            margin-top: 25px;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 9.5pt;
+            font-weight: 700;
+            color: #0d1b2a;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1.5px solid #b8860b;
+            padding-bottom: 3px;
+            margin-top: 16px;
+            margin-bottom: 8px;
         }}
         h3 {{
-            font-size: 12pt;
-            color: #666;
+            font-size: 11.5pt;
+            font-weight: 600;
+            color: #1b263b;
+            margin-bottom: 1px;
+            margin-top: 10px;
+        }}
+        h3 + p {{
+            margin-top: 0;
+            margin-bottom: 0;
+        }}
+        p {{
+            margin: 4px 0;
+        }}
+        em {{
+            font-style: italic;
+            color: #6b5c4c;
+            font-size: 9.5pt;
+        }}
+        strong {{
+            font-weight: 600;
+            color: #1b263b;
         }}
         ul {{
-            padding-left: 20px;
+            padding-left: 16px;
+            margin: 4px 0 8px 0;
         }}
         li {{
-            margin-bottom: 5px;
+            margin-bottom: 2px;
+            color: #3d3428;
+            font-size: 10pt;
+            line-height: 1.45;
         }}
         a {{
-            color: #0066cc;
+            color: #1b4f72;
             text-decoration: none;
         }}
-        .contact {{
-            color: #666;
-            margin-bottom: 20px;
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 10pt;
+        }}
+        th {{
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1.5px solid #b8860b;
+            padding: 4px 8px;
+            color: #0d1b2a;
+        }}
+        td {{
+            padding: 3px 8px;
+            border-bottom: 1px solid #d4c5a9;
+            color: #3d3428;
         }}
     </style>
 </head>
@@ -196,8 +289,9 @@ Generate a complete, professional CV in Markdown format."""
 
         console.print(f"  Generating {language}/{format} CV...")
 
-        # Generate content
+        # Generate content and strip code fences if LLM wrapped the output
         cv_content = self._generate_with_llm(career_data, language, format)
+        cv_content = _clean_llm_output(cv_content)
 
         # Save markdown with secure permissions
         filename = f"cv_{language}_{format}.md"
