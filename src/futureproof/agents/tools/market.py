@@ -1,6 +1,7 @@
 """Market intelligence tools for the career agent."""
 
 from typing import TYPE_CHECKING
+from unicodedata import normalize
 
 from langchain_core.tools import tool
 
@@ -8,6 +9,117 @@ from ._async import run_async
 
 if TYPE_CHECKING:
     from futureproof.services.analysis_service import AnalysisAction
+
+# Common location translations (non-English → English)
+# Covers Spanish, French, German, Portuguese, Italian, and native names
+_LOCATION_ALIASES: dict[str, str] = {
+    # Countries
+    "españa": "spain",
+    "espana": "spain",
+    "alemania": "germany",
+    "deutschland": "germany",
+    "francia": "france",
+    "italien": "italy",
+    "italia": "italy",
+    "reino unido": "united kingdom",
+    "estados unidos": "united states",
+    "países bajos": "netherlands",
+    "paises bajos": "netherlands",
+    "suiza": "switzerland",
+    "schweiz": "switzerland",
+    "suecia": "sweden",
+    "sverige": "sweden",
+    "noruega": "norway",
+    "norge": "norway",
+    "dinamarca": "denmark",
+    "danmark": "denmark",
+    "irlanda": "ireland",
+    "bélgica": "belgium",
+    "belgica": "belgium",
+    "austria": "austria",
+    "portugal": "portugal",
+    "brasil": "brazil",
+    "méxico": "mexico",
+    "mexico": "mexico",
+    "japón": "japan",
+    "japon": "japan",
+    "corea del sur": "south korea",
+    "canadá": "canada",
+    "canada": "canada",
+    "argentina": "argentina",
+    "colombia": "colombia",
+    "chile": "chile",
+    "perú": "peru",
+    "peru": "peru",
+    "polska": "poland",
+    "polonia": "poland",
+    "república checa": "czech republic",
+    "republica checa": "czech republic",
+    "grecia": "greece",
+    "rumanía": "romania",
+    "rumania": "romania",
+    "hungría": "hungary",
+    "hungria": "hungary",
+    "finlandia": "finland",
+    "suomi": "finland",
+    # Cities
+    "málaga": "malaga",
+    "múnich": "munich",
+    "munich": "munich",
+    "münchen": "munich",
+    "munchen": "munich",
+    "milán": "milan",
+    "milan": "milan",
+    "milano": "milan",
+    "lisboa": "lisbon",
+    "londres": "london",
+    "berlín": "berlin",
+    "berlin": "berlin",
+    "París": "paris",
+    "paris": "paris",
+    "bruselas": "brussels",
+    "bruxelles": "brussels",
+    "ámsterdam": "amsterdam",
+    "amsterdam": "amsterdam",
+    "copenhague": "copenhagen",
+    "estocolmo": "stockholm",
+    "varsovia": "warsaw",
+    "warszawa": "warsaw",
+    "praga": "prague",
+    "praha": "prague",
+    "viena": "vienna",
+    "wien": "vienna",
+    "ginebra": "geneva",
+    "genève": "geneva",
+    "geneve": "geneva",
+    "zúrich": "zurich",
+    "zurich": "zurich",
+    "zürich": "zurich",
+    "barcelona": "barcelona",
+    "madrid": "madrid",
+    "valencia": "valencia",
+    "sevilla": "seville",
+    "bilbao": "bilbao",
+}
+
+
+def _norm(s: object) -> str:
+    """Normalize accented chars for matching (e.g. Málaga → malaga).
+
+    Handles non-string values (e.g. NaN floats from pandas/JobSpy).
+    """
+    if not isinstance(s, str):
+        return ""
+    return normalize("NFD", s.lower()).encode("ascii", "ignore").decode()
+
+
+def _translate_location(location: str) -> str:
+    """Translate non-English location to English for API queries.
+
+    Returns the English equivalent if found, otherwise returns original.
+    """
+    key = _norm(location)
+    return _LOCATION_ALIASES.get(key, location)
 
 
 def _analyze_with_market_data(action: "AnalysisAction", label: str) -> str:
@@ -30,44 +142,137 @@ def _analyze_with_market_data(action: "AnalysisAction", label: str) -> str:
 def search_jobs(
     query: str,
     location: str = "remote",
-    limit: int = 20,
+    limit: int = 50,
 ) -> str:
     """Search for job opportunities matching the query.
 
     Args:
         query: Job search query (e.g., "ML Engineer", "Python Developer")
-        location: Location filter (e.g., "remote", "New York", "Europe")
+        location: Where the user wants to work. Use the country/city the user
+            mentions (e.g., "Argentina", "Spain", "Berlin"). If the user says
+            "remote job from Argentina", use "Argentina" — NOT "remote".
+            Only use "remote" when NO specific location is mentioned.
         limit: Maximum number of results to return
 
     Use this when the user asks about job opportunities or wants to see what's available.
     """
     from futureproof.gatherers.market import JobMarketGatherer
 
+    # Translate non-English locations for API queries (España → Spain)
+    search_location = _translate_location(location)
+
     gatherer = JobMarketGatherer()
-    data = run_async(gatherer.gather(role=query, location=location, limit=limit))
+    data = run_async(gatherer.gather(role=query, location=search_location, limit=limit))
 
     jobs = data.get("job_listings", [])
     summary = data.get("summary", {})
     errors = data.get("errors", [])
 
+    # Show the user's original location in the header
     result_parts = [f"Job search results for '{query}' in '{location}':"]
     total = summary.get("total_jobs", 0)
-    src_count = len(summary.get("sources", []))
-    result_parts.append(f"\nFound {total} jobs from {src_count} sources")
+    sources = summary.get("sources", [])
+    result_parts.append(f"\nFound {total} jobs from {len(sources)} sources: {', '.join(sources)}")
 
     if summary.get("remote_positions"):
         result_parts.append(f"Remote positions: {summary['remote_positions']}")
 
     if jobs:
-        result_parts.append("\n**Top opportunities:**")
-        for job in jobs[:10]:
-            title = job.get("title", "Unknown")
-            company = job.get("company", "Unknown")
-            job_loc = job.get("location", location)
+        from collections import defaultdict
+
+        # Deduplicate by title+company (LinkedIn posts same job in multiple cities)
+        seen: set[str] = set()
+        unique_jobs: list[dict] = []
+        for job in jobs:
+            key = f"{job.get('title', '')}|{job.get('company', '')}".lower()
+            if key not in seen:
+                seen.add(key)
+                unique_jobs.append(job)
+        jobs = unique_jobs
+
+        # Filter by role relevance — drop jobs with no keyword overlap in title
+        # (e.g. "Medical Claims Negotiator" when searching "AI Engineer")
+        query_words = {w.lower() for w in query.split() if len(w) >= 2}
+        # Common tech synonyms to broaden matching
+        _synonyms = {
+            "ai": {"ai", "ml", "machine", "learning", "data", "intelligence"},
+            "engineer": {"engineer", "developer", "dev", "architect", "lead"},
+            "full": {"full", "fullstack", "full-stack"},
+            "stack": {"stack", "fullstack", "full-stack"},
+            "frontend": {"frontend", "front-end", "front", "ui", "react", "vue"},
+            "backend": {"backend", "back-end", "back", "api", "server"},
+            "senior": {"senior", "sr", "staff", "principal", "lead"},
+            "software": {"software", "swe"},
+        }
+        expanded = set(query_words)
+        for w in query_words:
+            if w in _synonyms:
+                expanded.update(_synonyms[w])
+
+        def _is_relevant(job: dict) -> bool:
+            title = (job.get("title") or "").lower()
+            title_words = set(title.replace("-", " ").split())
+            return bool(expanded & title_words)
+
+        jobs = [j for j in jobs if _is_relevant(j)]
+
+        # Separate location-matched vs unmatched jobs
+        matched: list[dict] = []
+        unmatched = jobs
+        if search_location.lower() != "remote":
+            # Match against both original and translated location
+            loc_norms = {_norm(location), _norm(search_location)}
+            matched = [
+                j for j in jobs if any(ln in _norm(j.get("location") or "") for ln in loc_norms)
+            ]
+            unmatched = [j for j in jobs if j not in matched]
+
+        def _fmt_job(job: dict) -> None:
+            """Append formatted job lines to result_parts."""
+            title = job.get("title") or "Unknown"
+            company = job.get("company") or "Unknown"
+            loc_raw = job.get("location")
+            job_loc = loc_raw if isinstance(loc_raw, str) and loc_raw else "Remote"
             salary = job.get("salary", "")
             salary_str = f" - {salary}" if salary else ""
-            result_parts.append(f"\n- **{title}** at {company}")
+            url = job.get("url") or job.get("job_url") or job.get("apply_url") or ""
+            source = job.get("site", "")
+            source_str = f" [{source}]" if source else ""
+            result_parts.append(f"\n- **{title}** at {company}{source_str}")
             result_parts.append(f"  Location: {job_loc}{salary_str}")
+            if url:
+                result_parts.append(f"  Apply: {url}")
+
+        # Display matched jobs first, then round-robin unmatched
+        max_display = 25
+        if matched:
+            result_parts.append(f"\n**Jobs in {location}:** ({len(matched)} found)")
+            for job in matched[:max_display]:
+                _fmt_job(job)
+
+        remaining = max_display - min(len(matched), max_display)
+        if remaining > 0 and unmatched:
+            if matched:
+                result_parts.append(f"\n**Remote/other opportunities:**")
+            else:
+                result_parts.append("\n**Top opportunities:**")
+
+            # Round-robin across sources
+            jobs_by_source: dict[str, list[dict]] = defaultdict(list)
+            for job in unmatched:
+                jobs_by_source[job.get("site", "unknown")].append(job)
+
+            groups = list(jobs_by_source.values())
+            idx = 0
+            shown = 0
+            while shown < remaining and groups:
+                group = groups[idx % len(groups)]
+                if group:
+                    _fmt_job(group.pop(0))
+                    shown += 1
+                    idx += 1
+                else:
+                    groups.pop(idx % len(groups))
 
     if errors:
         result_parts.append(f"\nNote: Some sources had issues: {len(errors)} errors")
