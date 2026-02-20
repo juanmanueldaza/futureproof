@@ -89,19 +89,18 @@ class PortfolioMarkdownWriter:
 
     def _open_graph(self, content: "ExtractedContent") -> str:
         """Generate Open Graph data section."""
-        if not content.open_graph:
-            return ""
-        lines = ["\n## Open Graph Data\n"]
-        for key, value in content.open_graph.items():
-            lines.append(f"- **{key}:** {value}")
-        return "\n".join(lines) + "\n"
+        return self._dict_section("Open Graph Data", content.open_graph)
 
     def _meta_info(self, content: "ExtractedContent") -> str:
         """Generate meta information section."""
-        if not content.meta_tags:
+        return self._dict_section("Meta Information", content.meta_tags)
+
+    def _dict_section(self, title: str, data: dict[str, str]) -> str:
+        """Format a dict as a markdown section with key-value list."""
+        if not data:
             return ""
-        lines = ["\n## Meta Information\n"]
-        for key, value in content.meta_tags.items():
+        lines = [f"\n## {title}\n"]
+        for key, value in data.items():
             lines.append(f"- **{key}:** {value}")
         return "\n".join(lines) + "\n"
 

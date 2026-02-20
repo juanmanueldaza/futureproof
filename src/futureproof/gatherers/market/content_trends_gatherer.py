@@ -12,6 +12,7 @@ Sources:
 import logging
 from typing import Any
 
+from ...config import settings
 from ...mcp.factory import MCPClientFactory
 from .base import MarketGatherer
 
@@ -29,6 +30,8 @@ class ContentTrendsGatherer(MarketGatherer):
     Cache TTL: 12 hours (content changes moderately)
     """
 
+    cache_ttl_hours = settings.content_cache_hours
+
     # Topics relevant for AI Engineer profile
     AI_TOPICS = ["ai", "machinelearning", "langchain", "llm", "openai", "python"]
     FULLSTACK_TOPICS = ["typescript", "react", "nextjs", "vue", "webdev"]
@@ -37,12 +40,6 @@ class ContentTrendsGatherer(MarketGatherer):
         """Generate cache key based on focus area."""
         focus = kwargs.get("focus", "all")
         return f"content_trends_{focus}".lower().replace(" ", "_")
-
-    def _get_cache_ttl_hours(self) -> int:
-        """Content trends cached for 12 hours."""
-        from ...config import settings
-
-        return settings.content_cache_hours
 
     async def gather(self, **kwargs: Any) -> dict[str, Any]:
         """Gather content trends from developer communities.
@@ -179,84 +176,3 @@ class ContentTrendsGatherer(MarketGatherer):
 
         return results
 
-    def to_markdown(self, data: dict[str, Any]) -> str:
-        """Convert gathered data to markdown format.
-
-        Args:
-            data: Gathered content trends data
-
-        Returns:
-            Markdown formatted string
-        """
-        lines = ["# Content Trends Report\n"]
-
-        focus = data.get("focus", "all")
-        topics = data.get("topics_tracked", [])
-        lines.append(f"**Focus:** {focus}")
-        lines.append(f"**Topics tracked:** {', '.join(topics)}\n")
-
-        # Summary
-        summary = data.get("summary", {})
-        if summary:
-            lines.append("## Summary\n")
-            if summary.get("devto_total_articles"):
-                lines.append(f"- **Dev.to articles:** {summary['devto_total_articles']}")
-                lines.append(f"- **Total reactions:** {summary.get('devto_total_reactions', 0)}")
-                lines.append(f"- **Total comments:** {summary.get('devto_total_comments', 0)}")
-            lines.append("")
-
-        # Dev.to Articles
-        articles = data.get("devto_articles", [])
-        if articles:
-            lines.append("## Trending Dev.to Articles\n")
-            for article in articles[:15]:
-                title = article.get("title", "Unknown")
-                author = article.get("author", "")
-                reactions = article.get("reactions_count", 0)
-                comments = article.get("comments_count", 0)
-                url = article.get("url", "")
-                tags = article.get("tags", [])
-
-                if url:
-                    lines.append(f"### [{title}]({url})")
-                else:
-                    lines.append(f"### {title}")
-
-                lines.append(
-                    f"**Author:** {author} | **Reactions:** {reactions} | **Comments:** {comments}"
-                )
-                if tags:
-                    lines.append(f"**Tags:** {', '.join(tags[:5])}")
-                lines.append("")
-
-        # Stack Overflow Trends
-        so_trends = data.get("stackoverflow_trends", {})
-        if so_trends:
-            lines.append("## Stack Overflow Technology Trends\n")
-
-            topic_pop = so_trends.get("topic_popularity", [])
-            if topic_pop:
-                lines.append("### Tracked Topics Popularity\n")
-                for tag_info in topic_pop[:12]:
-                    tag = tag_info.get("tag", "")
-                    count = tag_info.get("question_count", 0)
-                    lines.append(f"- **{tag}:** {count:,} questions")
-                lines.append("")
-
-            top_tags = so_trends.get("top_tags", [])
-            if top_tags:
-                lines.append("### Top Overall Tags\n")
-                for tag_info in top_tags[:10]:
-                    tag = tag_info.get("tag", "")
-                    count = tag_info.get("question_count", 0)
-                    lines.append(f"- **{tag}:** {count:,} questions")
-                lines.append("")
-
-        # Errors
-        errors = data.get("errors", [])
-        if errors:
-            lines.append("## Data Collection Notes\n")
-            for error in errors:
-                lines.append(f"- {error}")
-
-        return "\n".join(lines)

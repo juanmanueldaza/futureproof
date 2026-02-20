@@ -16,8 +16,6 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .base import BaseGatherer
-
 logger = logging.getLogger(__name__)
 
 # Filename indicators for detecting Gallup CliftonStrengths PDFs
@@ -113,15 +111,12 @@ class CliftonStrengthsData:
     dominant_domain: str = ""
 
 
-class CliftonStrengthsGatherer(BaseGatherer):
+class CliftonStrengthsGatherer:
     """Gather and process CliftonStrengths assessment data from PDFs.
 
     Extracts structured data from Gallup CliftonStrengths PDF reports
     and generates a comprehensive markdown summary for career analysis.
     """
-
-    def __init__(self) -> None:
-        """Initialize the gatherer."""
 
     def gather(self, input_dir: Path | None = None) -> str:
         """Gather CliftonStrengths data from PDF files.
@@ -707,10 +702,8 @@ class CliftonStrengthsGatherer(BaseGatherer):
 
     def _clean_text(self, text: str) -> str:
         """Clean extracted text by removing extra whitespace."""
-        # Remove multiple spaces and newlines
         text = re.sub(r"\s+", " ", text)
-        # Remove page numbers and copyright
-        text = re.sub(r"StrengthsFinder.*?reserved\.", "", text, flags=re.IGNORECASE)
+        text = self._clean_copyright(text)
         text = re.sub(r"\d+\s*$", "", text)
         return text.strip()
 
@@ -838,52 +831,5 @@ class CliftonStrengthsGatherer(BaseGatherer):
             lines.append("### Lesser Themes (24-34)")
             lines.append(", ".join(data.all_34[23:]))
             lines.append("")
-
-        # Career insights summary
-        lines.append("## Career Alignment Insights\n")
-        lines.append("Based on your CliftonStrengths profile:\n")
-
-        if data.dominant_domain == "STRATEGIC THINKING":
-            lines.append("- **Natural Fit:** Strategy, analysis, research, planning roles")
-            value = "Pattern recognition, informed decisions, big-picture thinking"
-            lines.append(f"- **Value to Teams:** {value}")
-        elif data.dominant_domain == "INFLUENCING":
-            lines.append("- **Natural Fit:** Leadership, sales, marketing, public speaking roles")
-            lines.append("- **Value to Teams:** Taking charge, driving action, persuading others")
-        elif data.dominant_domain == "RELATIONSHIP BUILDING":
-            lines.append("- **Natural Fit:** HR, coaching, team leadership, customer success roles")
-            lines.append(
-                "- **Value to Teams:** Building trust, creating cohesion, developing others"
-            )
-        elif data.dominant_domain == "EXECUTING":
-            lines.append("- **Natural Fit:** Project management, operations, implementation roles")
-            lines.append("- **Value to Teams:** Getting things done, reliability, follow-through")
-
-        # Add specific strength-based insights
-        strength_names = [s.name for s in data.top_5]
-        if "Learner" in strength_names:
-            lines.append(
-                "- **Growth Orientation:** Thrives in roles with continuous learning opportunities"
-            )
-        if "Activator" in strength_names:
-            lines.append(
-                "- **Action Bias:** Excels in fast-paced environments requiring quick decisions"
-            )
-        if "Strategic" in strength_names:
-            lines.append(
-                "- **Problem Solving:** Natural ability to see patterns and find optimal paths"
-            )
-        if "Woo" in strength_names:
-            lines.append(
-                "- **Networking:** Excellent at building new relationships and connections"
-            )
-        if "Ideation" in strength_names:
-            lines.append("- **Innovation:** Generates creative solutions and novel approaches")
-        if "Individualization" in strength_names:
-            lines.append(
-                "- **Team Building:** Skilled at recognizing and leveraging individual talents"
-            )
-
-        lines.append("")
 
         return "\n".join(lines)

@@ -7,12 +7,11 @@ Database-first: gatherers return content strings, indexed directly to ChromaDB.
 import logging
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..config import settings
 
 if TYPE_CHECKING:
-    from ..gatherers.base import BaseGatherer
     from .knowledge_service import KnowledgeService
 
 logger = logging.getLogger(__name__)
@@ -30,13 +29,13 @@ class GathererService:
 
     def __init__(
         self,
-        gatherers: dict[str, "BaseGatherer"] | None = None,
+        gatherers: dict[str, Any] | None = None,
         knowledge_service: "KnowledgeService | None" = None,
     ) -> None:
         self._gatherers = gatherers or {}
         self._knowledge_service = knowledge_service
 
-    def _get_gatherer(self, name: str) -> "BaseGatherer":
+    def _get_gatherer(self, name: str) -> Any:
         """Get or create a gatherer by name."""
         if name in self._gatherers:
             return self._gatherers[name]
@@ -50,7 +49,7 @@ class GathererService:
 
             return LinkedInGatherer()
         if name == "assessment":
-            from ..gatherers.cliftonstrengths import CliftonStrengthsGatherer
+            from ..gatherers import CliftonStrengthsGatherer
 
             return CliftonStrengthsGatherer()
 
@@ -174,21 +173,18 @@ class GathererService:
             Markdown content string
         """
         gatherer = self._get_gatherer("portfolio")
-        result = gatherer.gather(url)
-        content = str(result)  # PortfolioGatherer returns str
+        content = gatherer.gather(url)
         self._index_content("portfolio", content, verbose=verbose)
         return content
 
-    def gather_linkedin(
-        self, zip_path: Path, output_dir: Path | None = None, verbose: bool = False
-    ) -> str:
+    def gather_linkedin(self, zip_path: Path, verbose: bool = False) -> str:
         """Gather data from LinkedIn export.
 
         Returns:
             Markdown content string
         """
         gatherer = self._get_gatherer("linkedin")
-        content = str(gatherer.gather(zip_path, output_dir))
+        content = gatherer.gather(zip_path)
         self._index_content("linkedin", content, verbose=verbose)
         return content
 
@@ -199,7 +195,6 @@ class GathererService:
             Markdown content string
         """
         gatherer = self._get_gatherer("assessment")
-        result = gatherer.gather(input_dir)
-        content = str(result)  # CliftonStrengthsGatherer returns str
+        content = gatherer.gather(input_dir)
         self._index_content("assessment", content, verbose=verbose)
         return content

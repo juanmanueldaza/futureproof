@@ -76,12 +76,6 @@ class TestHTMLExtractor:
         assert result.open_graph["title"] == "John Doe Portfolio"
         assert result.open_graph["description"] == "My portfolio site"
 
-    def test_extracts_twitter_card(self, extractor: HTMLExtractor, sample_html: str) -> None:
-        """Test Twitter Card meta tag extraction."""
-        result = extractor.extract(sample_html, "https://example.com")
-        assert result.twitter_card["card"] == "summary"
-        assert result.twitter_card["title"] == "John Doe"
-
     def test_extracts_other_meta(self, extractor: HTMLExtractor, sample_html: str) -> None:
         """Test other meta tag extraction (author, keywords)."""
         result = extractor.extract(sample_html, "https://example.com")

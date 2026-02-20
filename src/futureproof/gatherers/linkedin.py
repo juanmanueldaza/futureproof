@@ -19,8 +19,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from .base import BaseGatherer
-
 logger = logging.getLogger(__name__)
 
 
@@ -61,13 +59,10 @@ def _read_csv_variants(zf: zipfile.ZipFile, base_name: str) -> list[dict[str, st
     LinkedIn splits large CSVs into numbered files.
     """
     rows = _read_csv(zf, base_name)
-    stem = Path(base_name).stem
-    parent = str(Path(base_name).parent)
-    suffix = Path(base_name).suffix
+    p = Path(base_name)
 
-    # Try _1, _2, ... up to _10
     for i in range(1, 11):
-        variant = f"{parent}/{stem}_{i}{suffix}" if parent != "." else f"{stem}_{i}{suffix}"
+        variant = str(p.with_stem(f"{p.stem}_{i}"))
         extra = _read_csv(zf, variant)
         if not extra:
             break
@@ -504,10 +499,10 @@ def _parse_messages(rows: list[dict[str, str]]) -> str:
 
 
 def _parse_company_follows(rows: list[dict[str, str]]) -> str:
-    """Extract company follow count."""
+    """Extract company follow count as Network section."""
     if not rows:
         return ""
-    return f"- Following {len(rows)} companies"
+    return f"## Network\n\n- Following {len(rows)} companies"
 
 
 # =============================================================================
@@ -536,10 +531,12 @@ _CSV_PARSERS: list[tuple[str, str, Any, bool]] = [
     ("Tier 2", "Inferences_about_you.csv", _parse_inferences, False),
     ("Tier 2", "Connections.csv", _parse_connections, False),
     ("Tier 2", "messages.csv", _parse_messages, False),
+    # Tier 3 — Network Summary
+    ("Tier 3", "Company Follows.csv", _parse_company_follows, False),
 ]
 
 
-class LinkedInGatherer(BaseGatherer):
+class LinkedInGatherer:
     """Gather data from LinkedIn export ZIP — direct CSV parsing.
 
     Parses up to 19 career-relevant CSV files organized in 3 tiers:
@@ -550,12 +547,11 @@ class LinkedInGatherer(BaseGatherer):
     - Tier 3 (network summary): Companies Followed count
     """
 
-    def gather(self, zip_path: Path, output_dir: Path | None = None) -> str:
+    def gather(self, zip_path: Path) -> str:
         """Parse LinkedIn ZIP and return markdown content.
 
         Args:
             zip_path: Path to the LinkedIn data export ZIP file
-            output_dir: Unused (kept for interface compatibility)
 
         Returns:
             Markdown string with all career-relevant data
@@ -573,13 +569,6 @@ class LinkedInGatherer(BaseGatherer):
                 if section:
                     sections.append(section)
                     logger.debug("%s: %s → %d rows", tier, csv_name, len(rows))
-
-            # Tier 3 — Network Summary
-            follows_rows = _read_csv(zf, "Company Follows.csv")
-            follows_section = _parse_company_follows(follows_rows)
-            if follows_section:
-                sections.append(f"## Network\n\n{follows_section}")
-                logger.debug("Tier 3: Company Follows → %d rows", len(follows_rows))
 
         content = "\n\n".join(sections)
         logger.info("LinkedIn parsing complete: %d sections, %d chars", len(sections), len(content))

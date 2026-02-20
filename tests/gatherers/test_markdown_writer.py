@@ -38,7 +38,6 @@ class TestPortfolioMarkdownWriter:
                 }
             ],
             open_graph={"title": "John Doe", "description": "Portfolio"},
-            twitter_card={"card": "summary"},
             meta_tags={"author": "John Doe"},
         )
 

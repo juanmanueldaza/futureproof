@@ -27,7 +27,6 @@ class ExtractedContent:
     sections: dict[str, str] = field(default_factory=dict)
     json_ld: list[dict] = field(default_factory=list)
     open_graph: dict[str, str] = field(default_factory=dict)
-    twitter_card: dict[str, str] = field(default_factory=dict)
     meta_tags: dict[str, str] = field(default_factory=dict)
 
 
@@ -61,7 +60,6 @@ class HTMLExtractor:
         content.title = self._extract_title(soup)
         content.meta_description = self._extract_meta_description(soup)
         content.open_graph = self._extract_open_graph(soup)
-        content.twitter_card = self._extract_twitter_card(soup)
         content.meta_tags = self._extract_other_meta(soup)
 
         # Remove script/style before text extraction
@@ -127,18 +125,6 @@ class HTMLExtractor:
                     key = str(prop).replace("og:", "")
                     og[key] = str(content)
         return og
-
-    def _extract_twitter_card(self, soup: BeautifulSoup) -> dict[str, str]:
-        """Extract Twitter Card meta tags."""
-        tw: dict[str, str] = {}
-        for tag in soup.find_all("meta", attrs={"name": re.compile(r"^twitter:")}):
-            if isinstance(tag, Tag):
-                name = tag.get("name")
-                content = tag.get("content")
-                if name and content:
-                    key = str(name).replace("twitter:", "")
-                    tw[key] = str(content)
-        return tw
 
     def _extract_other_meta(self, soup: BeautifulSoup) -> dict[str, str]:
         """Extract other useful meta tags (author, keywords, theme-color)."""

@@ -26,8 +26,11 @@ class MarketGatherer(ABC):
     Subclasses should implement:
     - gather(): Collect data from MCP sources
     - _get_cache_key(): Return unique cache key
-    - _get_cache_ttl_hours(): Return cache TTL in hours
+    And set:
+    - cache_ttl_hours: Cache TTL in hours (class attribute)
     """
+
+    cache_ttl_hours: int = 24
 
     def __init__(self) -> None:
         """Initialize gatherer with cache directory."""
@@ -55,15 +58,6 @@ class MarketGatherer(ABC):
 
         Returns:
             Unique cache key string
-        """
-        ...
-
-    @abstractmethod
-    def _get_cache_ttl_hours(self) -> int:
-        """Get cache TTL in hours.
-
-        Returns:
-            Number of hours before cache expires
         """
         ...
 
@@ -97,7 +91,7 @@ class MarketGatherer(ABC):
                 cache_data = json.load(f)
 
             cached_at = datetime.fromisoformat(cache_data.get("cached_at", ""))
-            ttl_hours = self._get_cache_ttl_hours()
+            ttl_hours = self.cache_ttl_hours
             expires_at = cached_at + timedelta(hours=ttl_hours)
 
             return datetime.now() < expires_at
@@ -130,7 +124,7 @@ class MarketGatherer(ABC):
         """
         cache_data = {
             "cached_at": datetime.now().isoformat(),
-            "ttl_hours": self._get_cache_ttl_hours(),
+            "ttl_hours": self.cache_ttl_hours,
             "data": data,
         }
         try:

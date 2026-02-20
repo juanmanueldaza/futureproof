@@ -20,7 +20,7 @@ from bs4 import BeautifulSoup
 from ...utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from .fetcher import ContentFetcher
+    from .fetcher import PortfolioFetcher
 
 logger = get_logger(__name__)
 
@@ -52,7 +52,7 @@ class JSExtractor:
         self,
         html: str,
         base_url: str,
-        fetcher: "ContentFetcher",
+        fetcher: "PortfolioFetcher",
     ) -> JSContent:
         """Find and extract content from linked JavaScript files.
 
@@ -95,7 +95,7 @@ class JSExtractor:
         self,
         js_text: str,
         js_url: str,
-        fetcher: "ContentFetcher",
+        fetcher: "PortfolioFetcher",
     ) -> JSContent:
         """Find and fetch content files from import statements."""
         imports = re.findall(r"from\s+['\"]([^'\"]+)['\"]", js_text)

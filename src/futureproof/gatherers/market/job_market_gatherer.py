@@ -19,6 +19,7 @@ Sources:
 import logging
 from typing import Any
 
+from ...config import settings
 from .base import MarketGatherer
 from .source_registry import JOB_SOURCE_REGISTRY, SALARY_SOURCE
 
@@ -36,17 +37,13 @@ class JobMarketGatherer(MarketGatherer):
     Cache TTL: 12 hours (job market changes more frequently)
     """
 
+    cache_ttl_hours = settings.job_cache_hours
+
     def _get_cache_key(self, **kwargs: Any) -> str:
         """Generate cache key based on role and location."""
         role = kwargs.get("role", "developer")
         location = kwargs.get("location", "remote")
         return f"job_market_{role}_{location}".lower().replace(" ", "_")
-
-    def _get_cache_ttl_hours(self) -> int:
-        """Job market data cached for 12 hours."""
-        from ...config import settings
-
-        return settings.job_cache_hours
 
     async def gather(self, **kwargs: Any) -> dict[str, Any]:
         """Gather job market data.
@@ -128,73 +125,3 @@ class JobMarketGatherer(MarketGatherer):
 
         return results
 
-    def to_markdown(self, data: dict[str, Any]) -> str:
-        """Convert gathered data to markdown format.
-
-        Args:
-            data: Gathered job market data
-
-        Returns:
-            Markdown formatted string
-        """
-        lines = ["# Job Market Report\n"]
-
-        role = data.get("role", "Unknown")
-        location = data.get("location", "Unknown")
-        lines.append(f"**Role:** {role}")
-        lines.append(f"**Location:** {location}\n")
-
-        # Summary
-        summary = data.get("summary", {})
-        if summary:
-            lines.append("## Summary\n")
-            lines.append(f"- **Total listings found:** {summary.get('total_jobs', 0)}")
-            lines.append(f"- **Remote positions:** {summary.get('remote_positions', 0)}")
-            if summary.get("sources"):
-                lines.append(f"- **Sources:** {', '.join(summary['sources'])}")
-            lines.append("")
-
-        # Job listings
-        jobs = data.get("job_listings", [])
-        if jobs:
-            lines.append("## Job Listings\n")
-            for job in jobs[:20]:  # Limit display
-                title = job.get("title", "Unknown Title")
-                company = job.get("company", "Unknown Company")
-                job_location = job.get("location") or "Remote"
-                salary = job.get("salary", "")
-
-                lines.append(f"### {title}")
-                lines.append(f"**Company:** {company}")
-                lines.append(f"**Location:** {job_location}")
-                if salary:
-                    lines.append(f"**Salary:** {salary}")
-
-                desc = job.get("description", "")
-                if desc:
-                    # Truncate long descriptions
-                    desc = desc[:400] + "..." if len(desc) > 400 else desc
-                    lines.append(f"\n{desc}")
-                lines.append("")
-
-        # Salary data
-        salary_data = data.get("salary_data", [])
-        if salary_data:
-            lines.append("## Salary Information\n")
-            for item in salary_data[:6]:
-                title = item.get("title", "")
-                snippet = item.get("description", item.get("snippet", ""))
-                if title:
-                    lines.append(f"### {title}")
-                if snippet:
-                    lines.append(snippet)
-                lines.append("")
-
-        # Errors
-        errors = data.get("errors", [])
-        if errors:
-            lines.append("## Data Collection Notes\n")
-            for error in errors:
-                lines.append(f"- {error}")
-
-        return "\n".join(lines)

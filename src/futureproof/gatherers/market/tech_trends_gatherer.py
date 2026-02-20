@@ -7,6 +7,7 @@ from Hacker News to understand market demands.
 import logging
 from typing import Any
 
+from ...config import settings
 from ...mcp.factory import MCPClientFactory
 from .base import MarketGatherer
 
@@ -24,16 +25,12 @@ class TechTrendsGatherer(MarketGatherer):
     Cache TTL: 24 hours (trends don't change that fast)
     """
 
+    cache_ttl_hours = settings.market_cache_hours
+
     def _get_cache_key(self, **kwargs: Any) -> str:
         """Generate cache key based on topic."""
         topic = kwargs.get("topic", "general")
         return f"tech_trends_{topic}"
-
-    def _get_cache_ttl_hours(self) -> int:
-        """Tech trends cached for 24 hours."""
-        from ...config import settings
-
-        return settings.market_cache_hours
 
     async def gather(self, **kwargs: Any) -> dict[str, Any]:
         """Gather tech trends from Hacker News.
@@ -135,96 +132,3 @@ class TechTrendsGatherer(MarketGatherer):
 
         return results
 
-    def to_markdown(self, data: dict[str, Any]) -> str:
-        """Convert gathered data to markdown format.
-
-        Args:
-            data: Gathered tech trends data
-
-        Returns:
-            Markdown formatted string
-        """
-        lines = ["# Tech Trends Report\n"]
-
-        topic = data.get("topic", "general")
-        if topic != "general":
-            lines.append(f"**Focus:** {topic}\n")
-
-        # Trending stories
-        stories = data.get("trending_stories", [])
-        if stories:
-            lines.append("## Trending Discussions\n")
-            for story in stories[:15]:
-                title = story.get("title", "Unknown")
-                points = story.get("points", 0)
-                num_comments = story.get("num_comments", 0)
-                author = story.get("author", "")
-                hn_url = story.get("hn_url", "")
-                author_str = f" by {author}" if author else ""
-                if hn_url:
-                    lines.append(
-                        f"- [{title}]({hn_url}){author_str} ({points} pts, {num_comments} comments)"
-                    )
-                else:
-                    lines.append(
-                        f"- **{title}**{author_str} ({points} pts, {num_comments} comments)"
-                    )
-            lines.append("")
-
-        # Hiring trends
-        hiring = data.get("hiring_trends", {})
-        if hiring:
-            lines.append("## Hiring Trends\n")
-
-            if hiring.get("top_technologies"):
-                lines.append("### Most Requested Technologies")
-                for tech, count in hiring["top_technologies"][:12]:
-                    lines.append(f"- {tech}: {count} mentions")
-                lines.append("")
-
-            if hiring.get("top_roles"):
-                lines.append("### Most Common Roles")
-                for role, count in hiring["top_roles"][:8]:
-                    lines.append(f"- {role}: {count} postings")
-                lines.append("")
-
-            if hiring.get("remote_percentage"):
-                lines.append(f"**Remote-friendly:** {hiring['remote_percentage']}% of positions\n")
-
-        # HN Job Postings (structured data)
-        hn_jobs = data.get("hn_job_postings", [])
-        if hn_jobs:
-            lines.append("## HN Job Postings (Structured)\n")
-            with_salary = sum(1 for j in hn_jobs if j.get("salary_min"))
-            remote = sum(1 for j in hn_jobs if j.get("remote"))
-            lines.append(f"**Total:** {len(hn_jobs)} postings")
-            lines.append(f"**With salary:** {with_salary}")
-            lines.append(f"**Remote:** {remote}\n")
-
-            for job in hn_jobs[:10]:
-                company = job.get("company") or "Unknown Company"
-                title_hints = job.get("title_hints", [])
-                title = title_hints[0] if title_hints else "Various Roles"
-                location = job.get("location") or ("Remote" if job.get("remote") else "Unknown")
-                tech = ", ".join(job.get("tech_stack", [])[:5]) or "Not specified"
-
-                lines.append(f"### {company}")
-                lines.append(f"**Role:** {title}")
-                lines.append(f"**Location:** {location}")
-                if job.get("salary_min"):
-                    sal_min = job.get("salary_min", 0) // 1000
-                    sal_max = job.get("salary_max", 0) // 1000
-                    lines.append(f"**Salary:** ${sal_min}k - ${sal_max}k")
-                lines.append(f"**Tech:** {tech}")
-                if job.get("hn_url"):
-                    lines.append(f"[View on HN]({job['hn_url']})")
-                lines.append("")
-
-        # Errors
-        errors = data.get("errors", [])
-        if errors:
-            lines.append("## Data Collection Notes\n")
-            for error in errors:
-                lines.append(f"- {error}")
-
-        return "\n".join(lines)

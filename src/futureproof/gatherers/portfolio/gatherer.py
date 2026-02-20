@@ -4,9 +4,7 @@ Orchestrates the extraction process using specialized components.
 """
 
 from ...config import settings
-from ...utils.console import console
 from ...utils.logging import get_logger
-from ..base import BaseGatherer
 from .fetcher import PortfolioFetcher
 from .html_extractor import HTMLExtractor
 from .js_extractor import JSExtractor
@@ -15,7 +13,7 @@ from .markdown_writer import PortfolioMarkdownWriter
 logger = get_logger(__name__)
 
 
-class PortfolioGatherer(BaseGatherer):
+class PortfolioGatherer:
     """Gather data from personal portfolio website.
 
     This class coordinates the extraction process using specialized components:
@@ -59,20 +57,19 @@ class PortfolioGatherer(BaseGatherer):
         target_url = url or settings.portfolio_url
 
         logger.info("Gathering portfolio from %s", target_url)
-        console.print(f"  Fetching: {target_url}")
 
-        with PortfolioFetcher() as fetcher:
+        with (self._fetcher or PortfolioFetcher()) as fetcher:
             # Fetch HTML
             html_result = fetcher.fetch(target_url)
-            console.print(f"  [dim]Fetched {len(html_result.content)} bytes[/dim]")
+            logger.debug("Fetched %d bytes", len(html_result.content))
 
             # Extract HTML content
             content = self._html_extractor.extract(html_result.content, target_url)
-            console.print(f"  [dim]Extracted {len(content.paragraphs)} paragraphs[/dim]")
-            console.print(f"  [dim]Found {len(content.sections)} sections[/dim]")
+            logger.debug("Extracted %d paragraphs, %d sections",
+                         len(content.paragraphs), len(content.sections))
 
             if content.json_ld:
-                console.print(f"  [dim]Found {len(content.json_ld)} JSON-LD blocks[/dim]")
+                logger.debug("Found %d JSON-LD blocks", len(content.json_ld))
 
             # Extract JS content
             js_content = self._js_extractor.extract(
@@ -81,9 +78,9 @@ class PortfolioGatherer(BaseGatherer):
                 fetcher,
             )
             if js_content.projects:
-                console.print(f"  [dim]Found {len(js_content.projects)} projects from JS[/dim]")
+                logger.debug("Found %d projects from JS", len(js_content.projects))
             if js_content.socials:
-                console.print(f"  [dim]Found {len(js_content.socials)} social links from JS[/dim]")
+                logger.debug("Found %d social links from JS", len(js_content.socials))
 
         # Generate markdown
         markdown = self._markdown_writer.generate(content, js_content)

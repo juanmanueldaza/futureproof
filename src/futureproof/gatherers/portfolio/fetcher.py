@@ -6,7 +6,6 @@ Single Responsibility: Fetch content from URLs with proper headers/timeouts.
 import socket
 from dataclasses import dataclass
 from ipaddress import ip_address
-from typing import Protocol
 from urllib.parse import urlparse
 
 import httpx
@@ -22,16 +21,6 @@ class FetchResult:
 
     url: str
     content: str
-    status_code: int
-    content_type: str
-
-
-class ContentFetcher(Protocol):
-    """Protocol for fetching URL content - enables dependency injection."""
-
-    def fetch(self, url: str) -> FetchResult:
-        """Fetch content from URL."""
-        ...
 
 
 class PortfolioFetcher:
@@ -97,7 +86,7 @@ class PortfolioFetcher:
             # Check if hostname is an IP address
             try:
                 ip = ip_address(hostname)
-                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                if ip.is_private:
                     logger.warning("Blocked private IP: %s", hostname)
                     return False
             except ValueError:
@@ -105,7 +94,7 @@ class PortfolioFetcher:
                 try:
                     resolved = socket.gethostbyname(hostname)
                     ip = ip_address(resolved)
-                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                    if ip.is_private:
                         logger.warning(
                             "Blocked hostname resolving to private IP: %s -> %s",
                             hostname,
@@ -155,6 +144,4 @@ class PortfolioFetcher:
         return FetchResult(
             url=url,
             content=response.text,
-            status_code=response.status_code,
-            content_type=response.headers.get("content-type", ""),
         )
