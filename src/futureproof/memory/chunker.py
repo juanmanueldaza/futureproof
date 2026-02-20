@@ -1,19 +1,26 @@
-"""Intelligent markdown chunking for career documents.
+"""Markdown chunking for career documents.
 
-Chunks by markdown headers to preserve semantic boundaries.
-Each chunk maintains context about its section hierarchy.
+Chunks content by size while preserving section metadata.
+Section labels are passed in directly — no header regex parsing.
 """
 
-import re
 from dataclasses import dataclass, field
+from typing import NamedTuple
+
+
+class Section(NamedTuple):
+    """A named section of content (e.g., name="Experience", content="...")."""
+
+    name: str
+    content: str
 
 
 @dataclass
 class MarkdownChunk:
-    """A chunk of markdown with section context."""
+    """A chunk of content with section context."""
 
     content: str
-    section_path: list[str] = field(default_factory=list)  # e.g., ["Repositories", "pokedex"]
+    section_path: list[str] = field(default_factory=list)
     header_level: int = 0
     start_line: int = 0
     end_line: int = 0
@@ -28,157 +35,46 @@ class MarkdownChunk:
         """Get the parent section name."""
         return self.section_path[0] if self.section_path else ""
 
-    @property
-    def category(self) -> str:
-        """Get the h2-level category (e.g., 'Experience', 'Education', 'Messages').
-
-        For h3+ chunks, returns the parent h2 (second-to-last in path).
-        For h2 chunks or shallower, returns the leaf section name.
-        This groups all sub-sections under their h2 parent.
-        """
-        if len(self.section_path) >= 3:
-            # [h1, h2, h3] → h2
-            return self.section_path[-2]
-        return self.section_path[-1] if self.section_path else ""
-
 
 class MarkdownChunker:
-    """Split markdown by headers while preserving context.
+    """Split content into size-bounded chunks.
 
     Strategy:
-    1. Split on ## headers (level 2) as primary chunks
-    2. Include parent # header context in section_path
-    3. Keep chunks under max_tokens (configurable)
-    4. Merge small sections that are under min_tokens
+    1. Accept pre-labeled sections (Section NamedTuples)
+    2. Split sections that exceed max_tokens by paragraphs
+    3. Merge consecutive small sections under min_tokens
     """
 
-    # Regex to match markdown headers
-    HEADER_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
-
     def __init__(self, max_tokens: int = 500, min_tokens: int = 50):
-        """Initialize chunker with token limits.
-
-        Args:
-            max_tokens: Maximum tokens per chunk (will split if exceeded)
-            min_tokens: Minimum tokens per chunk (will merge if below)
-        """
         self.max_tokens = max_tokens
         self.min_tokens = min_tokens
 
-    def chunk(self, content: str) -> list[MarkdownChunk]:
-        """Split markdown content into semantic chunks.
+    def chunk_section(self, section: Section) -> list[MarkdownChunk]:
+        """Split a single section into size-bounded chunks.
+
+        Section name flows directly into chunk metadata — no header parsing.
 
         Args:
-            content: Raw markdown text
+            section: Named section with content
 
         Returns:
-            List of MarkdownChunk objects with section context
+            List of MarkdownChunk objects with section_path=[section.name]
         """
-        if not content or not content.strip():
+        content = section.content.strip()
+        if not content:
             return []
 
-        lines = content.split("\n")
-        chunks: list[MarkdownChunk] = []
-
-        # Track current section hierarchy
-        current_h1 = ""
-        current_h2 = ""
-        current_chunk_lines: list[str] = []
-        current_section_path: list[str] = []
-        current_header_level = 0
-        chunk_start_line = 0
-
-        for i, line in enumerate(lines):
-            header_match = self.HEADER_PATTERN.match(line)
-
-            if header_match:
-                level = len(header_match.group(1))
-                header_text = header_match.group(2).strip()
-
-                # Save current chunk before starting new section
-                if current_chunk_lines:
-                    chunk = self._create_chunk(
-                        current_chunk_lines,
-                        current_section_path.copy(),
-                        current_header_level,
-                        chunk_start_line,
-                        i - 1,
-                    )
-                    if chunk:
-                        chunks.append(chunk)
-                    current_chunk_lines = []
-
-                # Update section hierarchy — preserve full h1/h2/h3 path
-                if level == 1:
-                    current_h1 = header_text
-                    current_h2 = ""
-                    current_section_path = [header_text]
-                elif level == 2:
-                    current_h2 = header_text
-                    current_section_path = (
-                        [current_h1, header_text] if current_h1 else [header_text]
-                    )
-                elif level >= 3:
-                    # Preserve h1 > h2 > h3 hierarchy
-                    path: list[str] = []
-                    if current_h1:
-                        path.append(current_h1)
-                    if current_h2:
-                        path.append(current_h2)
-                    path.append(header_text)
-                    current_section_path = path
-
-                current_header_level = level
-                chunk_start_line = i
-
-            current_chunk_lines.append(line)
-
-        # Don't forget the last chunk
-        if current_chunk_lines:
-            chunk = self._create_chunk(
-                current_chunk_lines,
-                current_section_path.copy(),
-                current_header_level,
-                chunk_start_line,
-                len(lines) - 1,
-            )
-            if chunk:
-                chunks.append(chunk)
-
-        # Post-process: merge small chunks, split large ones
-        chunks = self._merge_small_chunks(chunks)
-        chunks = self._split_large_chunks(chunks)
-
-        return chunks
-
-    def _create_chunk(
-        self,
-        lines: list[str],
-        section_path: list[str],
-        header_level: int,
-        start_line: int,
-        end_line: int,
-    ) -> MarkdownChunk | None:
-        """Create a chunk from lines if it has meaningful content."""
-        content = "\n".join(lines).strip()
-
-        # Skip empty or whitespace-only chunks
-        if not content:
-            return None
-
-        return MarkdownChunk(
+        chunk = MarkdownChunk(
             content=content,
-            section_path=section_path,
-            header_level=header_level,
-            start_line=start_line,
-            end_line=end_line,
+            section_path=[section.name],
         )
 
-    def _estimate_tokens(self, text: str) -> int:
-        """Estimate token count (simple word-based approximation).
+        # Apply size constraints
+        chunks = self._merge_small_chunks([chunk])
+        return self._split_large_chunks(chunks)
 
-        Uses ~1.3 tokens per word for English text as a rough estimate.
-        """
+    def _estimate_tokens(self, text: str) -> int:
+        """Estimate token count (~1.3 tokens per word for English text)."""
         return int(len(text.split()) * 1.3)
 
     def _merge_small_chunks(self, chunks: list[MarkdownChunk]) -> list[MarkdownChunk]:
@@ -206,7 +102,6 @@ class MarkdownChunker:
                 fits = combined_tokens <= self.max_tokens
 
                 if same_parent and fits and chunk_tokens < self.min_tokens:
-                    # Merge into buffer
                     buffer = MarkdownChunk(
                         content=buffer.content + "\n\n" + chunk.content,
                         section_path=buffer.section_path,
@@ -215,7 +110,6 @@ class MarkdownChunker:
                         end_line=chunk.end_line,
                     )
                 else:
-                    # Flush buffer and start fresh
                     merged.append(buffer)
                     if chunk_tokens < self.min_tokens:
                         buffer = chunk
@@ -223,7 +117,6 @@ class MarkdownChunker:
                         merged.append(chunk)
                         buffer = None
 
-        # Don't forget buffered chunk
         if buffer:
             merged.append(buffer)
 
@@ -237,7 +130,6 @@ class MarkdownChunker:
             if self._estimate_tokens(chunk.content) <= self.max_tokens:
                 result.append(chunk)
             else:
-                # Split by paragraphs (double newline)
                 paragraphs = chunk.content.split("\n\n")
                 current_content: list[str] = []
                 current_tokens = 0
@@ -246,7 +138,6 @@ class MarkdownChunker:
                     para_tokens = self._estimate_tokens(para)
 
                     if current_tokens + para_tokens > self.max_tokens and current_content:
-                        # Flush current content
                         result.append(
                             MarkdownChunk(
                                 content="\n\n".join(current_content),
@@ -262,7 +153,6 @@ class MarkdownChunker:
                         current_content.append(para)
                         current_tokens += para_tokens
 
-                # Flush remaining
                 if current_content:
                     result.append(
                         MarkdownChunk(

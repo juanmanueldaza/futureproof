@@ -1,7 +1,7 @@
 """Gatherer service - data collection operations.
 
 Single responsibility: Manage and execute data gathering from external sources.
-Database-first: gatherers return content strings, indexed directly to ChromaDB.
+Database-first: gatherers return Section tuples, indexed directly to ChromaDB.
 """
 
 import logging
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..config import settings
+from ..memory.chunker import Section
 
 if TYPE_CHECKING:
     from .knowledge_service import KnowledgeService
@@ -21,7 +22,7 @@ class GathererService:
     """Service for data gathering operations.
 
     Encapsulates all data gathering logic, making it testable and reusable.
-    Auto-indexes gathered data directly to the knowledge base (ChromaDB).
+    Auto-indexes gathered sections directly to the knowledge base (ChromaDB).
 
     Supports dependency injection for testing:
         service = GathererService(gatherers={"portfolio": mock_gatherer})
@@ -63,13 +64,13 @@ class GathererService:
             self._knowledge_service = KnowledgeService()
         return self._knowledge_service
 
-    def _index_content(
+    def _index_sections(
         self,
         source_name: str,
-        content: str,
+        sections: list[Section],
         verbose: bool = False,
     ) -> None:
-        """Index content directly to knowledge base if auto-indexing is enabled."""
+        """Index sections to knowledge base if auto-indexing is enabled."""
         if not settings.knowledge_auto_index:
             return
 
@@ -85,7 +86,7 @@ class GathererService:
             source = source_map.get(source_name)
             if source:
                 service = self._get_knowledge_service()
-                count = service.index_content(source, content, verbose=verbose)
+                count = service.index_sections(source, sections, verbose=verbose)
                 logger.info("Auto-indexed %d chunks for %s", count, source_name)
         except ImportError:
             logger.debug("ChromaDB not available, skipping auto-index")
@@ -166,35 +167,29 @@ class GathererService:
 
         return results
 
-    def gather_portfolio(self, url: str | None = None, verbose: bool = False) -> str:
-        """Gather data from portfolio website.
-
-        Returns:
-            Markdown content string
-        """
+    def gather_portfolio(
+        self, url: str | None = None, verbose: bool = False,
+    ) -> list[Section]:
+        """Gather data from portfolio website."""
         gatherer = self._get_gatherer("portfolio")
-        content = gatherer.gather(url)
-        self._index_content("portfolio", content, verbose=verbose)
-        return content
+        sections = gatherer.gather(url)
+        self._index_sections("portfolio", sections, verbose=verbose)
+        return sections
 
-    def gather_linkedin(self, zip_path: Path, verbose: bool = False) -> str:
-        """Gather data from LinkedIn export.
-
-        Returns:
-            Markdown content string
-        """
+    def gather_linkedin(
+        self, zip_path: Path, verbose: bool = False,
+    ) -> list[Section]:
+        """Gather data from LinkedIn export."""
         gatherer = self._get_gatherer("linkedin")
-        content = gatherer.gather(zip_path)
-        self._index_content("linkedin", content, verbose=verbose)
-        return content
+        sections = gatherer.gather(zip_path)
+        self._index_sections("linkedin", sections, verbose=verbose)
+        return sections
 
-    def gather_assessment(self, input_dir: Path | None = None, verbose: bool = False) -> str:
-        """Gather CliftonStrengths assessment data from PDFs.
-
-        Returns:
-            Markdown content string
-        """
+    def gather_assessment(
+        self, input_dir: Path | None = None, verbose: bool = False,
+    ) -> list[Section]:
+        """Gather CliftonStrengths assessment data from PDFs."""
         gatherer = self._get_gatherer("assessment")
-        content = gatherer.gather(input_dir)
-        self._index_content("assessment", content, verbose=verbose)
-        return content
+        sections = gatherer.gather(input_dir)
+        self._index_sections("assessment", sections, verbose=verbose)
+        return sections

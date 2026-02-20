@@ -1,13 +1,14 @@
 """Knowledge indexing service.
 
-Orchestrates indexing of career documents into the knowledge base.
-Database-first: content is indexed directly to ChromaDB, no intermediate files.
+Orchestrates indexing of career sections into the knowledge base.
+Database-first: gatherers produce Section tuples, indexed directly to ChromaDB.
 """
 
 import logging
 import time
 from typing import Any
 
+from ..memory.chunker import Section
 from ..memory.knowledge import (
     CareerKnowledgeStore,
     KnowledgeSource,
@@ -43,8 +44,7 @@ class KnowledgeService:
     """Service for managing the career knowledge base.
 
     Responsibilities:
-    - Index career content directly (no file I/O for portfolio/assessment)
-    - Index LinkedIn files after CLI generates them
+    - Index career sections (Section tuples from gatherers)
     - Provide search interface for agent tools
     - Retrieve all content for a source (replaces file-based data loading)
     """
@@ -59,19 +59,20 @@ class KnowledgeService:
             self._store = get_knowledge_store()
         return self._store
 
-    def index_content(
+    def index_sections(
         self,
         source: KnowledgeSource,
-        content: str,
+        sections: list[Section],
         verbose: bool = False,
     ) -> int:
-        """Index raw content directly into the knowledge base.
+        """Index pre-labeled sections into the knowledge base.
 
-        Clears existing chunks for source first (incremental update).
+        Safe-swap: indexes new content first, then deletes old chunks.
+        If embedding fails, old data is preserved.
 
         Args:
             source: The knowledge source
-            content: Raw markdown content to index
+            sections: List of Section(name, content) tuples
             verbose: If True, print progress to console
 
         Returns:
@@ -82,8 +83,8 @@ class KnowledgeService:
         # Get existing chunk IDs BEFORE indexing new content
         old_ids = self.store._get_by_filter({"source": source.value})
 
-        # Index new content first — if embedding fails, old data is preserved
-        chunk_ids = self.store.index_content(source=source, content=content)
+        # Index new sections first — if embedding fails, old data is preserved
+        chunk_ids = self.store.index_sections(source=source, sections=sections)
 
         # Only delete old chunks AFTER successful indexing
         if old_ids:
@@ -103,7 +104,7 @@ class KnowledgeService:
     def index_all(self, verbose: bool = False) -> dict[str, int]:
         """Report existing chunk counts for all sources.
 
-        All sources are indexed at gather time via index_content().
+        All sources are indexed at gather time via index_sections().
 
         Args:
             verbose: If True, print progress to console

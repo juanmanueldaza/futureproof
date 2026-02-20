@@ -75,14 +75,16 @@ class TestTier1Profile:
             }
         ]
         result = _parse_profile(rows)
-        assert "# John Doe" in result
-        assert "Senior Engineer" in result
-        assert "Experienced developer." in result
-        assert "Technology" in result
-        assert "Madrid, Spain" in result
+        profile = next(s for s in result if s.name == "Profile")
+        summary = next(s for s in result if s.name == "Summary")
+        assert "John Doe" in profile.content
+        assert "Senior Engineer" in profile.content
+        assert "Technology" in profile.content
+        assert "Madrid, Spain" in profile.content
+        assert "Experienced developer." in summary.content
 
     def test_parse_profile_empty(self):
-        assert _parse_profile([]) == ""
+        assert _parse_profile([]) == []
 
 
 class TestTier1Positions:
@@ -98,11 +100,12 @@ class TestTier1Positions:
             }
         ]
         result = _parse_positions(rows)
-        assert "## Experience" in result
-        assert "### Acme Corp" in result
-        assert "**Lead Engineer**" in result
-        assert "Jan 2020 – Dec 2023" in result
-        assert "Led a team of 5." in result
+        assert result is not None
+        assert result.name == "Experience"
+        assert "### Acme Corp" in result.content
+        assert "**Lead Engineer**" in result.content
+        assert "Jan 2020 – Dec 2023" in result.content
+        assert "Led a team of 5." in result.content
 
     def test_current_position(self):
         rows = [
@@ -116,7 +119,8 @@ class TestTier1Positions:
             }
         ]
         result = _parse_positions(rows)
-        assert "Jan 2024 – Present" in result
+        assert result is not None
+        assert "Jan 2024 – Present" in result.content
 
 
 class TestTier1Education:
@@ -133,21 +137,22 @@ class TestTier1Education:
             }
         ]
         result = _parse_education(rows)
-        assert "### MIT" in result
-        assert "**M.S.**" in result
-        assert "Computer Science" in result
-        assert "Hackathon club" in result
+        assert result is not None
+        assert "### MIT" in result.content
+        assert "**M.S.**" in result.content
+        assert "Computer Science" in result.content
+        assert "Hackathon club" in result.content
 
 
 class TestTier1Skills:
     def test_parse_skills(self):
         rows = [{"Name": "Python"}, {"Name": "Rust"}, {"Name": "Go"}]
         result = _parse_skills(rows)
-        assert "## Skills" in result
-        assert "Python, Rust, Go" in result
+        assert result is not None
+        assert "Python, Rust, Go" in result.content
 
     def test_empty_skills(self):
-        assert _parse_skills([]) == ""
+        assert _parse_skills([]) is None
 
 
 class TestTier1Certifications:
@@ -161,9 +166,10 @@ class TestTier1Certifications:
             }
         ]
         result = _parse_certifications(rows)
-        assert "AWS Solutions Architect" in result
-        assert "(Amazon)" in result
-        assert "[link]" in result
+        assert result is not None
+        assert "AWS Solutions Architect" in result.content
+        assert "(Amazon)" in result.content
+        assert "[link]" in result.content
 
 
 class TestTier1Others:
@@ -173,8 +179,9 @@ class TestTier1Others:
             {"Name": "Spanish", "Proficiency": "Professional"},
         ]
         result = _parse_languages(rows)
-        assert "English: Native" in result
-        assert "Spanish: Professional" in result
+        assert result is not None
+        assert "English: Native" in result.content
+        assert "Spanish: Professional" in result.content
 
     def test_parse_projects(self):
         rows = [
@@ -186,8 +193,9 @@ class TestTier1Others:
             }
         ]
         result = _parse_projects(rows)
-        assert "### Open Source Tool" in result
-        assert "A CLI tool." in result
+        assert result is not None
+        assert "### Open Source Tool" in result.content
+        assert "A CLI tool." in result.content
 
     def test_parse_recommendations_received(self):
         rows = [
@@ -199,9 +207,10 @@ class TestTier1Others:
             }
         ]
         result = _parse_recommendations_received(rows)
-        assert '"Great engineer!"' in result
-        assert "Jane Smith" in result
-        assert "BigCo" in result
+        assert result is not None
+        assert '"Great engineer!"' in result.content
+        assert "Jane Smith" in result.content
+        assert "BigCo" in result.content
 
     def test_parse_endorsements(self):
         rows = [
@@ -212,7 +221,8 @@ class TestTier1Others:
             }
         ]
         result = _parse_endorsements(rows)
-        assert "Python: endorsed by Alice Bob" in result
+        assert result is not None
+        assert "Python: endorsed by Alice Bob" in result.content
 
     def test_parse_recommendations_given(self):
         rows = [
@@ -224,7 +234,8 @@ class TestTier1Others:
             }
         ]
         result = _parse_recommendations_given(rows)
-        assert '"Wonderful colleague."' in result
+        assert result is not None
+        assert '"Wonderful colleague."' in result.content
 
 
 # =============================================================================
@@ -242,9 +253,10 @@ class TestTier2:
             }
         ]
         result = _parse_learning(rows)
-        assert "Deep Learning Specialization" in result
-        assert "(COURSE)" in result
-        assert "2023-06-15" in result
+        assert result is not None
+        assert "Deep Learning Specialization" in result.content
+        assert "(COURSE)" in result.content
+        assert "2023-06-15" in result.content
 
     def test_parse_job_applications(self):
         rows = [
@@ -255,14 +267,16 @@ class TestTier2:
             }
         ]
         result = _parse_job_applications(rows)
-        assert "**Staff Engineer**" in result
-        assert "Google" in result
+        assert result is not None
+        assert "**Staff Engineer**" in result.content
+        assert "Google" in result.content
 
     def test_parse_job_preferences(self):
         rows = [{"Job Type": "Full-time", "Location": "Remote", "Title": "Engineer"}]
         result = _parse_job_preferences(rows)
-        assert "Job Type: Full-time" in result
-        assert "Location: Remote" in result
+        assert result is not None
+        assert "Job Type: Full-time" in result.content
+        assert "Location: Remote" in result.content
 
     def test_parse_shares(self):
         rows = [
@@ -273,19 +287,21 @@ class TestTier2:
             }
         ]
         result = _parse_shares(rows)
-        assert "Excited to announce..." in result
-        assert "### 2023-05-01" in result
+        assert result is not None
+        assert "Excited to announce..." in result.content
+        assert "### 2023-05-01" in result.content
 
     def test_parse_shares_skips_empty(self):
         rows = [{"Date": "2023-05-01", "Commentary": "", "ShareLink": ""}]
         result = _parse_shares(rows)
         # Should skip entries with no commentary
-        assert "### 2023-05-01" not in result
+        assert result is None
 
     def test_parse_inferences(self):
         rows = [{"Type": "Career", "Inference": "Software Engineering"}]
         result = _parse_inferences(rows)
-        assert "Career: Software Engineering" in result
+        assert result is not None
+        assert "Career: Software Engineering" in result.content
 
 
 # =============================================================================
@@ -316,15 +332,15 @@ class TestConnections:
             },
         ]
         result = _parse_connections(rows)
-        assert "## Connections" in result
-        assert "**María García**" in result
-        assert "Company: Accenture" in result
-        assert "Position: Senior Developer" in result
-        assert "Connected: 15 Jan 2023" in result
-        assert "Email: maria@accenture.com" in result
-        assert "URL: https://linkedin.com/in/mariagarcia" in result
-        assert "**John Smith**" in result
-        assert "Company: Google" in result
+        assert result is not None
+        assert "**María García**" in result.content
+        assert "Company: Accenture" in result.content
+        assert "Position: Senior Developer" in result.content
+        assert "Connected: 15 Jan 2023" in result.content
+        assert "Email: maria@accenture.com" in result.content
+        assert "URL: https://linkedin.com/in/mariagarcia" in result.content
+        assert "**John Smith**" in result.content
+        assert "Company: Google" in result.content
 
     def test_parse_connections_summary_included(self):
         rows = [
@@ -333,9 +349,10 @@ class TestConnections:
             {"First Name": "E", "Last Name": "F", "Company": "Meta", "Position": "SWE"},
         ]
         result = _parse_connections(rows)
-        assert "Network Summary" in result
-        assert "3 connections" in result
-        assert "Google (2)" in result
+        assert result is not None
+        assert "Network Summary" in result.content
+        assert "3 connections" in result.content
+        assert "Google (2)" in result.content
 
     def test_parse_connections_compact_format(self):
         """Each connection is a single pipe-separated line, no ### headers."""
@@ -348,32 +365,35 @@ class TestConnections:
             },
         ]
         result = _parse_connections(rows)
-        assert "###" not in result.split("## Connections")[1]
-        assert "**Alice Wong** | Company: Accenture | Position: Manager" in result
+        assert result is not None
+        assert "###" not in result.content
+        assert "**Alice Wong** | Company: Accenture | Position: Manager" in result.content
 
     def test_parse_connections_partial_fields(self):
         rows = [
             {"First Name": "Alice", "Last Name": "Wong", "Company": "Accenture", "Position": ""},
         ]
         result = _parse_connections(rows)
-        assert "**Alice Wong**" in result
-        assert "Company: Accenture" in result
+        assert result is not None
+        assert "**Alice Wong**" in result.content
+        assert "Company: Accenture" in result.content
         # No Position field when empty
-        assert "Position:" not in result.split("Alice Wong")[1]
+        assert "Position:" not in result.content
 
     def test_parse_connections_skips_nameless(self):
         rows = [
             {"First Name": "", "Last Name": "", "Company": "Unknown", "Position": "Role"},
         ]
         result = _parse_connections(rows)
+        assert result is not None
         # No individual connection entry — only summary
-        assert "Company: Unknown" not in result
-        assert "Position: Role" not in result
+        assert "Company: Unknown" not in result.content
+        assert "Position: Role" not in result.content
         # Summary should still count
-        assert "1 connections" in result
+        assert "1 connections" in result.content
 
     def test_parse_connections_empty(self):
-        assert _parse_connections([]) == ""
+        assert _parse_connections([]) is None
 
 
 class TestMessages:
@@ -399,11 +419,11 @@ class TestMessages:
             },
         ]
         result = _parse_messages(rows)
-        assert "## Messages" in result
-        assert "### Conversation: María García" in result
-        assert "**María García**: Hi, I saw your profile!" in result
-        assert "**You**: Thanks for reaching out!" in result
-        assert "_2024-03-15 10:00:00_" in result
+        assert result is not None
+        assert "### Conversation: María García" in result.content
+        assert "**María García**: Hi, I saw your profile!" in result.content
+        assert "**You**: Thanks for reaching out!" in result.content
+        assert "_2024-03-15 10:00:00_" in result.content
 
     def test_parse_messages_multiple_conversations(self):
         rows = [
@@ -423,8 +443,9 @@ class TestMessages:
             },
         ]
         result = _parse_messages(rows)
-        assert "### Conversation: Alice" in result
-        assert "### Conversation: Bob" in result
+        assert result is not None
+        assert "### Conversation: Alice" in result.content
+        assert "### Conversation: Bob" in result.content
 
     def test_parse_messages_with_subject(self):
         rows = [
@@ -438,7 +459,8 @@ class TestMessages:
             },
         ]
         result = _parse_messages(rows)
-        assert "**Subject: Job Opportunity at Accenture Spain**" in result
+        assert result is not None
+        assert "**Subject: Job Opportunity at Accenture Spain**" in result.content
 
     def test_parse_messages_skips_empty_content(self):
         rows = [
@@ -451,7 +473,8 @@ class TestMessages:
             },
         ]
         result = _parse_messages(rows)
-        assert "**Someone**" not in result
+        assert result is not None
+        assert "**Someone**" not in result.content
 
     def test_parse_messages_strips_html(self):
         rows = [
@@ -464,13 +487,14 @@ class TestMessages:
             },
         ]
         result = _parse_messages(rows)
-        assert "<p" not in result
-        assert "<strong>" not in result
-        assert "Hi Juan," in result
-        assert "Great profile!" in result
+        assert result is not None
+        assert "<p" not in result.content
+        assert "<strong>" not in result.content
+        assert "Hi Juan," in result.content
+        assert "Great profile!" in result.content
 
     def test_parse_messages_empty(self):
-        assert _parse_messages([]) == ""
+        assert _parse_messages([]) is None
 
 
 # =============================================================================
@@ -482,7 +506,8 @@ class TestTier3:
     def test_parse_company_follows(self):
         rows = [{"Organization": "Google"}, {"Organization": "Meta"}]
         result = _parse_company_follows(rows)
-        assert "Following 2 companies" in result
+        assert result is not None
+        assert "Following 2 companies" in result.content
 
 
 # =============================================================================
@@ -575,13 +600,26 @@ class TestLinkedInGatherer:
         gatherer = LinkedInGatherer()
         result = gatherer.gather(zip_path)
 
-        assert isinstance(result, str)
-        assert "# Jane Doe" in result
-        assert "### DeepMind" in result
-        assert "PyTorch, TensorFlow" in result
-        assert "**Alice Lee**" in result
-        assert "**Bob Chen**" in result
-        assert "2 connections" in result
+        assert isinstance(result, list)
+        names = {s.name for s in result}
+        assert "Profile" in names
+        assert "Experience" in names
+        assert "Skills" in names
+        assert "Connections" in names
+
+        profile = next(s for s in result if s.name == "Profile")
+        assert "Jane Doe" in profile.content
+
+        experience = next(s for s in result if s.name == "Experience")
+        assert "### DeepMind" in experience.content
+
+        skills = next(s for s in result if s.name == "Skills")
+        assert "PyTorch, TensorFlow" in skills.content
+
+        connections = next(s for s in result if s.name == "Connections")
+        assert "**Alice Lee**" in connections.content
+        assert "**Bob Chen**" in connections.content
+        assert "2 connections" in connections.content
 
     def test_gather_missing_zip(self, tmp_path):
         gatherer = LinkedInGatherer()
@@ -592,4 +630,4 @@ class TestLinkedInGatherer:
         zip_path = _make_zip_file(tmp_path, {})
         gatherer = LinkedInGatherer()
         result = gatherer.gather(zip_path)
-        assert result == ""
+        assert result == []

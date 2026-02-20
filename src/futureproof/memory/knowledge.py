@@ -4,8 +4,8 @@ Provides semantic search over career documents (LinkedIn, Portfolio, Assessment)
 Unlike EpisodicStore (for decisions/experiences), this stores factual career data
 that can be queried by the agent instead of loading full documents into context.
 
-Architecture: Database-first — gatherers index content directly to ChromaDB
-via index_content(). No intermediate markdown files on disk.
+Architecture: Database-first — gatherers produce Section tuples (name, content)
+that are indexed directly to ChromaDB via index_sections(). No intermediate files.
 """
 
 import logging
@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .chromadb_store import ChromaDBStore
-from .chunker import MarkdownChunker
+from .chunker import MarkdownChunker, Section
 
 logger = logging.getLogger(__name__)
 
@@ -111,47 +111,51 @@ class CareerKnowledgeStore(ChromaDBStore):
             )
         return self._chunker
 
-    def index_content(
+    def index_sections(
         self,
         source: KnowledgeSource,
-        content: str,
+        sections: list[Section],
         extra_metadata: dict[str, Any] | None = None,
     ) -> list[str]:
-        """Chunk and index raw markdown content directly (no file I/O).
+        """Index pre-labeled sections directly (no header parsing).
 
-        Uses batch indexing — chunks are sent to ChromaDB in groups of 100
-        to avoid overwhelming the embedding API while still being efficient.
+        Each section's name becomes chunk metadata. Content is split
+        by size only via chunk_section().
+
+        Uses batch indexing — chunks are sent to ChromaDB in groups of 100.
 
         Args:
             source: Knowledge source
-            content: Raw markdown content to index
+            sections: List of Section(name, content) tuples
             extra_metadata: Additional metadata to include with all chunks
 
         Returns:
             List of chunk IDs created
         """
-        if not content.strip():
-            logger.warning("Empty content for source: %s", source.value)
+        if not sections:
+            logger.warning("No sections for source: %s", source.value)
             return []
-
-        chunks = self.chunker.chunk(content)
 
         # Build batch arrays
         ids: list[str] = []
         documents: list[str] = []
         metadatas: list[dict[str, str]] = []
 
-        for idx, chunk in enumerate(chunks):
-            kc = KnowledgeChunk(
-                id=str(uuid.uuid4()),
-                content=chunk.content,
-                source=source,
-                section=chunk.category or "general",
-                metadata={"chunk_index": idx, **(extra_metadata or {})},
-            )
-            ids.append(kc.id)
-            documents.append(kc.to_document())
-            metadatas.append(kc.to_metadata())
+        chunk_idx = 0
+        for section in sections:
+            chunks = self.chunker.chunk_section(section)
+            for chunk in chunks:
+                kc = KnowledgeChunk(
+                    id=str(uuid.uuid4()),
+                    content=chunk.content,
+                    source=source,
+                    section=section.name,
+                    metadata={"chunk_index": chunk_idx, **(extra_metadata or {})},
+                )
+                ids.append(kc.id)
+                documents.append(kc.to_document())
+                metadatas.append(kc.to_metadata())
+                chunk_idx += 1
 
         # Batch add — split into groups to avoid overwhelming the embedding API
         batch_size = 100
