@@ -24,13 +24,27 @@ def load_career_data() -> dict[str, str]:
     return service.get_all_content()
 
 
+def load_career_data_for_analysis() -> dict[str, str]:
+    """Load career data filtered for analysis (excludes social/network sections).
+
+    Connections, Messages, Posts remain searchable via the agent's
+    search_career_knowledge tool but are excluded from analysis prompts.
+    """
+    from ..services.knowledge_service import KnowledgeService
+
+    service = KnowledgeService()
+    return service.get_filtered_content()
+
+
 def load_career_data_for_cv() -> str:
     """Load career data formatted for CV generation.
+
+    Uses filtered data — CV doesn't need Connections, Messages, etc.
 
     Returns:
         Combined markdown string of all career data with section headers
     """
-    data = load_career_data()
+    data = load_career_data_for_analysis()
     if not data:
         return ""
 

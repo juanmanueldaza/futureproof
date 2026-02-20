@@ -5,6 +5,7 @@ from unittest.mock import patch
 from futureproof.utils.data_loader import (
     combine_career_data,
     load_career_data,
+    load_career_data_for_analysis,
     load_career_data_for_cv,
 )
 
@@ -43,20 +44,42 @@ class TestLoadCareerData:
             assert "linkedin_data" not in result
 
 
+class TestLoadCareerDataForAnalysis:
+    """Test load_career_data_for_analysis function (filtered loading)."""
+
+    def test_returns_empty_dict_when_no_data(self) -> None:
+        """Test returns empty dict when knowledge base is empty."""
+        with patch(_PATCH_TARGET) as mock_cls:
+            mock_cls.return_value.get_filtered_content.return_value = {}
+            result = load_career_data_for_analysis()
+            assert result == {}
+
+    def test_returns_filtered_data(self) -> None:
+        """Test returns filtered data from knowledge base."""
+        expected = {
+            "linkedin_data": "Experience content only",
+            "portfolio_data": "Portfolio content",
+        }
+        with patch(_PATCH_TARGET) as mock_cls:
+            mock_cls.return_value.get_filtered_content.return_value = expected
+            result = load_career_data_for_analysis()
+            assert result == expected
+
+
 class TestLoadCareerDataForCV:
-    """Test load_career_data_for_cv function."""
+    """Test load_career_data_for_cv function (uses filtered data)."""
 
     def test_returns_empty_string_when_no_data(self) -> None:
         """Test returns empty string when no data exists."""
         with patch(_PATCH_TARGET) as mock_cls:
-            mock_cls.return_value.get_all_content.return_value = {}
+            mock_cls.return_value.get_filtered_content.return_value = {}
             result = load_career_data_for_cv()
             assert result == ""
 
     def test_includes_section_headers(self) -> None:
         """Test includes section headers for each source."""
         with patch(_PATCH_TARGET) as mock_cls:
-            mock_cls.return_value.get_all_content.return_value = {
+            mock_cls.return_value.get_filtered_content.return_value = {
                 "linkedin_data": "LinkedIn content",
                 "portfolio_data": "Portfolio content",
             }
@@ -67,7 +90,7 @@ class TestLoadCareerDataForCV:
     def test_returns_string_not_dict(self) -> None:
         """Test returns combined string, not dict."""
         with patch(_PATCH_TARGET) as mock_cls:
-            mock_cls.return_value.get_all_content.return_value = {
+            mock_cls.return_value.get_filtered_content.return_value = {
                 "portfolio_data": "Portfolio content",
             }
             result = load_career_data_for_cv()

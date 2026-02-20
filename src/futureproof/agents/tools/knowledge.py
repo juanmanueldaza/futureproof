@@ -19,26 +19,42 @@ def _parse_source(source: str):
 def search_career_knowledge(
     query: str,
     sources: list[str] | None = None,
+    section: str | None = None,
     limit: int = 5,
+    include_social: bool = False,
 ) -> str:
     """Search the career knowledge base for relevant information.
 
     Args:
         query: What to search for (e.g., "Python projects", "leadership experience")
         sources: Optional filter by source (linkedin, portfolio, assessment)
-        limit: Maximum results to return
+        section: Optional filter by section name (h2 category). Examples:
+                 "Profile" for headline/location, "Summary" for about text,
+                 "Experience" for work history, "Skills" for skills,
+                 "Education" for degrees, "Certifications" for credentials,
+                 "Projects" for side projects, "Connections" for contacts,
+                 "Messages" for conversations.
+        limit: Maximum results to return (increase for broad searches, e.g., 20)
+        include_social: Set True ONLY when searching for messages, connections,
+                        or posts. Default False — focuses on career content
+                        (experience, skills, education, projects, certifications).
 
     Use this to find specific information from the user's career history
     instead of relying on general context. More efficient than loading
     all career data. Examples:
     - "Python projects" to find Python-related work
     - "leadership" to find management or leadership experience
-    - "recent contributions" for recent activity
+    - "headline summary" to find LinkedIn profile headline and summary
+    - "Accenture" with section="Connections", include_social=True to find contacts
+    - "relocation" with section="Conversation", include_social=True for messages
     """
     from futureproof.services.knowledge_service import KnowledgeService
 
     service = KnowledgeService()
-    results = service.search(query, limit=limit, sources=sources)
+    results = service.search(
+        query, limit=limit, sources=sources, section=section,
+        include_social=include_social,
+    )
 
     if not results:
         return (
@@ -50,7 +66,7 @@ def search_career_knowledge(
     for i, result in enumerate(results, 1):
         source = result.get("source", "unknown")
         section = result.get("section", "")
-        content = result.get("content", "")[:500]
+        content = result.get("content", "")[:2000]
         result_parts.append(f"\n**{i}. [{source}] {section}**")
         result_parts.append(content)
 

@@ -9,7 +9,7 @@ from typing import Literal
 
 from ..agents import CareerState, create_graph
 from ..agents.helpers import ACTION_RESULT_KEYS
-from ..utils.data_loader import load_career_data
+from ..utils.data_loader import load_career_data_for_analysis
 from .exceptions import AnalysisError, NoDataError
 
 # Type alias for analysis actions
@@ -54,8 +54,8 @@ class AnalysisService:
         return self._graph
 
     def load_data(self) -> CareerState:
-        """Load all processed career data."""
-        data = load_career_data()
+        """Load career data filtered for analysis."""
+        data = load_career_data_for_analysis()
         return CareerState(**data)  # type: ignore[typeddict-item]
 
     def has_data(self, state: CareerState) -> bool:

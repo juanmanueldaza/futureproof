@@ -28,6 +28,19 @@ class MarkdownChunk:
         """Get the parent section name."""
         return self.section_path[0] if self.section_path else ""
 
+    @property
+    def category(self) -> str:
+        """Get the h2-level category (e.g., 'Experience', 'Education', 'Messages').
+
+        For h3+ chunks, returns the parent h2 (second-to-last in path).
+        For h2 chunks or shallower, returns the leaf section name.
+        This groups all sub-sections under their h2 parent.
+        """
+        if len(self.section_path) >= 3:
+            # [h1, h2, h3] → h2
+            return self.section_path[-2]
+        return self.section_path[-1] if self.section_path else ""
+
 
 class MarkdownChunker:
     """Split markdown by headers while preserving context.
@@ -69,6 +82,7 @@ class MarkdownChunker:
 
         # Track current section hierarchy
         current_h1 = ""
+        current_h2 = ""
         current_chunk_lines: list[str] = []
         current_section_path: list[str] = []
         current_header_level = 0
@@ -94,20 +108,25 @@ class MarkdownChunker:
                         chunks.append(chunk)
                     current_chunk_lines = []
 
-                # Update section hierarchy
+                # Update section hierarchy — preserve full h1/h2/h3 path
                 if level == 1:
                     current_h1 = header_text
+                    current_h2 = ""
                     current_section_path = [header_text]
                 elif level == 2:
+                    current_h2 = header_text
                     current_section_path = (
                         [current_h1, header_text] if current_h1 else [header_text]
                     )
                 elif level >= 3:
-                    # For deeper headers, keep h1 and use this as section
+                    # Preserve h1 > h2 > h3 hierarchy
+                    path: list[str] = []
                     if current_h1:
-                        current_section_path = [current_h1, header_text]
-                    else:
-                        current_section_path = [header_text]
+                        path.append(current_h1)
+                    if current_h2:
+                        path.append(current_h2)
+                    path.append(header_text)
+                    current_section_path = path
 
                 current_header_level = level
                 chunk_start_line = i

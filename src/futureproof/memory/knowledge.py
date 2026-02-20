@@ -119,9 +119,8 @@ class CareerKnowledgeStore(ChromaDBStore):
     ) -> list[str]:
         """Chunk and index raw markdown content directly (no file I/O).
 
-        Uses batch indexing — all chunks are sent to ChromaDB in a single
-        ``collection.add()`` call, triggering one batch embedding request
-        instead of one per chunk.
+        Uses batch indexing — chunks are sent to ChromaDB in groups of 100
+        to avoid overwhelming the embedding API while still being efficient.
 
         Args:
             source: Knowledge source
@@ -147,17 +146,24 @@ class CareerKnowledgeStore(ChromaDBStore):
                 id=str(uuid.uuid4()),
                 content=chunk.content,
                 source=source,
-                section=chunk.section_name or "general",
+                section=chunk.category or "general",
                 metadata={"chunk_index": idx, **(extra_metadata or {})},
             )
             ids.append(kc.id)
             documents.append(kc.to_document())
             metadatas.append(kc.to_metadata())
 
-        # Single batch add — one embedding API call for all chunks
-        self._add(ids=ids, documents=documents, metadatas=metadatas)
+        # Batch add — split into groups to avoid overwhelming the embedding API
+        batch_size = 100
+        for i in range(0, len(ids), batch_size):
+            end = min(i + batch_size, len(ids))
+            self._add(
+                ids=ids[i:end],
+                documents=documents[i:end],
+                metadatas=metadatas[i:end],
+            )
 
-        logger.info("Indexed %d chunks for %s (batch)", len(ids), source.value)
+        logger.info("Indexed %d chunks for %s", len(ids), source.value)
         return ids
 
     def get_all_content(self, source: KnowledgeSource) -> str:
@@ -191,22 +197,108 @@ class CareerKnowledgeStore(ChromaDBStore):
         sorted_docs = sorted(pairs, key=_sort_key)
         return "\n\n".join(doc for doc, _ in sorted_docs)
 
+    def get_filtered_content(
+        self,
+        source: KnowledgeSource,
+        excluded_sections: frozenset[str] = frozenset(),
+        excluded_prefixes: tuple[str, ...] = (),
+    ) -> str:
+        """Retrieve chunks for a source, excluding specified sections.
+
+        Uses metadata-only retrieval (no embeddings) followed by Python-side
+        filtering. For collections <1000 chunks this is sub-millisecond.
+
+        Handles two types of exclusion:
+        - Exact section names (e.g., "Connections") via set lookup
+        - Section name prefixes (e.g., "Conversation:") via str.startswith()
+
+        Args:
+            source: Knowledge source to retrieve
+            excluded_sections: Section names to exclude (exact match)
+            excluded_prefixes: Section name prefixes to exclude
+
+        Returns:
+            Combined content string, or empty string if no data
+        """
+        results = self.collection.get(
+            where={"source": source.value},
+            include=["documents", "metadatas"],
+        )
+
+        docs = results["documents"]
+        metas = results["metadatas"]
+        if not docs or not metas:
+            return ""
+
+        # Filter out excluded sections
+        filtered: list[tuple] = []
+        for doc, meta in zip(docs, metas):
+            section = str(meta.get("section", ""))
+            if section in excluded_sections:
+                continue
+            if excluded_prefixes and section.startswith(excluded_prefixes):
+                continue
+            filtered.append((doc, meta))
+
+        if not filtered:
+            return ""
+
+        # Sort by chunk_index
+        def _sort_key(pair: tuple) -> int:
+            idx = pair[1].get("chunk_index", 0)
+            return int(idx) if isinstance(idx, (int, float, str)) else 0
+
+        sorted_docs = sorted(filtered, key=_sort_key)
+        return "\n\n".join(doc for doc, _ in sorted_docs)
+
     def search(
         self,
         query: str,
         limit: int = 5,
         sources: list[KnowledgeSource] | None = None,
+        section: str | None = None,
+        excluded_sections: frozenset[str] = frozenset(),
+        excluded_prefixes: tuple[str, ...] = (),
     ) -> list[KnowledgeChunk]:
-        """Semantic search across career knowledge."""
-        where = None
+        """Semantic search across career knowledge.
+
+        Args:
+            query: Search query
+            limit: Maximum results
+            sources: Optional source filter
+            section: Optional section filter (exact match)
+            excluded_sections: Section names to exclude (exact match)
+            excluded_prefixes: Section name prefixes to exclude
+        """
+        conditions: list[dict] = []
         if sources:
             if len(sources) == 1:
-                where = {"source": sources[0].value}
+                conditions.append({"source": sources[0].value})
             else:
-                where = {"source": {"$in": [s.value for s in sources]}}
+                conditions.append({"source": {"$in": [s.value for s in sources]}})
+        if section:
+            conditions.append({"section": section})
 
-        results = self._query(query, limit=limit, where=where)
-        return [KnowledgeChunk.from_chromadb(id, doc, meta) for id, doc, meta in results]
+        where = None
+        if len(conditions) == 1:
+            where = conditions[0]
+        elif len(conditions) > 1:
+            where = {"$and": conditions}
+
+        needs_filtering = bool(excluded_sections or excluded_prefixes)
+        fetch_limit = limit * 3 if needs_filtering else limit
+
+        results = self._query(query, limit=fetch_limit, where=where)
+        chunks = [KnowledgeChunk.from_chromadb(id, doc, meta) for id, doc, meta in results]
+
+        if needs_filtering:
+            chunks = [
+                c for c in chunks
+                if c.section not in excluded_sections
+                and not (excluded_prefixes and c.section.startswith(excluded_prefixes))
+            ]
+
+        return chunks[:limit]
 
     def clear_source(self, source: KnowledgeSource) -> int:
         """Clear all chunks from a source (before re-indexing)."""

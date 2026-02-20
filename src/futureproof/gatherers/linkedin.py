@@ -1,11 +1,11 @@
 """LinkedIn data gatherer — direct CSV parsing from ZIP export.
 
-Parses 17 career-relevant CSV files organized in 3 tiers:
+Parses up to 19 career-relevant CSV files organized in 3 tiers:
 - Tier 1 (core): Profile, Positions, Education, Skills, Certifications,
   Languages, Projects, Recommendations, Endorsements
 - Tier 2 (intelligence): Learning, Job Applications, Job Preferences,
-  Posts/Shares, LinkedIn Inferences
-- Tier 3 (network summary): Connections count, Companies Followed count
+  Posts/Shares, LinkedIn Inferences, Connections (full), Messages
+- Tier 3 (network summary): Companies Followed count
 
 Returns a single markdown string for direct indexing to ChromaDB.
 """
@@ -13,6 +13,7 @@ Returns a single markdown string for direct indexing to ChromaDB.
 import csv
 import io
 import logging
+import re
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -24,11 +25,28 @@ logger = logging.getLogger(__name__)
 
 
 def _read_csv(zf: zipfile.ZipFile, name: str) -> list[dict[str, str]]:
-    """Read a single CSV from a ZIP, returning rows as dicts."""
+    """Read a single CSV from a ZIP, returning rows as dicts.
+
+    Handles LinkedIn's notes preamble (e.g., in Connections.csv) by skipping
+    lines until a valid multi-column CSV header is found.
+    """
     try:
         with zf.open(name) as f:
             text = io.TextIOWrapper(f, encoding="utf-8-sig")
-            return list(csv.DictReader(text))
+            lines = text.readlines()
+
+        # Skip LinkedIn's notes preamble (e.g., Connections.csv starts with
+        # "Notes:" + a quoted explanation + blank line before the real header).
+        # Detect: if line 0 has no commas, skip until after the first blank line.
+        start = 0
+        if lines and "," not in lines[0].strip():
+            for i, line in enumerate(lines):
+                if not line.strip():
+                    start = i + 1
+                    break
+
+        csv_text = io.StringIO("".join(lines[start:]))
+        return list(csv.DictReader(csv_text))
     except KeyError:
         logger.debug("CSV not found in ZIP: %s", name)
         return []
@@ -67,13 +85,21 @@ def _get(row: dict[str, str], *keys: str) -> str:
     return ""
 
 
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text: str) -> str:
+    """Strip HTML tags from text, collapsing whitespace."""
+    return _HTML_TAG_RE.sub(" ", text).strip()
+
+
 # =============================================================================
 # Tier 1 — Core Career Data
 # =============================================================================
 
 
 def _parse_profile(rows: list[dict[str, str]]) -> str:
-    """Parse Profile.csv → markdown header with headline and summary."""
+    """Parse Profile.csv → profile overview and summary sections."""
     if not rows:
         return ""
     row = rows[0]
@@ -85,14 +111,22 @@ def _parse_profile(rows: list[dict[str, str]]) -> str:
     industry = _get(row, "Industry")
     geo = _get(row, "Geo Location")
 
+    # h1 establishes hierarchy — h3 chunks inherit h2 category via path
     parts = [f"# {name}"] if name else ["# LinkedIn Profile"]
+
+    # Profile section — headline, industry, location
+    profile_lines: list[str] = ["## Profile"]
     if headline:
-        parts.append(headline)
-    if industry or geo:
-        details = " | ".join(filter(None, [industry, geo]))
-        parts.append(f"_{details}_")
+        profile_lines.append(f"**Headline:** {headline}")
+    if industry:
+        profile_lines.append(f"**Industry:** {industry}")
+    if geo:
+        profile_lines.append(f"**Location:** {geo}")
+    if len(profile_lines) > 1:
+        parts.append("\n".join(profile_lines))
+
     if summary:
-        parts.append(f"\n## Summary\n\n{summary}")
+        parts.append(f"## Summary\n\n{summary}")
     return "\n\n".join(parts)
 
 
@@ -357,36 +391,125 @@ def _parse_inferences(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-# =============================================================================
-# Tier 3 — Network Summary (aggregate stats only)
-# =============================================================================
+def _parse_connections(rows: list[dict[str, str]]) -> str:
+    """Parse Connections.csv → individual connection records + network summary.
 
-
-def _parse_connections_summary(rows: list[dict[str, str]]) -> str:
-    """Extract connection count + top companies/positions."""
+    Outputs each connection as a compact paragraph (no ### headers) so the
+    chunker keeps them under the "## Connections" section. When the section
+    exceeds max_tokens, the chunker splits by paragraph — each connection
+    becomes a separate chunk with section="Connections", enabling section
+    filtering via search_career_knowledge(section="Connection").
+    """
     if not rows:
         return ""
-    count = len(rows)
+
+    # Individual connection records
+    entries: list[str] = []
     company_counter: Counter[str] = Counter()
     position_counter: Counter[str] = Counter()
+
     for row in rows:
+        first = _get(row, "First Name")
+        last = _get(row, "Last Name")
         company = _get(row, "Company")
         position = _get(row, "Position")
+        connected_on = _get(row, "Connected On")
+        email = _get(row, "Email Address", "Email")
+        url = _get(row, "URL")
+
         if company:
             company_counter[company] += 1
         if position:
             position_counter[position] += 1
 
-    lines = [f"## Network\n\n- {count} connections"]
+        name = f"{first} {last}".strip()
+        if not name:
+            continue
+
+        # Compact single-line format per connection (no ### header)
+        details = [f"**{name}**"]
+        if company:
+            details.append(f"Company: {company}")
+        if position:
+            details.append(f"Position: {position}")
+        if connected_on:
+            details.append(f"Connected: {connected_on}")
+        if email:
+            details.append(f"Email: {email}")
+        if url:
+            details.append(f"URL: {url}")
+        entries.append(" | ".join(details))
+
+    # Network summary (aggregate stats)
+    count = len(rows)
+    summary_lines = [f"\n**Network Summary**: {count} connections"]
     if company_counter:
         top = company_counter.most_common(10)
         companies = ", ".join(f"{c} ({n})" for c, n in top)
-        lines.append(f"- Top companies: {companies}")
+        summary_lines.append(f"Top companies: {companies}")
     if position_counter:
         top = position_counter.most_common(10)
         positions = ", ".join(f"{p} ({n})" for p, n in top)
-        lines.append(f"- Top positions: {positions}")
-    return "\n".join(lines)
+        summary_lines.append(f"Top positions: {positions}")
+
+    parts_all = ["## Connections"]
+    if entries:
+        parts_all.append("\n\n".join(entries))
+    parts_all.append(" | ".join(summary_lines))
+    return "\n\n".join(parts_all)
+
+
+def _parse_messages(rows: list[dict[str, str]]) -> str:
+    """Parse messages.csv → Messages section grouped by conversation.
+
+    LinkedIn exports messages with columns: CONVERSATION ID,
+    CONVERSATION TITLE, FROM, SENDER PROFILE URL, DATE, SUBJECT, CONTENT.
+    Messages are grouped by conversation and ordered chronologically.
+    """
+    if not rows:
+        return ""
+
+    # Group messages by conversation
+    conversations: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        conv_id = _get(row, "CONVERSATION ID", "Conversation ID")
+        if not conv_id:
+            continue
+        conversations.setdefault(conv_id, []).append(row)
+
+    if not conversations:
+        return ""
+
+    sections: list[str] = ["## Messages"]
+
+    for conv_id, messages in conversations.items():
+        title = _get(messages[0], "CONVERSATION TITLE", "Conversation Title")
+        header = f"### Conversation: {title}" if title else f"### Conversation {conv_id}"
+        msg_lines = [header]
+
+        for msg in messages:
+            sender = _get(msg, "FROM", "From")
+            date = _get(msg, "DATE", "Date")
+            content = _strip_html(_get(msg, "CONTENT", "Content"))
+            subject = _get(msg, "SUBJECT", "Subject")
+
+            if not content:
+                continue
+            if date:
+                msg_lines.append(f"\n_{date}_")
+            if subject:
+                msg_lines.append(f"**Subject: {subject}**")
+            sender_label = f"**{sender}**" if sender else "**Unknown**"
+            msg_lines.append(f"{sender_label}: {content}")
+
+        sections.append("\n".join(msg_lines))
+
+    return "\n\n".join(sections)
+
+
+# =============================================================================
+# Tier 3 — Network Summary
+# =============================================================================
 
 
 def _parse_company_follows(rows: list[dict[str, str]]) -> str:
@@ -421,18 +544,20 @@ _TIER2_CSVS: list[tuple[str, Any, bool]] = [
     ("Jobs/Job Seeker Preferences.csv", _parse_job_preferences, False),
     ("Shares.csv", _parse_shares, False),
     ("Inferences_about_you.csv", _parse_inferences, False),
+    ("Connections.csv", _parse_connections, False),
+    ("messages.csv", _parse_messages, False),
 ]
 
 
 class LinkedInGatherer(BaseGatherer):
     """Gather data from LinkedIn export ZIP — direct CSV parsing.
 
-    Parses 17 career-relevant CSV files organized in 3 tiers:
+    Parses up to 19 career-relevant CSV files organized in 3 tiers:
     - Tier 1 (core): Profile, Positions, Education, Skills, Certifications,
       Languages, Projects, Recommendations, Endorsements
     - Tier 2 (intelligence): Learning, Job Applications, Job Preferences,
-      Posts/Shares, LinkedIn Inferences
-    - Tier 3 (network summary): Connections count, Companies Followed count
+      Posts/Shares, LinkedIn Inferences, Connections (full), Messages
+    - Tier 3 (network summary): Companies Followed count
     """
 
     def gather(self, zip_path: Path, output_dir: Path | None = None) -> str:
@@ -468,21 +593,11 @@ class LinkedInGatherer(BaseGatherer):
                     sections.append(section)
                     logger.debug("Tier 2: %s → %d rows", csv_name, len(rows))
 
-            # Tier 3 — Network Summary (aggregate stats only)
-            conn_rows = _read_csv(zf, "Connections.csv")
-            conn_section = _parse_connections_summary(conn_rows)
-            if conn_section:
-                sections.append(conn_section)
-                logger.debug("Tier 3: Connections → %d rows", len(conn_rows))
-
+            # Tier 3 — Network Summary
             follows_rows = _read_csv(zf, "Company Follows.csv")
             follows_section = _parse_company_follows(follows_rows)
             if follows_section:
-                # Append to network section if it exists
-                if conn_section:
-                    sections[-1] += f"\n{follows_section}"
-                else:
-                    sections.append(f"## Network\n\n{follows_section}")
+                sections.append(f"## Network\n\n{follows_section}")
                 logger.debug("Tier 3: Company Follows → %d rows", len(follows_rows))
 
         content = "\n\n".join(sections)

@@ -11,7 +11,7 @@ from futureproof.gatherers.linkedin import (
     LinkedInGatherer,
     _parse_certifications,
     _parse_company_follows,
-    _parse_connections_summary,
+    _parse_connections,
     _parse_education,
     _parse_endorsements,
     _parse_inferences,
@@ -19,6 +19,7 @@ from futureproof.gatherers.linkedin import (
     _parse_job_preferences,
     _parse_languages,
     _parse_learning,
+    _parse_messages,
     _parse_positions,
     _parse_profile,
     _parse_projects,
@@ -288,24 +289,196 @@ class TestTier2:
 
 
 # =============================================================================
+# Tier 2 — Connections & Messages
+# =============================================================================
+
+
+class TestConnections:
+    def test_parse_connections_individual_records(self):
+        rows = [
+            {
+                "First Name": "María",
+                "Last Name": "García",
+                "Email Address": "maria@accenture.com",
+                "Company": "Accenture",
+                "Position": "Senior Developer",
+                "Connected On": "15 Jan 2023",
+                "URL": "https://linkedin.com/in/mariagarcia",
+            },
+            {
+                "First Name": "John",
+                "Last Name": "Smith",
+                "Email Address": "",
+                "Company": "Google",
+                "Position": "SWE",
+                "Connected On": "3 Mar 2022",
+                "URL": "",
+            },
+        ]
+        result = _parse_connections(rows)
+        assert "## Connections" in result
+        assert "**María García**" in result
+        assert "Company: Accenture" in result
+        assert "Position: Senior Developer" in result
+        assert "Connected: 15 Jan 2023" in result
+        assert "Email: maria@accenture.com" in result
+        assert "URL: https://linkedin.com/in/mariagarcia" in result
+        assert "**John Smith**" in result
+        assert "Company: Google" in result
+
+    def test_parse_connections_summary_included(self):
+        rows = [
+            {"First Name": "A", "Last Name": "B", "Company": "Google", "Position": "SWE"},
+            {"First Name": "C", "Last Name": "D", "Company": "Google", "Position": "PM"},
+            {"First Name": "E", "Last Name": "F", "Company": "Meta", "Position": "SWE"},
+        ]
+        result = _parse_connections(rows)
+        assert "Network Summary" in result
+        assert "3 connections" in result
+        assert "Google (2)" in result
+
+    def test_parse_connections_compact_format(self):
+        """Each connection is a single pipe-separated line, no ### headers."""
+        rows = [
+            {
+                "First Name": "Alice",
+                "Last Name": "Wong",
+                "Company": "Accenture",
+                "Position": "Manager",
+            },
+        ]
+        result = _parse_connections(rows)
+        assert "###" not in result.split("## Connections")[1]
+        assert "**Alice Wong** | Company: Accenture | Position: Manager" in result
+
+    def test_parse_connections_partial_fields(self):
+        rows = [
+            {"First Name": "Alice", "Last Name": "Wong", "Company": "Accenture", "Position": ""},
+        ]
+        result = _parse_connections(rows)
+        assert "**Alice Wong**" in result
+        assert "Company: Accenture" in result
+        # No Position field when empty
+        assert "Position:" not in result.split("Alice Wong")[1]
+
+    def test_parse_connections_skips_nameless(self):
+        rows = [
+            {"First Name": "", "Last Name": "", "Company": "Unknown", "Position": "Role"},
+        ]
+        result = _parse_connections(rows)
+        # No individual connection entry — only summary
+        assert "Company: Unknown" not in result
+        assert "Position: Role" not in result
+        # Summary should still count
+        assert "1 connections" in result
+
+    def test_parse_connections_empty(self):
+        assert _parse_connections([]) == ""
+
+
+class TestMessages:
+    def test_parse_messages_grouped(self):
+        rows = [
+            {
+                "CONVERSATION ID": "conv1",
+                "CONVERSATION TITLE": "María García",
+                "FROM": "María García",
+                "SENDER PROFILE URL": "https://linkedin.com/in/maria",
+                "DATE": "2024-03-15 10:00:00",
+                "SUBJECT": "",
+                "CONTENT": "Hi, I saw your profile!",
+            },
+            {
+                "CONVERSATION ID": "conv1",
+                "CONVERSATION TITLE": "María García",
+                "FROM": "You",
+                "SENDER PROFILE URL": "",
+                "DATE": "2024-03-16 09:00:00",
+                "SUBJECT": "",
+                "CONTENT": "Thanks for reaching out!",
+            },
+        ]
+        result = _parse_messages(rows)
+        assert "## Messages" in result
+        assert "### Conversation: María García" in result
+        assert "**María García**: Hi, I saw your profile!" in result
+        assert "**You**: Thanks for reaching out!" in result
+        assert "_2024-03-15 10:00:00_" in result
+
+    def test_parse_messages_multiple_conversations(self):
+        rows = [
+            {
+                "CONVERSATION ID": "conv1",
+                "CONVERSATION TITLE": "Alice",
+                "FROM": "Alice",
+                "DATE": "2024-01-01",
+                "CONTENT": "Hello",
+            },
+            {
+                "CONVERSATION ID": "conv2",
+                "CONVERSATION TITLE": "Bob",
+                "FROM": "Bob",
+                "DATE": "2024-02-01",
+                "CONTENT": "Hey there",
+            },
+        ]
+        result = _parse_messages(rows)
+        assert "### Conversation: Alice" in result
+        assert "### Conversation: Bob" in result
+
+    def test_parse_messages_with_subject(self):
+        rows = [
+            {
+                "CONVERSATION ID": "conv1",
+                "CONVERSATION TITLE": "Recruiter",
+                "FROM": "Recruiter",
+                "DATE": "2024-01-01",
+                "SUBJECT": "Job Opportunity at Accenture Spain",
+                "CONTENT": "We have an opening...",
+            },
+        ]
+        result = _parse_messages(rows)
+        assert "**Subject: Job Opportunity at Accenture Spain**" in result
+
+    def test_parse_messages_skips_empty_content(self):
+        rows = [
+            {
+                "CONVERSATION ID": "conv1",
+                "CONVERSATION TITLE": "Test",
+                "FROM": "Someone",
+                "DATE": "2024-01-01",
+                "CONTENT": "",
+            },
+        ]
+        result = _parse_messages(rows)
+        assert "**Someone**" not in result
+
+    def test_parse_messages_strips_html(self):
+        rows = [
+            {
+                "CONVERSATION ID": "conv1",
+                "CONVERSATION TITLE": "Recruiter",
+                "FROM": "Recruiter",
+                "DATE": "2024-01-01",
+                "CONTENT": '<p class="spinmail">Hi Juan,</p><p><strong>Great profile!</strong></p>',
+            },
+        ]
+        result = _parse_messages(rows)
+        assert "<p" not in result
+        assert "<strong>" not in result
+        assert "Hi Juan," in result
+        assert "Great profile!" in result
+
+    def test_parse_messages_empty(self):
+        assert _parse_messages([]) == ""
+
+
+# =============================================================================
 # Tier 3 — Network Summary
 # =============================================================================
 
 
 class TestTier3:
-    def test_parse_connections_summary(self):
-        rows = [
-            {"Company": "Google", "Position": "SWE"},
-            {"Company": "Google", "Position": "PM"},
-            {"Company": "Meta", "Position": "SWE"},
-        ]
-        result = _parse_connections_summary(rows)
-        assert "3 connections" in result
-        assert "Google (2)" in result
-
-    def test_parse_connections_empty(self):
-        assert _parse_connections_summary([]) == ""
-
     def test_parse_company_follows(self):
         rows = [{"Organization": "Google"}, {"Organization": "Meta"}]
         result = _parse_company_follows(rows)
@@ -378,8 +551,24 @@ class TestLinkedInGatherer:
             ],
             "Skills.csv": [{"Name": "PyTorch"}, {"Name": "TensorFlow"}],
             "Connections.csv": [
-                {"Company": "Google", "Position": "SWE"},
-                {"Company": "Google", "Position": "SWE"},
+                {
+                    "First Name": "Alice",
+                    "Last Name": "Lee",
+                    "Email Address": "alice@google.com",
+                    "Company": "Google",
+                    "Position": "SWE",
+                    "Connected On": "1 Jan 2023",
+                    "URL": "https://linkedin.com/in/alicelee",
+                },
+                {
+                    "First Name": "Bob",
+                    "Last Name": "Chen",
+                    "Email Address": "",
+                    "Company": "Google",
+                    "Position": "SWE",
+                    "Connected On": "2 Feb 2023",
+                    "URL": "",
+                },
             ],
         }
         zip_path = _make_zip_file(tmp_path, files)
@@ -390,6 +579,8 @@ class TestLinkedInGatherer:
         assert "# Jane Doe" in result
         assert "### DeepMind" in result
         assert "PyTorch, TensorFlow" in result
+        assert "**Alice Lee**" in result
+        assert "**Bob Chen**" in result
         assert "2 connections" in result
 
     def test_gather_missing_zip(self, tmp_path):

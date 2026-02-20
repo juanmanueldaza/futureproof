@@ -16,6 +16,28 @@ from ..memory.knowledge import (
 
 logger = logging.getLogger(__name__)
 
+# Sections excluded from analysis/CV prompts — social/network data
+# searchable via the agent's search_career_knowledge tool (RAG).
+_EXCLUDED_SECTIONS: frozenset[str] = frozenset(
+    {
+        "Connections",
+        "Messages",
+        "Network",
+        "Job Applications",
+        "Posts",
+    }
+)
+
+# Dynamic sub-section prefixes to exclude (unpredictable names).
+# "Conversation:" — titled threads: "Conversation: John Smith"
+# "Conversation " — untitled threads: "Conversation 2-M2FkOTFi..."
+# "Sponsored" — sponsored InMail: "Sponsored Conversation"
+_EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "Conversation:",
+    "Conversation ",
+    "Sponsored",
+)
+
 
 class KnowledgeService:
     """Service for managing the career knowledge base.
@@ -57,11 +79,17 @@ class KnowledgeService:
         """
         t0 = time.monotonic()
 
-        cleared = self.store.clear_source(source)
-        if cleared > 0:
-            logger.info("Cleared %d existing chunks for %s", cleared, source.value)
+        # Get existing chunk IDs BEFORE indexing new content
+        old_ids = self.store._get_by_filter({"source": source.value})
 
+        # Index new content first — if embedding fails, old data is preserved
         chunk_ids = self.store.index_content(source=source, content=content)
+
+        # Only delete old chunks AFTER successful indexing
+        if old_ids:
+            self.store.collection.delete(ids=old_ids)
+            logger.info("Cleared %d old chunks for %s", len(old_ids), source.value)
+
         elapsed = time.monotonic() - t0
 
         if verbose:
@@ -97,6 +125,8 @@ class KnowledgeService:
         query: str,
         limit: int = 5,
         sources: list[str] | None = None,
+        section: str | None = None,
+        include_social: bool = False,
     ) -> list[dict[str, Any]]:
         """Search knowledge base.
 
@@ -104,6 +134,10 @@ class KnowledgeService:
             query: Search query
             limit: Maximum results
             sources: Optional list of source names to filter by
+            section: Optional section name to filter by (e.g., "Connections")
+            include_social: If True, include social/network data
+                (messages, connections, posts). Default False — focuses on
+                career content (experience, skills, education, etc.)
 
         Returns:
             List of result dicts with content, source, section
@@ -117,7 +151,23 @@ class KnowledgeService:
                 except ValueError:
                     logger.warning("Unknown source: %s", s)
 
-        chunks = self.store.search(query, limit=limit, sources=source_enums)
+        # When searching for career content, exclude social/network sections
+        # to avoid messages and connections drowning out profile data.
+        # Explicit section filter overrides this (user knows what they want).
+        excluded_sections: frozenset[str] = frozenset()
+        excluded_prefixes: tuple[str, ...] = ()
+        if not include_social and section is None:
+            excluded_sections = _EXCLUDED_SECTIONS
+            excluded_prefixes = _EXCLUDED_PREFIXES
+
+        chunks = self.store.search(
+            query,
+            limit=limit,
+            sources=source_enums,
+            section=section,
+            excluded_sections=excluded_sections,
+            excluded_prefixes=excluded_prefixes,
+        )
 
         return [
             {
@@ -146,6 +196,50 @@ class KnowledgeService:
             content = self.store.get_all_content(source)
             if content:
                 data[key] = content
+        return data
+
+    def get_filtered_content(
+        self,
+        excluded_sections: frozenset[str] | None = None,
+        excluded_prefixes: tuple[str, ...] | None = None,
+    ) -> dict[str, str]:
+        """Get career content with irrelevant sections excluded.
+
+        LinkedIn is filtered by excluding social/network sections.
+        Portfolio and Assessment are always returned fully (small data).
+
+        Args:
+            excluded_sections: Sections to exclude. Defaults to social data.
+            excluded_prefixes: Prefixes to exclude. Defaults to conversations.
+
+        Returns:
+            Dict with keys 'linkedin_data', 'portfolio_data', 'assessment_data'.
+        """
+        if excluded_sections is None:
+            excluded_sections = _EXCLUDED_SECTIONS
+        if excluded_prefixes is None:
+            excluded_prefixes = _EXCLUDED_PREFIXES
+
+        data: dict[str, str] = {}
+
+        # LinkedIn — filtered (exclude Connections, Messages, etc.)
+        linkedin = self.store.get_filtered_content(
+            KnowledgeSource.LINKEDIN,
+            excluded_sections,
+            excluded_prefixes,
+        )
+        if linkedin:
+            data["linkedin_data"] = linkedin
+
+        # Portfolio & Assessment — full (small data, always relevant)
+        for source, key in [
+            (KnowledgeSource.PORTFOLIO, "portfolio_data"),
+            (KnowledgeSource.ASSESSMENT, "assessment_data"),
+        ]:
+            content = self.store.get_all_content(source)
+            if content:
+                data[key] = content
+
         return data
 
     def get_stats(self) -> dict[str, Any]:

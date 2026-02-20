@@ -91,7 +91,8 @@ class GathererService:
         except ImportError:
             logger.debug("ChromaDB not available, skipping auto-index")
         except Exception as e:
-            logger.warning("Auto-index failed for %s: %s", source_name, e)
+            logger.error("Auto-index failed for %s: %s", source_name, e)
+            raise
 
     def gather_all(self, verbose: bool = False) -> dict[str, bool]:
         """Gather data from all sources.

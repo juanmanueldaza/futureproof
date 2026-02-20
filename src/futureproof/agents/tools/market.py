@@ -214,7 +214,12 @@ def search_jobs(
             title_words = set(title.replace("-", " ").split())
             return bool(expanded & title_words)
 
+        before_filter = len(jobs)
         jobs = [j for j in jobs if _is_relevant(j)]
+        if before_filter != len(jobs):
+            result_parts.append(
+                f"Showing {len(jobs)} relevant results (filtered {before_filter - len(jobs)} unrelated)"
+            )
 
         # Separate location-matched vs unmatched jobs
         matched: list[dict] = []
@@ -253,7 +258,7 @@ def search_jobs(
         remaining = max_display - min(len(matched), max_display)
         if remaining > 0 and unmatched:
             if matched:
-                result_parts.append(f"\n**Remote/other opportunities:**")
+                result_parts.append("\n**Remote/other opportunities:**")
             else:
                 result_parts.append("\n**Top opportunities:**")
 
