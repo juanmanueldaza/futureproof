@@ -232,13 +232,13 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 `FallbackLLMManager` with 4-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
 ### `memory/knowledge.py`
-`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Database-first: `index_content()` accepts raw strings (no file I/O), uses batch indexing (groups of 100). Chunk metadata uses `chunk.category` (h2-level parent) for section filtering. `get_all_content()` retrieves all chunks for a source. `get_filtered_content()` excludes social sections (Connections, Messages, etc.) with Python-side filtering. `search()` supports `excluded_sections`/`excluded_prefixes` params with over-fetch (3x) + post-filter pattern. `KnowledgeSource` enum: linkedin, portfolio, assessment. Methods: `index_content()`, `get_all_content()`, `get_filtered_content()`, `search()`, `clear_source()`, `get_stats()`.
+`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Section-based: `index_sections()` accepts `list[Section]` NamedTuples, calls `chunk_section()` on each, batch-indexes to ChromaDB (groups of 100). Chunk metadata uses `section.name` directly (no header parsing). `get_all_content()` retrieves all chunks for a source. `get_filtered_content()` excludes social sections (Connections, Messages, etc.) with Python-side filtering. `search()` supports `excluded_sections`/`excluded_prefixes` params with over-fetch (3x) + post-filter pattern. `KnowledgeSource` enum: linkedin, portfolio, assessment. Methods: `index_sections()`, `get_all_content()`, `get_filtered_content()`, `search()`, `clear_source()`, `get_stats()`.
 
 ### `memory/episodic.py`
 `EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION, CONVERSATION, MILESTONE, LEARNING, FEEDBACK. Methods: `remember()`, `recall()`, `get_recent()`, `forget()`, `stats()`.
 
 ### `memory/chunker.py`
-`MarkdownChunker` — splits markdown by headers while preserving full h1/h2/h3 hierarchy in `section_path`. `category` property returns h2-level parent (e.g., positions under `## Experience` get category="Experience"). Configurable max/min token limits. Merges small chunks, splits large ones.
+`MarkdownChunker` — splits content into size-bounded chunks. `Section` NamedTuple (name, content) carries section labels as structured data. `chunk_section()` does size-only splitting (merge small, split large) with `section_path=[section.name]` — no header regex parsing. Configurable max/min token limits.
 
 ### `utils/security.py`
 Security utilities: `detect_prompt_injection()`, `sanitize_user_input()`, `anonymize_pii()`, `anonymize_career_data()`, `create_safe_prompt()`.

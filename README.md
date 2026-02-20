@@ -42,7 +42,7 @@ GPT-4.1 over-delegated across agents, approximated with wrong tools, and didn't 
 
 ### File-based → Database-first pipeline
 
-The markdown chunker merged small entries (2-20 tokens each) into oversized chunks, making individual items unsearchable. Eliminated the entire file I/O layer — gatherers now return strings and index directly to ChromaDB via `index_content()`. No intermediate files, no `linkedin2md` dependency.
+The markdown chunker merged small entries (2-20 tokens each) into oversized chunks, making individual items unsearchable. Eliminated the entire file I/O layer and the markdown header roundtrip — gatherers now return `Section` NamedTuples and index directly to ChromaDB via `index_sections()`. No intermediate files, no header regex parsing.
 
 ### Systematic deletion
 
