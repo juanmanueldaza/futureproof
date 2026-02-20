@@ -7,7 +7,7 @@ Parses up to 19 career-relevant CSV files organized in 3 tiers:
   Posts/Shares, LinkedIn Inferences, Connections (full), Messages
 - Tier 3 (network summary): Companies Followed count
 
-Returns a single markdown string for direct indexing to ChromaDB.
+Returns a list of Section tuples for direct indexing to ChromaDB.
 """
 
 import csv
@@ -18,6 +18,8 @@ import zipfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+from ..memory.chunker import Section
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +100,10 @@ def _get_name(row: dict[str, str]) -> str:
 # =============================================================================
 
 
-def _parse_profile(rows: list[dict[str, str]]) -> str:
-    """Parse Profile.csv → profile overview and summary sections."""
+def _parse_profile(rows: list[dict[str, str]]) -> list[Section]:
+    """Parse Profile.csv → profile and summary sections."""
     if not rows:
-        return ""
+        return []
     row = rows[0]
     name = _get_name(row)
     headline = _get(row, "Headline")
@@ -109,30 +111,32 @@ def _parse_profile(rows: list[dict[str, str]]) -> str:
     industry = _get(row, "Industry")
     geo = _get(row, "Geo Location")
 
-    # h1 establishes hierarchy — h3 chunks inherit h2 category via path
-    parts = [f"# {name}"] if name else ["# LinkedIn Profile"]
+    sections: list[Section] = []
 
     # Profile section — headline, industry, location
-    profile_lines: list[str] = ["## Profile"]
+    profile_lines: list[str] = []
+    if name:
+        profile_lines.append(f"**{name}**")
     if headline:
         profile_lines.append(f"**Headline:** {headline}")
     if industry:
         profile_lines.append(f"**Industry:** {industry}")
     if geo:
         profile_lines.append(f"**Location:** {geo}")
-    if len(profile_lines) > 1:
-        parts.append("\n".join(profile_lines))
+    if profile_lines:
+        sections.append(Section("Profile", "\n".join(profile_lines)))
 
     if summary:
-        parts.append(f"## Summary\n\n{summary}")
-    return "\n\n".join(parts)
+        sections.append(Section("Summary", summary))
+
+    return sections
 
 
-def _parse_positions(rows: list[dict[str, str]]) -> str:
+def _parse_positions(rows: list[dict[str, str]]) -> Section | None:
     """Parse Positions.csv → Experience section."""
     if not rows:
-        return ""
-    lines = ["## Experience"]
+        return None
+    lines: list[str] = []
     for row in rows:
         company = _get(row, "Company Name", "Company")
         title = _get(row, "Title")
@@ -151,14 +155,14 @@ def _parse_positions(rows: list[dict[str, str]]) -> str:
         if description:
             entry.append(f"\n{description}")
         lines.append("\n".join(filter(None, entry)))
-    return "\n\n".join(lines)
+    return Section("Experience", "\n\n".join(lines))
 
 
-def _parse_education(rows: list[dict[str, str]]) -> str:
+def _parse_education(rows: list[dict[str, str]]) -> Section | None:
     """Parse Education.csv → Education section."""
     if not rows:
-        return ""
-    lines = ["## Education"]
+        return None
+    lines: list[str] = []
     for row in rows:
         school = _get(row, "School Name", "School")
         degree = _get(row, "Degree Name", "Degree")
@@ -179,59 +183,61 @@ def _parse_education(rows: list[dict[str, str]]) -> str:
         if activities:
             entry.append(f"Activities: {activities}")
         lines.append("\n".join(filter(None, entry)))
-    return "\n\n".join(lines)
+    return Section("Education", "\n\n".join(lines))
 
 
-def _parse_skills(rows: list[dict[str, str]]) -> str:
+def _parse_skills(rows: list[dict[str, str]]) -> Section | None:
     """Parse Skills.csv → Skills section."""
     if not rows:
-        return ""
+        return None
     skills = [_get(row, "Name") for row in rows if _get(row, "Name")]
     if not skills:
-        return ""
-    return f"## Skills\n\n{', '.join(skills)}"
+        return None
+    return Section("Skills", ", ".join(skills))
 
 
-def _parse_certifications(rows: list[dict[str, str]]) -> str:
+def _parse_certifications(rows: list[dict[str, str]]) -> Section | None:
     """Parse Certifications.csv → Certifications section."""
     if not rows:
-        return ""
-    lines = ["## Certifications"]
+        return None
+    lines: list[str] = []
     for row in rows:
         name = _get(row, "Name")
         authority = _get(row, "Authority")
         started = _get(row, "Started On")
         url = _get(row, "Url")
 
-        parts = [f"- **{name}**" if name else "- Certification"]
+        entry = f"- **{name}**" if name else "- Certification"
         if authority:
-            parts[0] += f" ({authority})"
+            entry += f" ({authority})"
         if started:
-            parts[0] += f" — {started}"
+            entry += f" — {started}"
         if url:
-            parts[0] += f" — [link]({url})"
-        lines.append(parts[0])
-    return "\n".join(lines)
+            entry += f" — [link]({url})"
+        lines.append(entry)
+    return Section("Certifications", "\n".join(lines))
 
 
-def _parse_languages(rows: list[dict[str, str]]) -> str:
+def _parse_languages(rows: list[dict[str, str]]) -> Section | None:
     """Parse Languages.csv → Languages section."""
     if not rows:
-        return ""
-    lines = ["## Languages"]
+        return None
+    lines: list[str] = []
     for row in rows:
         name = _get(row, "Name")
         prof = _get(row, "Proficiency")
         if name:
             lines.append(f"- {name}: {prof}" if prof else f"- {name}")
-    return "\n".join(lines)
+    if not lines:
+        return None
+    return Section("Languages", "\n".join(lines))
 
 
-def _parse_projects(rows: list[dict[str, str]]) -> str:
+def _parse_projects(rows: list[dict[str, str]]) -> Section | None:
     """Parse Projects.csv → Projects section."""
     if not rows:
-        return ""
-    lines = ["## Projects"]
+        return None
+    lines: list[str] = []
     for row in rows:
         title = _get(row, "Title")
         description = _get(row, "Description")
@@ -247,16 +253,16 @@ def _parse_projects(rows: list[dict[str, str]]) -> str:
         if url:
             entry.append(f"[Link]({url})")
         lines.append("\n".join(filter(None, entry)))
-    return "\n\n".join(lines)
+    return Section("Projects", "\n\n".join(lines))
 
 
 def _parse_recommendations(
-    rows: list[dict[str, str]], header: str, prefix: str, company_join: str,
-) -> str:
+    rows: list[dict[str, str]], section_name: str, prefix: str, company_join: str,
+) -> Section | None:
     """Parse a recommendations CSV → blockquote section."""
     if not rows:
-        return ""
-    lines = [f"## {header}"]
+        return None
+    lines: list[str] = []
     for row in rows:
         name = _get_name(row)
         company = _get(row, "Company")
@@ -265,22 +271,22 @@ def _parse_recommendations(
         if company:
             attribution += f"{company_join}{company}"
         lines.append(f'> "{text}" {attribution}'.strip())
-    return "\n\n".join(lines)
+    return Section(section_name, "\n\n".join(lines))
 
 
-def _parse_recommendations_received(rows: list[dict[str, str]]) -> str:
+def _parse_recommendations_received(rows: list[dict[str, str]]) -> Section | None:
     return _parse_recommendations(rows, "Recommendations Received", "— ", ", ")
 
 
-def _parse_recommendations_given(rows: list[dict[str, str]]) -> str:
+def _parse_recommendations_given(rows: list[dict[str, str]]) -> Section | None:
     return _parse_recommendations(rows, "Recommendations Given", "To ", " at ")
 
 
-def _parse_endorsements(rows: list[dict[str, str]]) -> str:
+def _parse_endorsements(rows: list[dict[str, str]]) -> Section | None:
     """Parse Endorsement_Received_Info.csv → Endorsements section."""
     if not rows:
-        return ""
-    lines = ["## Endorsements"]
+        return None
+    lines: list[str] = []
     for row in rows:
         skill = _get(row, "Skill Name")
         endorser = _get(row, "Endorser First Name", "Endorser")
@@ -288,7 +294,9 @@ def _parse_endorsements(rows: list[dict[str, str]]) -> str:
         name = f"{endorser} {endorser_last}".strip()
         if skill:
             lines.append(f"- {skill}: endorsed by {name}" if name else f"- {skill}")
-    return "\n".join(lines)
+    if not lines:
+        return None
+    return Section("Endorsements", "\n".join(lines))
 
 
 # =============================================================================
@@ -296,11 +304,11 @@ def _parse_endorsements(rows: list[dict[str, str]]) -> str:
 # =============================================================================
 
 
-def _parse_learning(rows: list[dict[str, str]]) -> str:
+def _parse_learning(rows: list[dict[str, str]]) -> Section | None:
     """Parse Learning.csv → Learning section (courses/certifications)."""
     if not rows:
-        return ""
-    lines = ["## Learning"]
+        return None
+    lines: list[str] = []
     for row in rows:
         title = _get(row, "Title", "Content Title")
         content_type = _get(row, "Content Type", "Type")
@@ -312,14 +320,14 @@ def _parse_learning(rows: list[dict[str, str]]) -> str:
         if completed:
             entry += f" — Completed: {completed}"
         lines.append(entry)
-    return "\n".join(lines)
+    return Section("Learning", "\n".join(lines))
 
 
-def _parse_job_applications(rows: list[dict[str, str]]) -> str:
+def _parse_job_applications(rows: list[dict[str, str]]) -> Section | None:
     """Parse Job Applications CSV(s) → Job Applications section."""
     if not rows:
-        return ""
-    lines = ["## Job Applications"]
+        return None
+    lines: list[str] = []
     for row in rows:
         date = _get(row, "Application Date", "Applied On")
         title = _get(row, "Job Title", "Title")
@@ -330,27 +338,29 @@ def _parse_job_applications(rows: list[dict[str, str]]) -> str:
         if company:
             entry += f" at {company}"
         lines.append(entry)
-    return "\n".join(lines)
+    return Section("Job Applications", "\n".join(lines))
 
 
-def _parse_job_preferences(rows: list[dict[str, str]]) -> str:
+def _parse_job_preferences(rows: list[dict[str, str]]) -> Section | None:
     """Parse Job Seeker Preferences.csv → Job Search Preferences section."""
     if not rows:
-        return ""
-    lines = ["## Job Search Preferences"]
+        return None
+    lines: list[str] = []
     for row in rows:
         for key, val in row.items():
             val = val.strip()
             if val:
                 lines.append(f"- {key}: {val}")
-    return "\n".join(lines)
+    if not lines:
+        return None
+    return Section("Job Search Preferences", "\n".join(lines))
 
 
-def _parse_shares(rows: list[dict[str, str]]) -> str:
+def _parse_shares(rows: list[dict[str, str]]) -> Section | None:
     """Parse Shares.csv (posts) → Posts section."""
     if not rows:
-        return ""
-    lines = ["## Posts"]
+        return None
+    lines: list[str] = []
     for row in rows:
         date = _get(row, "Date", "SharedDate")
         commentary = _get(row, "Commentary", "ShareCommentary")
@@ -363,33 +373,35 @@ def _parse_shares(rows: list[dict[str, str]]) -> str:
         if url:
             entry.append(f"[Link]({url})")
         lines.append("\n".join(entry))
-    return "\n\n".join(lines)
+    if not lines:
+        return None
+    return Section("Posts", "\n\n".join(lines))
 
 
-def _parse_inferences(rows: list[dict[str, str]]) -> str:
+def _parse_inferences(rows: list[dict[str, str]]) -> Section | None:
     """Parse Inferences_about_you.csv → LinkedIn Inferences section."""
     if not rows:
-        return ""
-    lines = ["## LinkedIn Inferences"]
+        return None
+    lines: list[str] = []
     for row in rows:
         inf_type = _get(row, "Type", "Category")
         inference = _get(row, "Inference", "Description", "Value")
         if inference:
             lines.append(f"- {inf_type}: {inference}" if inf_type else f"- {inference}")
-    return "\n".join(lines)
+    if not lines:
+        return None
+    return Section("LinkedIn Inferences", "\n".join(lines))
 
 
-def _parse_connections(rows: list[dict[str, str]]) -> str:
+def _parse_connections(rows: list[dict[str, str]]) -> Section | None:
     """Parse Connections.csv → individual connection records + network summary.
 
-    Outputs each connection as a compact paragraph (no ### headers) so the
-    chunker keeps them under the "## Connections" section. When the section
-    exceeds max_tokens, the chunker splits by paragraph — each connection
-    becomes a separate chunk with section="Connections", enabling section
-    filtering via search_career_knowledge(section="Connection").
+    Outputs each connection as a compact paragraph so the chunker splits
+    by paragraph — each connection becomes a separate chunk with
+    section="Connections", enabling section filtering.
     """
     if not rows:
-        return ""
+        return None
 
     # Individual connection records
     entries: list[str] = []
@@ -412,7 +424,7 @@ def _parse_connections(rows: list[dict[str, str]]) -> str:
         if not name:
             continue
 
-        # Compact single-line format per connection (no ### header)
+        # Compact single-line format per connection
         details = [f"**{name}**"]
         if company:
             details.append(f"Company: {company}")
@@ -428,7 +440,7 @@ def _parse_connections(rows: list[dict[str, str]]) -> str:
 
     # Network summary (aggregate stats)
     count = len(rows)
-    summary_lines = [f"\n**Network Summary**: {count} connections"]
+    summary_lines = [f"**Network Summary**: {count} connections"]
     if company_counter:
         top = company_counter.most_common(10)
         companies = ", ".join(f"{c} ({n})" for c, n in top)
@@ -438,14 +450,14 @@ def _parse_connections(rows: list[dict[str, str]]) -> str:
         positions = ", ".join(f"{p} ({n})" for p, n in top)
         summary_lines.append(f"Top positions: {positions}")
 
-    parts_all = ["## Connections"]
+    parts: list[str] = []
     if entries:
-        parts_all.append("\n\n".join(entries))
-    parts_all.append(" | ".join(summary_lines))
-    return "\n\n".join(parts_all)
+        parts.append("\n\n".join(entries))
+    parts.append(" | ".join(summary_lines))
+    return Section("Connections", "\n\n".join(parts))
 
 
-def _parse_messages(rows: list[dict[str, str]]) -> str:
+def _parse_messages(rows: list[dict[str, str]]) -> Section | None:
     """Parse messages.csv → Messages section grouped by conversation.
 
     LinkedIn exports messages with columns: CONVERSATION ID,
@@ -453,7 +465,7 @@ def _parse_messages(rows: list[dict[str, str]]) -> str:
     Messages are grouped by conversation and ordered chronologically.
     """
     if not rows:
-        return ""
+        return None
 
     # Group messages by conversation
     conversations: dict[str, list[dict[str, str]]] = {}
@@ -464,9 +476,9 @@ def _parse_messages(rows: list[dict[str, str]]) -> str:
         conversations.setdefault(conv_id, []).append(row)
 
     if not conversations:
-        return ""
+        return None
 
-    sections: list[str] = ["## Messages"]
+    sections: list[str] = []
 
     for conv_id, messages in conversations.items():
         title = _get(messages[0], "CONVERSATION TITLE", "Conversation Title")
@@ -490,7 +502,9 @@ def _parse_messages(rows: list[dict[str, str]]) -> str:
 
         sections.append("\n".join(msg_lines))
 
-    return "\n\n".join(sections)
+    if not sections:
+        return None
+    return Section("Messages", "\n\n".join(sections))
 
 
 # =============================================================================
@@ -498,11 +512,11 @@ def _parse_messages(rows: list[dict[str, str]]) -> str:
 # =============================================================================
 
 
-def _parse_company_follows(rows: list[dict[str, str]]) -> str:
+def _parse_company_follows(rows: list[dict[str, str]]) -> Section | None:
     """Extract company follow count as Network section."""
     if not rows:
-        return ""
-    return f"## Network\n\n- Following {len(rows)} companies"
+        return None
+    return Section("Network", f"- Following {len(rows)} companies")
 
 
 # =============================================================================
@@ -510,7 +524,7 @@ def _parse_company_follows(rows: list[dict[str, str]]) -> str:
 # =============================================================================
 
 
-# CSV file mappings: (zip_path, parser_function, use_variants)
+# CSV file mappings: (tier, zip_path, parser_function, use_variants)
 _CSV_PARSERS: list[tuple[str, str, Any, bool]] = [
     # Tier 1 — Core Career Data
     ("Tier 1", "Profile.csv", _parse_profile, False),
@@ -547,29 +561,39 @@ class LinkedInGatherer:
     - Tier 3 (network summary): Companies Followed count
     """
 
-    def gather(self, zip_path: Path) -> str:
-        """Parse LinkedIn ZIP and return markdown content.
+    def gather(self, zip_path: Path) -> list[Section]:
+        """Parse LinkedIn ZIP and return labeled sections.
 
         Args:
             zip_path: Path to the LinkedIn data export ZIP file
 
         Returns:
-            Markdown string with all career-relevant data
+            List of Section(name, content) tuples
         """
         if not zip_path.exists():
             raise FileNotFoundError(f"LinkedIn export not found: {zip_path}")
 
         logger.info("Parsing LinkedIn ZIP: %s", zip_path)
-        sections: list[str] = []
+        sections: list[Section] = []
 
         with zipfile.ZipFile(zip_path, "r") as zf:
             for tier, csv_name, parser, use_variants in _CSV_PARSERS:
-                rows = _read_csv_variants(zf, csv_name) if use_variants else _read_csv(zf, csv_name)
-                section = parser(rows)
-                if section:
-                    sections.append(section)
-                    logger.debug("%s: %s → %d rows", tier, csv_name, len(rows))
+                rows = (
+                    _read_csv_variants(zf, csv_name) if use_variants
+                    else _read_csv(zf, csv_name)
+                )
+                result = parser(rows)
+                if result is None:
+                    continue
+                # _parse_profile returns list[Section], others return Section
+                if isinstance(result, list):
+                    sections.extend(result)
+                else:
+                    sections.append(result)
+                logger.debug("%s: %s → %d rows", tier, csv_name, len(rows))
 
-        content = "\n\n".join(sections)
-        logger.info("LinkedIn parsing complete: %d sections, %d chars", len(sections), len(content))
-        return content
+        logger.info(
+            "LinkedIn parsing complete: %d sections",
+            len(sections),
+        )
+        return sections

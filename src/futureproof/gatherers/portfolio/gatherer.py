@@ -4,6 +4,7 @@ Orchestrates the extraction process using specialized components.
 """
 
 from ...config import settings
+from ...memory.chunker import Section
 from ...utils.logging import get_logger
 from .fetcher import PortfolioFetcher
 from .html_extractor import HTMLExtractor
@@ -20,7 +21,7 @@ class PortfolioGatherer:
     - PortfolioFetcher: HTTP requests
     - HTMLExtractor: HTML parsing
     - JSExtractor: JavaScript content
-    - PortfolioMarkdownWriter: Output generation
+    - PortfolioMarkdownWriter: Section generation
 
     Follows Dependency Inversion Principle - components can be injected for testing.
     """
@@ -32,38 +33,28 @@ class PortfolioGatherer:
         js_extractor: JSExtractor | None = None,
         markdown_writer: PortfolioMarkdownWriter | None = None,
     ) -> None:
-        """Initialize gatherer with optional dependency injection.
-
-        Args:
-            fetcher: HTTP fetcher (created if not provided)
-            html_extractor: HTML parser (created if not provided)
-            js_extractor: JS parser (created if not provided)
-            markdown_writer: Markdown generator (created if not provided)
-        """
         self._fetcher = fetcher
         self._html_extractor = html_extractor or HTMLExtractor()
         self._js_extractor = js_extractor or JSExtractor()
         self._markdown_writer = markdown_writer or PortfolioMarkdownWriter()
 
-    def gather(self, url: str | None = None) -> str:
+    def gather(self, url: str | None = None) -> list[Section]:
         """Gather data from portfolio website.
 
         Args:
             url: Portfolio URL (defaults to config)
 
         Returns:
-            Markdown content string (indexed directly to ChromaDB by caller)
+            List of Section(name, content) tuples
         """
         target_url = url or settings.portfolio_url
 
         logger.info("Gathering portfolio from %s", target_url)
 
         with (self._fetcher or PortfolioFetcher()) as fetcher:
-            # Fetch HTML
             html_result = fetcher.fetch(target_url)
             logger.debug("Fetched %d bytes", len(html_result.content))
 
-            # Extract HTML content
             content = self._html_extractor.extract(html_result.content, target_url)
             logger.debug("Extracted %d paragraphs, %d sections",
                          len(content.paragraphs), len(content.sections))
@@ -71,7 +62,6 @@ class PortfolioGatherer:
             if content.json_ld:
                 logger.debug("Found %d JSON-LD blocks", len(content.json_ld))
 
-            # Extract JS content
             js_content = self._js_extractor.extract(
                 html_result.content,
                 target_url,
@@ -82,8 +72,7 @@ class PortfolioGatherer:
             if js_content.socials:
                 logger.debug("Found %d social links from JS", len(js_content.socials))
 
-        # Generate markdown
-        markdown = self._markdown_writer.generate(content, js_content)
+        sections = self._markdown_writer.generate(content, js_content)
 
         logger.info("Portfolio gathered successfully from %s", target_url)
-        return markdown
+        return sections

@@ -16,6 +16,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..memory.chunker import Section
+
 logger = logging.getLogger(__name__)
 
 # Filename indicators for detecting Gallup CliftonStrengths PDFs
@@ -115,10 +117,10 @@ class CliftonStrengthsGatherer:
     """Gather and process CliftonStrengths assessment data from PDFs.
 
     Extracts structured data from Gallup CliftonStrengths PDF reports
-    and generates a comprehensive markdown summary for career analysis.
+    and produces labeled sections for career analysis.
     """
 
-    def gather(self, input_dir: Path | None = None) -> str:
+    def gather(self, input_dir: Path | None = None) -> list[Section]:
         """Gather CliftonStrengths data from PDF files.
 
         Args:
@@ -126,7 +128,7 @@ class CliftonStrengthsGatherer:
                       Defaults to data/raw
 
         Returns:
-            Markdown content string (indexed directly to ChromaDB by caller)
+            List of Section(name, content) tuples
         """
         from ..config import settings
 
@@ -134,7 +136,6 @@ class CliftonStrengthsGatherer:
 
         logger.info(f"Gathering CliftonStrengths data from {input_dir}")
 
-        # Find all Gallup PDF files
         pdf_files = list(input_dir.glob("*.pdf"))
         gallup_pdfs = [p for p in pdf_files if self._is_gallup_pdf(p)]
 
@@ -143,7 +144,6 @@ class CliftonStrengthsGatherer:
 
         logger.info(f"Found {len(gallup_pdfs)} Gallup PDF files")
 
-        # Parse all PDFs
         data = CliftonStrengthsData()
 
         for pdf_path in gallup_pdfs:
@@ -156,11 +156,10 @@ class CliftonStrengthsGatherer:
                 domain_counts[strength.domain] = domain_counts.get(strength.domain, 0) + 1
             data.dominant_domain = max(domain_counts, key=lambda d: domain_counts[d])
 
-        # Generate markdown
-        markdown = self._generate_markdown(data)
+        sections = self._build_sections(data)
 
         logger.info("CliftonStrengths data gathered successfully")
-        return markdown
+        return sections
 
     def _is_gallup_pdf(self, path: Path) -> bool:
         """Check if a PDF is a Gallup CliftonStrengths report."""
@@ -707,129 +706,132 @@ class CliftonStrengthsGatherer:
         text = re.sub(r"\d+\s*$", "", text)
         return text.strip()
 
-    def _generate_markdown(self, data: CliftonStrengthsData) -> str:
-        """Generate markdown from parsed CliftonStrengths data."""
-        lines = ["# CliftonStrengths Assessment\n"]
+    def _build_sections(self, data: CliftonStrengthsData) -> list[Section]:
+        """Build labeled sections from parsed CliftonStrengths data."""
+        sections: list[Section] = []
 
         # Header info
+        header_lines: list[str] = []
         if data.name:
-            lines.append(f"**Name:** {data.name}")
+            header_lines.append(f"**Name:** {data.name}")
         if data.date:
-            lines.append(f"**Assessment Date:** {data.date}")
+            header_lines.append(f"**Assessment Date:** {data.date}")
         if data.dominant_domain:
-            lines.append(f"**Dominant Domain:** {data.dominant_domain}")
-        lines.append("")
+            header_lines.append(f"**Dominant Domain:** {data.dominant_domain}")
+        if header_lines:
+            sections.append(Section("CliftonStrengths Assessment", "\n".join(header_lines)))
 
-        # Top 5 Summary
-        lines.append("## Top 5 Signature Themes\n")
-        lines.append("| Rank | Strength | Domain |")
-        lines.append("|------|----------|--------|")
-        for insight in data.top_5:
-            lines.append(f"| {insight.rank} | **{insight.name}** | {insight.domain} |")
-        lines.append("")
-
-        # Domain distribution
+        # Top 5 Summary + Domain distribution
         if data.top_5:
-            lines.append("### Domain Distribution (Top 5)\n")
+            lines = [
+                "| Rank | Strength | Domain |",
+                "|------|----------|--------|",
+            ]
+            for insight in data.top_5:
+                lines.append(
+                    f"| {insight.rank} | **{insight.name}** | {insight.domain} |"
+                )
+            lines.append("")
+
+            # Domain distribution
             domain_counts: dict[str, list[str]] = {}
             for insight in data.top_5:
                 domain_counts.setdefault(insight.domain, []).append(insight.name)
+            lines.append("### Domain Distribution (Top 5)")
             for domain, strengths in domain_counts.items():
                 lines.append(f"- **{domain}:** {', '.join(strengths)}")
-            lines.append("")
+
+            sections.append(Section("Top 5 Signature Themes", "\n".join(lines)))
 
         # Detailed insights for top 5
-        lines.append("## Detailed Strength Insights\n")
-        for insight in data.top_5:
-            lines.append(f"### {insight.rank}. {insight.name} ({insight.domain})\n")
-
-            if insight.description:
-                lines.append(f"**Description:** {insight.description}\n")
-
-            if insight.why_succeed:
-                lines.append(f"**Why You Succeed:** {insight.why_succeed}\n")
-
-            if insight.action_items:
-                lines.append("**Action Items:**")
-                for item in insight.action_items[:3]:  # Limit to top 3
-                    lines.append(f"- {item}")
+        if data.top_5:
+            lines = []
+            for insight in data.top_5:
+                lines.append(f"### {insight.rank}. {insight.name} ({insight.domain})")
+                if insight.description:
+                    lines.append(f"**Description:** {insight.description}")
+                if insight.why_succeed:
+                    lines.append(f"**Why You Succeed:** {insight.why_succeed}")
+                if insight.action_items:
+                    lines.append("**Action Items:**")
+                    for item in insight.action_items[:3]:
+                        lines.append(f"- {item}")
+                if insight.blind_spots:
+                    lines.append("**Blind Spots to Watch:**")
+                    for item in insight.blind_spots[:2]:
+                        lines.append(f"- {item}")
                 lines.append("")
+            sections.append(Section("Detailed Strength Insights", "\n".join(lines).rstrip()))
 
-            if insight.blind_spots:
-                lines.append("**Blind Spots to Watch:**")
-                for item in insight.blind_spots[:2]:  # Limit to top 2
-                    lines.append(f"- {item}")
-                lines.append("")
-
-        # Personalized talent patterns (from Action Planning / Leadership Insight)
+        # Personalized talent patterns
         all_strengths = data.top_10 if data.top_10 else data.top_5
         has_personalized = any(s.unique_insights for s in all_strengths)
         if has_personalized:
-            lines.append("## Personalized Talent Patterns\n")
-            lines.append(
+            lines = [
                 "Your specific talent manifestations based on your unique"
-                " CliftonStrengths combination:\n"
-            )
+                " CliftonStrengths combination:",
+            ]
             for insight in all_strengths:
                 if insight.unique_insights:
                     lines.append(
-                        f"### {insight.rank}. {insight.name} -- What Makes You Stand Out\n"
+                        f"### {insight.rank}. {insight.name} -- What Makes You Stand Out"
                     )
                     for paragraph in insight.unique_insights:
-                        lines.append(f"{paragraph}\n")
+                        lines.append(paragraph)
+            sections.append(Section("Personalized Talent Patterns", "\n\n".join(lines)))
 
-        # Extended Ideas for Action (from Action Planning / Discovery Development)
+        # Extended Ideas for Action
         has_extended = any(len(s.action_items) > 3 for s in all_strengths)
         if has_extended:
-            lines.append("## Extended Ideas for Action\n")
-            lines.append("Comprehensive action items for developing each strength:\n")
+            lines = ["Comprehensive action items for developing each strength:"]
             for insight in all_strengths:
                 if len(insight.action_items) > 3:
-                    lines.append(f"### {insight.rank}. {insight.name}\n")
+                    lines.append(f"### {insight.rank}. {insight.name}")
                     for i, item in enumerate(insight.action_items, 1):
                         lines.append(f"{i}. {item}")
                     lines.append("")
+            sections.append(
+                Section("Extended Ideas for Action", "\n".join(lines).rstrip())
+            )
 
-        # Strengths in Practice — real-world quotes (from Action Planning)
+        # Strengths in Practice
         has_quotes = any(s.sounds_like_quotes for s in all_strengths)
         if has_quotes:
-            lines.append("## Strengths in Practice\n")
-            lines.append(
+            lines = [
                 "Real quotes from people who share your top themes,"
-                " showing how these strengths manifest:\n"
-            )
+                " showing how these strengths manifest:",
+            ]
             for insight in all_strengths:
                 if insight.sounds_like_quotes:
-                    lines.append(f"### {insight.rank}. {insight.name}\n")
+                    lines.append(f"### {insight.rank}. {insight.name}")
                     for quote in insight.sounds_like_quotes:
-                        lines.append(f"> {quote}\n")
+                        lines.append(f"> {quote}")
+            sections.append(Section("Strengths in Practice", "\n\n".join(lines)))
 
         # Top 10 (6-10 only)
         if data.top_10 and len(data.top_10) > 5:
-            lines.append("## Supporting Strengths (6-10)\n")
-            lines.append("| Rank | Strength | Domain |")
-            lines.append("|------|----------|--------|")
+            lines = [
+                "| Rank | Strength | Domain |",
+                "|------|----------|--------|",
+            ]
             for insight in data.top_10[5:]:
                 lines.append(f"| {insight.rank} | {insight.name} | {insight.domain} |")
-            lines.append("")
+            sections.append(Section("Supporting Strengths (6-10)", "\n".join(lines)))
 
         # Full 34 ranking
         if data.all_34:
-            lines.append("## Complete Strength Ranking (All 34)\n")
+            lines = [
+                "### Strengthen (1-10)",
+                ", ".join(
+                    f"**{s}**" if i < 5 else s for i, s in enumerate(data.all_34[:10])
+                ),
+                "",
+                "### Navigate (11-23)",
+                ", ".join(data.all_34[10:23]),
+                "",
+                "### Lesser Themes (24-34)",
+                ", ".join(data.all_34[23:]),
+            ]
+            sections.append(Section("Complete Strength Ranking (All 34)", "\n".join(lines)))
 
-            # Group into sections
-            lines.append("### Strengthen (1-10)")
-            lines.append(
-                ", ".join(f"**{s}**" if i < 5 else s for i, s in enumerate(data.all_34[:10]))
-            )
-            lines.append("")
-
-            lines.append("### Navigate (11-23)")
-            lines.append(", ".join(data.all_34[10:23]))
-            lines.append("")
-
-            lines.append("### Lesser Themes (24-34)")
-            lines.append(", ".join(data.all_34[23:]))
-            lines.append("")
-
-        return "\n".join(lines)
+        return sections

@@ -216,9 +216,11 @@ def search_jobs(
 
         before_filter = len(jobs)
         jobs = [j for j in jobs if _is_relevant(j)]
-        if before_filter != len(jobs):
+        filtered_out = before_filter - len(jobs)
+        if filtered_out:
             result_parts.append(
-                f"Showing {len(jobs)} relevant results (filtered {before_filter - len(jobs)} unrelated)"
+                f"Showing {len(jobs)} relevant results"
+                f" (filtered {filtered_out} unrelated)"
             )
 
         # Separate location-matched vs unmatched jobs

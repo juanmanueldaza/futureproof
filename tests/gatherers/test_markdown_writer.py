@@ -1,10 +1,16 @@
-"""Tests for markdown generation."""
+"""Tests for portfolio section generation."""
 
 import pytest
 
 from futureproof.gatherers.portfolio.html_extractor import ExtractedContent
 from futureproof.gatherers.portfolio.js_extractor import JSContent
 from futureproof.gatherers.portfolio.markdown_writer import PortfolioMarkdownWriter
+from futureproof.memory.chunker import Section
+
+
+def _find(sections: list[Section], name: str) -> Section | None:
+    """Find a section by name."""
+    return next((s for s in sections if s.name == name), None)
 
 
 class TestPortfolioMarkdownWriter:
@@ -60,15 +66,16 @@ class TestPortfolioMarkdownWriter:
     def empty_js_content(self) -> JSContent:
         return JSContent()
 
-    def test_generates_markdown_string(
+    def test_returns_section_list(
         self,
         writer: PortfolioMarkdownWriter,
         sample_content: ExtractedContent,
         sample_js_content: JSContent,
     ) -> None:
-        """Test that generate returns a string."""
+        """Test that generate returns a list of Section tuples."""
         result = writer.generate(sample_content, sample_js_content)
-        assert isinstance(result, str)
+        assert isinstance(result, list)
+        assert all(isinstance(s, Section) for s in result)
 
     def test_includes_header_with_title(
         self,
@@ -78,9 +85,11 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test header includes title and URL."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "# Portfolio: John Doe - Developer" in result
-        assert "**URL:** https://example.com" in result
-        assert "**Scraped:**" in result
+        header = _find(result, "Header")
+        assert header is not None
+        assert "John Doe - Developer" in header.content
+        assert "**URL:** https://example.com" in header.content
+        assert "**Scraped:**" in header.content
 
     def test_includes_description(
         self,
@@ -90,8 +99,9 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test meta description is included."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "## Description" in result
-        assert "Full-stack developer portfolio" in result
+        desc = _find(result, "Description")
+        assert desc is not None
+        assert "Full-stack developer portfolio" in desc.content
 
     def test_includes_json_ld_person(
         self,
@@ -101,10 +111,11 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test JSON-LD Person data is included."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "## Professional Profile" in result
-        assert "**Name:** John Doe" in result
-        assert "**Job Title:** Developer" in result
-        assert "**Email:** john@example.com" in result
+        profile = _find(result, "Professional Profile")
+        assert profile is not None
+        assert "**Name:** John Doe" in profile.content
+        assert "**Job Title:** Developer" in profile.content
+        assert "**Email:** john@example.com" in profile.content
 
     def test_includes_open_graph(
         self,
@@ -114,8 +125,9 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test Open Graph data is included."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "## Open Graph Data" in result
-        assert "**title:** John Doe" in result
+        og = _find(result, "Open Graph Data")
+        assert og is not None
+        assert "**title:** John Doe" in og.content
 
     def test_includes_meta_info(
         self,
@@ -125,8 +137,9 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test meta information is included."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "## Meta Information" in result
-        assert "**author:** John Doe" in result
+        meta = _find(result, "Meta Information")
+        assert meta is not None
+        assert "**author:** John Doe" in meta.content
 
     def test_includes_js_projects(
         self,
@@ -136,11 +149,12 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test JS projects are included."""
         result = writer.generate(sample_content, sample_js_content)
-        assert "## Featured Projects" in result
-        assert "### Project A" in result
-        assert "**Description:** A cool project" in result
-        assert "**Live URL:** https://project-a.com" in result
-        assert "**GitHub:** https://github.com/johndoe/project-a" in result
+        projects = _find(result, "Featured Projects")
+        assert projects is not None
+        assert "### Project A" in projects.content
+        assert "**Description:** A cool project" in projects.content
+        assert "**Live URL:** https://project-a.com" in projects.content
+        assert "**GitHub:** https://github.com/johndoe/project-a" in projects.content
 
     def test_includes_js_socials(
         self,
@@ -150,8 +164,9 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test JS social links are included."""
         result = writer.generate(sample_content, sample_js_content)
-        assert "## Social Links" in result
-        assert "**GitHub:** https://github.com/johndoe" in result
+        socials = _find(result, "Social Links")
+        assert socials is not None
+        assert "**GitHub:** https://github.com/johndoe" in socials.content
 
     def test_includes_js_bio(
         self,
@@ -161,9 +176,10 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test JS bio is included."""
         result = writer.generate(sample_content, sample_js_content)
-        assert "## About (from content)" in result
-        assert "**Role:** Senior Engineer" in result
-        assert "I am a developer" in result
+        about = _find(result, "About")
+        assert about is not None
+        assert "**Role:** Senior Engineer" in about.content
+        assert "I am a developer" in about.content
 
     def test_includes_html_sections(
         self,
@@ -173,8 +189,9 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test HTML sections are included."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "## About" in result
-        assert "About section content" in result
+        about = _find(result, "About")
+        assert about is not None
+        assert "About section content" in about.content
 
     def test_includes_all_links(
         self,
@@ -184,8 +201,9 @@ class TestPortfolioMarkdownWriter:
     ) -> None:
         """Test all links section is included."""
         result = writer.generate(sample_content, empty_js_content)
-        assert "## All Links" in result
-        assert "[GitHub](https://github.com/johndoe)" in result
+        links = _find(result, "All Links")
+        assert links is not None
+        assert "[GitHub](https://github.com/johndoe)" in links.content
 
     def test_fallback_content_when_no_sections(self, writer: PortfolioMarkdownWriter) -> None:
         """Test fallback content (headings/paragraphs) when no sections or projects."""
@@ -198,10 +216,17 @@ class TestPortfolioMarkdownWriter:
         js_content = JSContent()
 
         result = writer.generate(content, js_content)
-        assert "## Content Structure" in result
-        assert "## Main Heading" in result
-        assert "## Main Content" in result
-        assert "This is a paragraph." in result
+        names = {s.name for s in result}
+        assert "Content Structure" in names
+        assert "Main Content" in names
+
+        structure = _find(result, "Content Structure")
+        assert structure is not None
+        assert "Main Heading" in structure.content
+
+        main = _find(result, "Main Content")
+        assert main is not None
+        assert "This is a paragraph." in main.content
 
     def test_handles_empty_content(self, writer: PortfolioMarkdownWriter) -> None:
         """Test handling of completely empty content."""
@@ -209,5 +234,7 @@ class TestPortfolioMarkdownWriter:
         js_content = JSContent()
 
         result = writer.generate(content, js_content)
-        assert "# Portfolio:" in result
-        assert "**URL:** https://example.com" in result
+        # Should have at least the header section
+        header = _find(result, "Header")
+        assert header is not None
+        assert "**URL:** https://example.com" in header.content
