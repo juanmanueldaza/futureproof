@@ -93,6 +93,11 @@ def _strip_html(text: str) -> str:
     return _HTML_TAG_RE.sub(" ", text).strip()
 
 
+def _get_name(row: dict[str, str]) -> str:
+    """Build full name from First Name + Last Name columns."""
+    return f"{_get(row, 'First Name')} {_get(row, 'Last Name')}".strip()
+
+
 # =============================================================================
 # Tier 1 — Core Career Data
 # =============================================================================
@@ -103,9 +108,7 @@ def _parse_profile(rows: list[dict[str, str]]) -> str:
     if not rows:
         return ""
     row = rows[0]
-    first = _get(row, "First Name")
-    last = _get(row, "Last Name")
-    name = f"{first} {last}".strip()
+    name = _get_name(row)
     headline = _get(row, "Headline")
     summary = _get(row, "Summary")
     industry = _get(row, "Industry")
@@ -252,22 +255,30 @@ def _parse_projects(rows: list[dict[str, str]]) -> str:
     return "\n\n".join(lines)
 
 
-def _parse_recommendations_received(rows: list[dict[str, str]]) -> str:
-    """Parse Recommendations_Received.csv → Recommendations section."""
+def _parse_recommendations(
+    rows: list[dict[str, str]], header: str, prefix: str, company_join: str,
+) -> str:
+    """Parse a recommendations CSV → blockquote section."""
     if not rows:
         return ""
-    lines = ["## Recommendations Received"]
+    lines = [f"## {header}"]
     for row in rows:
-        first = _get(row, "First Name")
-        last = _get(row, "Last Name")
+        name = _get_name(row)
         company = _get(row, "Company")
         text = _get(row, "Text", "Recommendation")
-        name = f"{first} {last}".strip()
-        attribution = f"— {name}" if name else ""
+        attribution = f"{prefix}{name}" if name else ""
         if company:
-            attribution += f", {company}"
+            attribution += f"{company_join}{company}"
         lines.append(f'> "{text}" {attribution}'.strip())
     return "\n\n".join(lines)
+
+
+def _parse_recommendations_received(rows: list[dict[str, str]]) -> str:
+    return _parse_recommendations(rows, "Recommendations Received", "— ", ", ")
+
+
+def _parse_recommendations_given(rows: list[dict[str, str]]) -> str:
+    return _parse_recommendations(rows, "Recommendations Given", "To ", " at ")
 
 
 def _parse_endorsements(rows: list[dict[str, str]]) -> str:
@@ -283,24 +294,6 @@ def _parse_endorsements(rows: list[dict[str, str]]) -> str:
         if skill:
             lines.append(f"- {skill}: endorsed by {name}" if name else f"- {skill}")
     return "\n".join(lines)
-
-
-def _parse_recommendations_given(rows: list[dict[str, str]]) -> str:
-    """Parse Recommendations_Given.csv → Recommendations Given section."""
-    if not rows:
-        return ""
-    lines = ["## Recommendations Given"]
-    for row in rows:
-        first = _get(row, "First Name")
-        last = _get(row, "Last Name")
-        company = _get(row, "Company")
-        text = _get(row, "Text", "Recommendation")
-        name = f"{first} {last}".strip()
-        attribution = f"To {name}" if name else ""
-        if company:
-            attribution += f" at {company}"
-        lines.append(f'> "{text}" {attribution}'.strip())
-    return "\n\n".join(lines)
 
 
 # =============================================================================
@@ -409,8 +402,6 @@ def _parse_connections(rows: list[dict[str, str]]) -> str:
     position_counter: Counter[str] = Counter()
 
     for row in rows:
-        first = _get(row, "First Name")
-        last = _get(row, "Last Name")
         company = _get(row, "Company")
         position = _get(row, "Position")
         connected_on = _get(row, "Connected On")
@@ -422,7 +413,7 @@ def _parse_connections(rows: list[dict[str, str]]) -> str:
         if position:
             position_counter[position] += 1
 
-        name = f"{first} {last}".strip()
+        name = _get_name(row)
         if not name:
             continue
 
@@ -525,27 +516,26 @@ def _parse_company_follows(rows: list[dict[str, str]]) -> str:
 
 
 # CSV file mappings: (zip_path, parser_function, use_variants)
-_TIER1_CSVS: list[tuple[str, Any, bool]] = [
-    ("Profile.csv", _parse_profile, False),
-    ("Positions.csv", _parse_positions, False),
-    ("Education.csv", _parse_education, False),
-    ("Skills.csv", _parse_skills, False),
-    ("Certifications.csv", _parse_certifications, False),
-    ("Languages.csv", _parse_languages, False),
-    ("Projects.csv", _parse_projects, False),
-    ("Recommendations_Received.csv", _parse_recommendations_received, False),
-    ("Endorsement_Received_Info.csv", _parse_endorsements, False),
-    ("Recommendations_Given.csv", _parse_recommendations_given, False),
-]
-
-_TIER2_CSVS: list[tuple[str, Any, bool]] = [
-    ("Learning.csv", _parse_learning, False),
-    ("Jobs/Job Applications.csv", _parse_job_applications, True),
-    ("Jobs/Job Seeker Preferences.csv", _parse_job_preferences, False),
-    ("Shares.csv", _parse_shares, False),
-    ("Inferences_about_you.csv", _parse_inferences, False),
-    ("Connections.csv", _parse_connections, False),
-    ("messages.csv", _parse_messages, False),
+_CSV_PARSERS: list[tuple[str, str, Any, bool]] = [
+    # Tier 1 — Core Career Data
+    ("Tier 1", "Profile.csv", _parse_profile, False),
+    ("Tier 1", "Positions.csv", _parse_positions, False),
+    ("Tier 1", "Education.csv", _parse_education, False),
+    ("Tier 1", "Skills.csv", _parse_skills, False),
+    ("Tier 1", "Certifications.csv", _parse_certifications, False),
+    ("Tier 1", "Languages.csv", _parse_languages, False),
+    ("Tier 1", "Projects.csv", _parse_projects, False),
+    ("Tier 1", "Recommendations_Received.csv", _parse_recommendations_received, False),
+    ("Tier 1", "Endorsement_Received_Info.csv", _parse_endorsements, False),
+    ("Tier 1", "Recommendations_Given.csv", _parse_recommendations_given, False),
+    # Tier 2 — Career Intelligence
+    ("Tier 2", "Learning.csv", _parse_learning, False),
+    ("Tier 2", "Jobs/Job Applications.csv", _parse_job_applications, True),
+    ("Tier 2", "Jobs/Job Seeker Preferences.csv", _parse_job_preferences, False),
+    ("Tier 2", "Shares.csv", _parse_shares, False),
+    ("Tier 2", "Inferences_about_you.csv", _parse_inferences, False),
+    ("Tier 2", "Connections.csv", _parse_connections, False),
+    ("Tier 2", "messages.csv", _parse_messages, False),
 ]
 
 
@@ -577,21 +567,12 @@ class LinkedInGatherer(BaseGatherer):
         sections: list[str] = []
 
         with zipfile.ZipFile(zip_path, "r") as zf:
-            # Tier 1 — Core Career Data
-            for csv_name, parser, use_variants in _TIER1_CSVS:
+            for tier, csv_name, parser, use_variants in _CSV_PARSERS:
                 rows = _read_csv_variants(zf, csv_name) if use_variants else _read_csv(zf, csv_name)
                 section = parser(rows)
                 if section:
                     sections.append(section)
-                    logger.debug("Tier 1: %s → %d rows", csv_name, len(rows))
-
-            # Tier 2 — Career Intelligence
-            for csv_name, parser, use_variants in _TIER2_CSVS:
-                rows = _read_csv_variants(zf, csv_name) if use_variants else _read_csv(zf, csv_name)
-                section = parser(rows)
-                if section:
-                    sections.append(section)
-                    logger.debug("Tier 2: %s → %d rows", csv_name, len(rows))
+                    logger.debug("%s: %s → %d rows", tier, csv_name, len(rows))
 
             # Tier 3 — Network Summary
             follows_rows = _read_csv(zf, "Company Follows.csv")
