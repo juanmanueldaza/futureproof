@@ -2,15 +2,15 @@
 
 import logging
 import os
-from collections.abc import Callable
+import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from ..config import settings
 from ..llm.fallback import get_model_with_fallback
 from ..prompts import GENERATE_CV_PROMPT
 from ..utils.console import console
-from ..utils.data_loader import combine_career_data, load_career_data_for_cv
+from ..utils.data_loader import load_career_data_for_cv
 from ..utils.security import anonymize_career_data
 
 logger = logging.getLogger(__name__)
@@ -21,8 +21,6 @@ def _clean_llm_output(text: str) -> str:
 
     Strips code fences and trailing disclaimers that LLMs add on their own.
     """
-    import re
-
     stripped = text.strip()
 
     # Strip wrapping code fences (```markdown ... ```)
@@ -46,7 +44,7 @@ def _clean_llm_output(text: str) -> str:
     return stripped.rstrip()
 
 
-def render_pdf(markdown_path: Path) -> Path:
+def _render_pdf(markdown_path: Path) -> Path:
     """Convert markdown to styled PDF.
 
     Args:
@@ -200,48 +198,38 @@ def render_pdf(markdown_path: Path) -> Path:
         return markdown_path
 
 
-class CVGenerator:
-    """Generate CVs in multiple languages and formats."""
+def _generate_with_llm(
+    career_data: str,
+    language: Literal["en", "es"],
+    format: Literal["ats", "creative"],
+) -> str:
+    """Generate CV content using LLM."""
+    model, _config = get_model_with_fallback(
+        temperature=settings.cv_temperature, purpose="analysis"
+    )
 
-    def __init__(
-        self,
-        llm_factory: Callable[..., tuple] | None = None,
-        output_dir: Path | None = None,
-    ) -> None:
-        self.output_dir = output_dir or settings.output_dir
-        self._llm_factory = llm_factory or get_model_with_fallback
+    lang_instruction = {
+        "en": "Generate the CV in English.",
+        "es": "Generate the CV in Spanish (Español). All content should be in Spanish.",
+    }
 
-    def _generate_with_llm(
-        self,
-        career_data: str,
-        language: Literal["en", "es"],
-        format: Literal["ats", "creative"],
-    ) -> str:
-        """Generate CV content using LLM."""
-        model, _config = self._llm_factory(temperature=settings.cv_temperature, purpose="analysis")
-
-        lang_instruction = {
-            "en": "Generate the CV in English.",
-            "es": "Generate the CV in Spanish (Español). All content should be in Spanish.",
-        }
-
-        format_instruction = {
-            "ats": """Focus on ATS optimization:
+    format_instruction = {
+        "ats": """Focus on ATS optimization:
 - Use standard section headers
 - Include keywords naturally
 - Simple, clean formatting
 - No tables or columns""",
-            "creative": """Use a more creative format:
+        "creative": """Use a more creative format:
 - Compelling narrative in summary
 - Highlight unique achievements
 - Show personality while remaining professional""",
-        }
+    }
 
-        # Anonymize PII before sending to external LLM
-        # For CV generation, we preserve professional email domains for context
-        safe_career_data = anonymize_career_data(career_data, preserve_professional_emails=True)
+    # Anonymize PII before sending to external LLM
+    # For CV generation, we preserve professional email domains for context
+    safe_career_data = anonymize_career_data(career_data, preserve_professional_emails=True)
 
-        prompt = f"""{GENERATE_CV_PROMPT}
+    prompt = f"""{GENERATE_CV_PROMPT}
 
 {lang_instruction[language]}
 
@@ -252,58 +240,52 @@ CAREER DATA:
 
 Generate a complete, professional CV in Markdown format."""
 
-        try:
-            response = model.invoke(prompt)
-            return str(response.content)
-        except Exception:
-            # Log full error, show sanitized message to user
-            logger.exception("LLM invocation failed")
-            console.print("[red]CV generation failed. Check logs for details.[/red]")
-            raise
+    try:
+        response = model.invoke(prompt)
+        return str(response.content)
+    except Exception:
+        # Log full error, show sanitized message to user
+        logger.exception("LLM invocation failed")
+        console.print("[red]CV generation failed. Check logs for details.[/red]")
+        raise
 
-    def generate(
-        self,
-        language: Literal["en", "es"] = "en",
-        format: Literal["ats", "creative"] = "ats",
-        state: dict[str, Any] | None = None,
-    ) -> Path:
-        """
-        Generate CV in specified language and format.
 
-        Args:
-            language: Output language (en or es)
-            format: CV format (ats or creative)
-            state: Optional state dict with pre-loaded data
+def create_cv(
+    language: Literal["en", "es"] = "en",
+    format: Literal["ats", "creative"] = "ats",
+) -> Path:
+    """Generate CV in specified language and format.
 
-        Returns:
-            Path to generated CV file
-        """
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    Args:
+        language: Output language (en or es)
+        format: CV format (ats or creative)
 
-        # Load data from state or files
-        if state:
-            career_data = combine_career_data(state, header_prefix="###")
-        else:
-            career_data = load_career_data_for_cv()
+    Returns:
+        Path to generated CV file
+    """
+    output_dir = settings.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-        if not career_data:
-            console.print("[yellow]No career data found. Run 'gather' first.[/yellow]")
-            return Path()
+    career_data = load_career_data_for_cv()
 
-        console.print(f"  Generating {language}/{format} CV...")
+    if not career_data:
+        console.print("[yellow]No career data found. Run 'gather' first.[/yellow]")
+        return Path()
 
-        # Generate content and strip code fences if LLM wrapped the output
-        cv_content = self._generate_with_llm(career_data, language, format)
-        cv_content = _clean_llm_output(cv_content)
+    console.print(f"  Generating {language}/{format} CV...")
 
-        # Save markdown with secure permissions
-        filename = f"cv_{language}_{format}.md"
-        output_path = self.output_dir / filename
-        output_path.write_text(cv_content)
-        os.chmod(output_path, 0o600)  # Owner read/write only
-        console.print(f"  [dim]Markdown saved: {output_path}[/dim]")
+    # Generate content and strip code fences if LLM wrapped the output
+    cv_content = _generate_with_llm(career_data, language, format)
+    cv_content = _clean_llm_output(cv_content)
 
-        # Convert to PDF
-        render_pdf(output_path)
+    # Save markdown with secure permissions
+    filename = f"cv_{language}_{format}.md"
+    output_path = output_dir / filename
+    output_path.write_text(cv_content)
+    os.chmod(output_path, 0o600)  # Owner read/write only
+    console.print(f"  [dim]Markdown saved: {output_path}[/dim]")
 
-        return output_path
+    # Convert to PDF
+    _render_pdf(output_path)
+
+    return output_path
