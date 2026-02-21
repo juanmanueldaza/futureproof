@@ -104,15 +104,15 @@ class TestCombineCareerData:
         """Test combines all provided data sources."""
         result = combine_career_data(sample_career_data)
 
-        assert "LinkedIn Data" in result
-        assert "Portfolio Data" in result
+        assert "LinkedIn" in result
+        assert "Portfolio" in result
 
     def test_uses_custom_header_prefix(self, sample_career_data: dict[str, str]) -> None:
         """Test uses custom header prefix."""
         result = combine_career_data(sample_career_data, header_prefix="###")
 
-        assert "### LinkedIn Data" in result
-        assert "### Portfolio Data" in result
+        assert "### LinkedIn" in result
+        assert "### Portfolio" in result
 
     def test_excludes_analysis_by_default(self) -> None:
         """Test excludes analysis field by default."""
@@ -122,7 +122,7 @@ class TestCombineCareerData:
         }
         result = combine_career_data(data)
 
-        assert "LinkedIn Data" in result
+        assert "LinkedIn" in result
         assert "Previous Analysis" not in result
 
     def test_includes_analysis_when_requested(self) -> None:
@@ -133,7 +133,7 @@ class TestCombineCareerData:
         }
         result = combine_career_data(data, include_analysis=True)
 
-        assert "LinkedIn Data" in result
+        assert "LinkedIn" in result
         assert "Previous Analysis" in result
 
     def test_handles_empty_data(self) -> None:
@@ -146,8 +146,8 @@ class TestCombineCareerData:
         data = {"portfolio_data": "Only portfolio data"}
         result = combine_career_data(data)
 
-        assert "Portfolio Data" in result
-        assert "LinkedIn Data" not in result
+        assert "Portfolio" in result
+        assert "LinkedIn" not in result
 
     def test_handles_none_values(self) -> None:
         """Test handles None values in data."""
@@ -157,8 +157,8 @@ class TestCombineCareerData:
         }
         result = combine_career_data(data)
 
-        assert "LinkedIn Data" in result
-        assert "Portfolio Data" not in result
+        assert "LinkedIn" in result
+        assert "Portfolio" not in result
 
     def test_preserves_content(self, sample_career_data: dict[str, str]) -> None:
         """Test preserves actual content from sources."""

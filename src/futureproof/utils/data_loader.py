@@ -36,33 +36,6 @@ def load_career_data_for_analysis() -> dict[str, str]:
     return service.get_filtered_content()
 
 
-def load_career_data_for_cv() -> str:
-    """Load career data formatted for CV generation.
-
-    Uses filtered data — CV doesn't need Connections, Messages, etc.
-
-    Returns:
-        Combined markdown string of all career data with section headers
-    """
-    data = load_career_data_for_analysis()
-    if not data:
-        return ""
-
-    source_names = {
-        "linkedin_data": "LinkedIn",
-        "portfolio_data": "Portfolio",
-        "assessment_data": "CliftonStrengths Assessment",
-    }
-
-    parts = []
-    for key, name in source_names.items():
-        value = data.get(key)
-        if value:
-            parts.append(f"### {name}\n{value}")
-
-    return "\n\n".join(parts) if parts else ""
-
-
 def combine_career_data(
     data: Mapping[str, Any],
     header_prefix: str = "##",
@@ -80,8 +53,8 @@ def combine_career_data(
     """
     parts = []
     source_names = {
-        "linkedin_data": "LinkedIn Data",
-        "portfolio_data": "Portfolio Data",
+        "linkedin_data": "LinkedIn",
+        "portfolio_data": "Portfolio",
         "assessment_data": "CliftonStrengths Assessment",
     }
 
@@ -94,3 +67,17 @@ def combine_career_data(
             parts.append(f"{header_prefix} {name}\n{value}")
 
     return "\n\n".join(parts)
+
+
+def load_career_data_for_cv() -> str:
+    """Load career data formatted for CV generation.
+
+    Uses filtered data — CV doesn't need Connections, Messages, etc.
+
+    Returns:
+        Combined markdown string of all career data with section headers
+    """
+    data = load_career_data_for_analysis()
+    if not data:
+        return ""
+    return combine_career_data(data, header_prefix="###")

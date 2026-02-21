@@ -1,5 +1,5 @@
 """CV and report generators."""
 
-from .cv_generator import CVGenerator
+from .cv_generator import create_cv
 
-__all__ = ["CVGenerator"]
+__all__ = ["create_cv"]
