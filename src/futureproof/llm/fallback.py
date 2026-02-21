@@ -260,13 +260,17 @@ def get_model_for_purpose(
         Tuple of (model instance, model config)
     """
     deployment_map = {
-        "agent": (settings.azure_agent_deployment, "Agent"),
-        "analysis": (settings.azure_analysis_deployment, "Analysis"),
-        "summary": (settings.azure_summary_deployment, "Summary"),
+        "agent": settings.azure_agent_deployment,
+        "analysis": settings.azure_analysis_deployment,
+        "summary": settings.azure_summary_deployment,
     }
 
-    deployment, desc = deployment_map.get(purpose, ("", ""))
-    chain = _build_purpose_chain(deployment, desc) if deployment else None
+    deployment = deployment_map.get(purpose, "")
+    if deployment:
+        desc = f"Azure {deployment}"
+        chain = _build_purpose_chain(deployment, desc)
+    else:
+        chain = None
     return get_fallback_manager().get_model(temperature=temperature, chain=chain)
 
 
