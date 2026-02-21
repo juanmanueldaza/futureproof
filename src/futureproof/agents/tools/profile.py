@@ -116,3 +116,29 @@ def update_current_role(role: str, years_experience: int | None = None) -> str:
 
     exp_str = f" ({years_experience} years)" if years_experience else ""
     return f"Updated current role to: {role}{exp_str}"
+
+
+@tool
+def update_salary_info(
+    current_salary: str,
+    currency: str = "USD",
+    includes_bonus: bool = False,
+    notes: str = "",
+) -> str:
+    """Save the user's current compensation information.
+
+    Args:
+        current_salary: Current base salary amount or range (e.g., "95000", "90k-100k")
+        currency: Currency code (e.g., "USD", "EUR", "GBP")
+        includes_bonus: Whether the amount includes bonuses/equity
+        notes: Additional compensation details (e.g., "plus 10% annual bonus")
+
+    Use this when the user shares their current salary or compensation details.
+    This establishes a baseline for salary recommendations based on market data.
+    """
+    bonus_note = " (includes bonus/equity)" if includes_bonus else ""
+    extra = f" — {notes}" if notes else ""
+    info = f"{currency} {current_salary}{bonus_note}{extra}"
+
+    edit_profile(lambda p: setattr(p, "salary_expectations", info))
+    return f"Saved current compensation: {info}"

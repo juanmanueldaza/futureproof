@@ -54,6 +54,7 @@ _TOOL_TO_CATEGORY: dict[str, str] = {
     "update_user_skills": "profile",
     "set_target_roles": "profile",
     "update_user_goal": "profile",
+    "update_salary_info": "profile",
     # Gathering
     "gather_portfolio_data": "gathering",
     "gather_linkedin_data": "gathering",
@@ -351,6 +352,8 @@ def display_profile_summary() -> None:
         profile_parts.append(f"**Work Style:** {profile.preferred_work_style}")
     if profile.deal_breakers:
         profile_parts.append(f"**Deal Breakers:** {', '.join(profile.deal_breakers)}")
+    if profile.salary_expectations:
+        profile_parts.append(f"**Compensation:** {profile.salary_expectations}")
 
     console.print(
         Panel(
