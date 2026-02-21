@@ -80,7 +80,7 @@ class AzureOpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
             )
             return [item.embedding for item in response.data]
         except Exception as e:
-            logger.error(f"Azure OpenAI embedding failed: {e}")
+            logger.error("Azure OpenAI embedding failed: %s", e)
             raise
 
 
@@ -153,14 +153,11 @@ class CachedEmbeddingFunction(EmbeddingFunction[Documents]):
 _embedding_function: EmbeddingFunction[Documents] | None = None
 
 
-def get_embedding_function(use_cache: bool = True) -> EmbeddingFunction[Documents]:
+def get_embedding_function() -> EmbeddingFunction[Documents]:
     """Get the configured embedding function for ChromaDB.
 
-    Returns Azure OpenAI embeddings if configured, otherwise falls back
-    to ChromaDB's default (sentence-transformers, slower but works offline).
-
-    Args:
-        use_cache: Whether to wrap with caching (recommended)
+    Returns Azure OpenAI embeddings wrapped with caching if configured,
+    otherwise falls back to ChromaDB's default (sentence-transformers).
 
     Returns:
         ChromaDB-compatible embedding function
@@ -173,10 +170,7 @@ def get_embedding_function(use_cache: bool = True) -> EmbeddingFunction[Document
     if settings.azure_openai_api_key and settings.azure_embedding_deployment:
         logger.info("Using Azure OpenAI embeddings")
         base: EmbeddingFunction[Documents] = AzureOpenAIEmbeddingFunction()
-        if use_cache:
-            _embedding_function = CachedEmbeddingFunction(base)
-        else:
-            _embedding_function = base
+        _embedding_function = CachedEmbeddingFunction(base)
     else:
         logger.warning(
             "No embedding API configured. Using default embeddings (slow, local). "

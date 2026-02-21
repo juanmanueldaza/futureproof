@@ -152,16 +152,14 @@ def clear_career_knowledge(source: str = "") -> str:
     if not approved:
         return "Knowledge base clear cancelled."
 
-    from futureproof.memory.knowledge import KnowledgeSource, get_knowledge_store
+    from futureproof.services.knowledge_service import KnowledgeService
 
-    store = get_knowledge_store()
+    service = KnowledgeService()
 
     if source:
         ks = _parse_source(source)
-        deleted = store.clear_source(ks)
+        deleted = service.clear_source(ks)
         return f"Cleared {deleted} chunks for '{source}' from the knowledge base."
     else:
-        total_deleted = 0
-        for ks in KnowledgeSource:
-            total_deleted += store.clear_source(ks)
+        total_deleted = service.clear_all()
         return f"Cleared {total_deleted} chunks from the knowledge base."

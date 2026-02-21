@@ -10,8 +10,6 @@ that are indexed directly to ChromaDB via index_sections(). No intermediate file
 
 import logging
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -30,57 +28,6 @@ class KnowledgeSource(Enum):
     ASSESSMENT = "assessment"  # CliftonStrengths
 
 
-@dataclass
-class KnowledgeChunk:
-    """A chunk of career knowledge with metadata."""
-
-    id: str
-    content: str
-    source: KnowledgeSource
-    section: str  # e.g., "Repositories", "Experience", "Skills"
-    metadata: dict[str, Any] = field(default_factory=dict)
-    indexed_at: datetime = field(default_factory=datetime.now)
-
-    def to_document(self) -> str:
-        """Convert to searchable document string."""
-        return self.content
-
-    def to_metadata(self) -> dict[str, str]:
-        """Convert to ChromaDB metadata format (all values must be strings)."""
-        return {
-            "source": self.source.value,
-            "section": self.section,
-            "indexed_at": self.indexed_at.isoformat(),
-            **{k: str(v) for k, v in self.metadata.items()},
-        }
-
-    @classmethod
-    def from_chromadb(
-        cls,
-        id: str,
-        document: str,
-        metadata: dict[str, Any],
-    ) -> "KnowledgeChunk":
-        """Create from ChromaDB query result."""
-        source_str = metadata.get("source", "portfolio")
-        try:
-            source = KnowledgeSource(source_str)
-        except ValueError:
-            source = KnowledgeSource.PORTFOLIO
-
-        reserved = {"source", "section", "indexed_at"}
-        return cls(
-            id=id,
-            content=document,
-            source=source,
-            section=metadata.get("section", ""),
-            indexed_at=datetime.fromisoformat(
-                metadata.get("indexed_at", datetime.now().isoformat())
-            ),
-            metadata={k: v for k, v in metadata.items() if k not in reserved},
-        )
-
-
 class CareerKnowledgeStore(ChromaDBStore):
     """ChromaDB-backed store for career knowledge RAG.
 
@@ -89,7 +36,6 @@ class CareerKnowledgeStore(ChromaDBStore):
     """
 
     collection_name = "career_knowledge"
-    collection_description = "Career knowledge for RAG retrieval"
 
     def __init__(
         self,
@@ -115,7 +61,6 @@ class CareerKnowledgeStore(ChromaDBStore):
         self,
         source: KnowledgeSource,
         sections: list[Section],
-        extra_metadata: dict[str, Any] | None = None,
     ) -> list[str]:
         """Index pre-labeled sections directly (no header parsing).
 
@@ -127,7 +72,6 @@ class CareerKnowledgeStore(ChromaDBStore):
         Args:
             source: Knowledge source
             sections: List of Section(name, content) tuples
-            extra_metadata: Additional metadata to include with all chunks
 
         Returns:
             List of chunk IDs created
@@ -136,7 +80,6 @@ class CareerKnowledgeStore(ChromaDBStore):
             logger.warning("No sections for source: %s", source.value)
             return []
 
-        # Build batch arrays
         ids: list[str] = []
         documents: list[str] = []
         metadatas: list[dict[str, str]] = []
@@ -145,19 +88,16 @@ class CareerKnowledgeStore(ChromaDBStore):
         for section in sections:
             chunks = self.chunker.chunk_section(section)
             for chunk in chunks:
-                kc = KnowledgeChunk(
-                    id=str(uuid.uuid4()),
-                    content=chunk.content,
-                    source=source,
-                    section=section.name,
-                    metadata={"chunk_index": chunk_idx, **(extra_metadata or {})},
-                )
-                ids.append(kc.id)
-                documents.append(kc.to_document())
-                metadatas.append(kc.to_metadata())
+                chunk_id = str(uuid.uuid4())
+                ids.append(chunk_id)
+                documents.append(chunk.content)
+                metadatas.append({
+                    "source": source.value,
+                    "section": section.name,
+                    "chunk_index": str(chunk_idx),
+                })
                 chunk_idx += 1
 
-        # Batch add — split into groups to avoid overwhelming the embedding API
         batch_size = 100
         for i in range(0, len(ids), batch_size):
             end = min(i + batch_size, len(ids))
@@ -170,18 +110,13 @@ class CareerKnowledgeStore(ChromaDBStore):
         logger.info("Indexed %d chunks for %s", len(ids), source.value)
         return ids
 
-    def get_all_content(self, source: KnowledgeSource) -> str:
-        """Retrieve all chunks for a source and join them in order.
-
-        Uses metadata-based retrieval (not semantic search) to reconstruct
-        the full content for a source. Chunks are sorted by chunk_index.
-
-        Args:
-            source: Knowledge source to retrieve
-
-        Returns:
-            Combined content string, or empty string if no data
-        """
+    def _fetch_sorted_docs(
+        self,
+        source: KnowledgeSource,
+        excluded_sections: frozenset[str] = frozenset(),
+        excluded_prefixes: tuple[str, ...] = (),
+    ) -> str:
+        """Fetch chunks for a source, optionally filter, sort, and join."""
         results = self.collection.get(
             where={"source": source.value},
             include=["documents", "metadatas"],
@@ -192,14 +127,30 @@ class CareerKnowledgeStore(ChromaDBStore):
         if not docs or not metas:
             return ""
 
-        # Sort by chunk_index if available, else preserve order
+        pairs = list(zip(docs, metas))
+
+        if excluded_sections or excluded_prefixes:
+            pairs = [
+                (doc, meta) for doc, meta in pairs
+                if str(meta.get("section", "")) not in excluded_sections
+                and not (
+                    excluded_prefixes
+                    and str(meta.get("section", "")).startswith(excluded_prefixes)
+                )
+            ]
+            if not pairs:
+                return ""
+
         def _sort_key(pair: tuple) -> int:
             idx = pair[1].get("chunk_index", 0)
             return int(idx) if isinstance(idx, (int, float, str)) else 0
 
-        pairs = list(zip(docs, metas))
-        sorted_docs = sorted(pairs, key=_sort_key)
-        return "\n\n".join(doc for doc, _ in sorted_docs)
+        pairs.sort(key=_sort_key)
+        return "\n\n".join(doc for doc, _ in pairs)
+
+    def get_all_content(self, source: KnowledgeSource) -> str:
+        """Retrieve all chunks for a source and join them in order."""
+        return self._fetch_sorted_docs(source)
 
     def get_filtered_content(
         self,
@@ -207,53 +158,8 @@ class CareerKnowledgeStore(ChromaDBStore):
         excluded_sections: frozenset[str] = frozenset(),
         excluded_prefixes: tuple[str, ...] = (),
     ) -> str:
-        """Retrieve chunks for a source, excluding specified sections.
-
-        Uses metadata-only retrieval (no embeddings) followed by Python-side
-        filtering. For collections <1000 chunks this is sub-millisecond.
-
-        Handles two types of exclusion:
-        - Exact section names (e.g., "Connections") via set lookup
-        - Section name prefixes (e.g., "Conversation:") via str.startswith()
-
-        Args:
-            source: Knowledge source to retrieve
-            excluded_sections: Section names to exclude (exact match)
-            excluded_prefixes: Section name prefixes to exclude
-
-        Returns:
-            Combined content string, or empty string if no data
-        """
-        results = self.collection.get(
-            where={"source": source.value},
-            include=["documents", "metadatas"],
-        )
-
-        docs = results["documents"]
-        metas = results["metadatas"]
-        if not docs or not metas:
-            return ""
-
-        # Filter out excluded sections
-        filtered: list[tuple] = []
-        for doc, meta in zip(docs, metas):
-            section = str(meta.get("section", ""))
-            if section in excluded_sections:
-                continue
-            if excluded_prefixes and section.startswith(excluded_prefixes):
-                continue
-            filtered.append((doc, meta))
-
-        if not filtered:
-            return ""
-
-        # Sort by chunk_index
-        def _sort_key(pair: tuple) -> int:
-            idx = pair[1].get("chunk_index", 0)
-            return int(idx) if isinstance(idx, (int, float, str)) else 0
-
-        sorted_docs = sorted(filtered, key=_sort_key)
-        return "\n\n".join(doc for doc, _ in sorted_docs)
+        """Retrieve chunks for a source, excluding specified sections."""
+        return self._fetch_sorted_docs(source, excluded_sections, excluded_prefixes)
 
     def search(
         self,
@@ -263,7 +169,7 @@ class CareerKnowledgeStore(ChromaDBStore):
         section: str | None = None,
         excluded_sections: frozenset[str] = frozenset(),
         excluded_prefixes: tuple[str, ...] = (),
-    ) -> list[KnowledgeChunk]:
+    ) -> list[dict[str, Any]]:
         """Semantic search across career knowledge.
 
         Args:
@@ -273,6 +179,9 @@ class CareerKnowledgeStore(ChromaDBStore):
             section: Optional section filter (exact match)
             excluded_sections: Section names to exclude (exact match)
             excluded_prefixes: Section name prefixes to exclude
+
+        Returns:
+            List of result dicts with content, source, section, metadata
         """
         conditions: list[dict] = []
         if sources:
@@ -293,22 +202,30 @@ class CareerKnowledgeStore(ChromaDBStore):
         fetch_limit = limit * 3 if needs_filtering else limit
 
         results = self._query(query, limit=fetch_limit, where=where)
-        chunks = [KnowledgeChunk.from_chromadb(id, doc, meta) for id, doc, meta in results]
 
-        if needs_filtering:
-            chunks = [
-                c for c in chunks
-                if c.section not in excluded_sections
-                and not (excluded_prefixes and c.section.startswith(excluded_prefixes))
-            ]
+        reserved = {"source", "section", "chunk_index"}
+        items: list[dict[str, Any]] = []
+        for _id, doc, meta in results:
+            sec = str(meta.get("section", ""))
+            if needs_filtering:
+                if sec in excluded_sections:
+                    continue
+                if excluded_prefixes and sec.startswith(excluded_prefixes):
+                    continue
+            items.append({
+                "content": doc,
+                "source": meta.get("source", "portfolio"),
+                "section": sec,
+                "metadata": {k: v for k, v in meta.items() if k not in reserved},
+            })
 
-        return chunks[:limit]
+        return items[:limit]
 
     def clear_source(self, source: KnowledgeSource) -> int:
         """Clear all chunks from a source (before re-indexing)."""
-        ids = self._get_by_filter({"source": source.value})
+        ids = self.get_ids_by_filter({"source": source.value})
         if ids:
-            self.collection.delete(ids=ids)
+            self.delete_by_ids(ids)
             logger.info("Cleared %d chunks from %s", len(ids), source.value)
             return len(ids)
         return 0

@@ -22,7 +22,6 @@ class ChromaDBStore:
     """
 
     collection_name: str = ""
-    collection_description: str = ""
 
     def __init__(self, persist_dir: Path | None = None) -> None:
         from futureproof.memory.checkpointer import get_data_dir
@@ -57,7 +56,6 @@ class ChromaDBStore:
             embedding_fn = get_embedding_function()
             self._collection = self.client.get_or_create_collection(
                 name=self.collection_name,
-                metadata={"description": self.collection_description},
                 embedding_function=embedding_fn,  # type: ignore[arg-type]
             )
         return self._collection
@@ -92,10 +90,15 @@ class ChromaDBStore:
                 items.append((doc_id, doc, dict(meta)))
         return items
 
-    def _get_by_filter(self, where: dict[str, Any]) -> list[str]:
+    def get_ids_by_filter(self, where: dict[str, Any]) -> list[str]:
         """Get document IDs matching a filter."""
-        results = self.collection.get(where=where)
+        results = self.collection.get(where=where, include=[])
         return results["ids"] if results["ids"] else []
+
+    def delete_by_ids(self, ids: list[str]) -> None:
+        """Delete documents by their IDs."""
+        if ids:
+            self.collection.delete(ids=ids)
 
     def _count_by_values(
         self,
@@ -105,7 +108,7 @@ class ChromaDBStore:
         """Count documents for each value of a metadata field."""
         counts = {}
         for value in values:
-            ids = self._get_by_filter({field: value})
+            ids = self.get_ids_by_filter({field: value})
             counts[value] = len(ids)
         return counts
 

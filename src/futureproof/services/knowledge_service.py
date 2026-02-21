@@ -81,14 +81,14 @@ class KnowledgeService:
         t0 = time.monotonic()
 
         # Get existing chunk IDs BEFORE indexing new content
-        old_ids = self.store._get_by_filter({"source": source.value})
+        old_ids = self.store.get_ids_by_filter({"source": source.value})
 
         # Index new sections first — if embedding fails, old data is preserved
         chunk_ids = self.store.index_sections(source=source, sections=sections)
 
         # Only delete old chunks AFTER successful indexing
         if old_ids:
-            self.store.collection.delete(ids=old_ids)
+            self.store.delete_by_ids(old_ids)
             logger.info("Cleared %d old chunks for %s", len(old_ids), source.value)
 
         elapsed = time.monotonic() - t0
@@ -161,7 +161,7 @@ class KnowledgeService:
             excluded_sections = _EXCLUDED_SECTIONS
             excluded_prefixes = _EXCLUDED_PREFIXES
 
-        chunks = self.store.search(
+        return self.store.search(
             query,
             limit=limit,
             sources=source_enums,
@@ -169,16 +169,6 @@ class KnowledgeService:
             excluded_sections=excluded_sections,
             excluded_prefixes=excluded_prefixes,
         )
-
-        return [
-            {
-                "content": chunk.content,
-                "source": chunk.source.value,
-                "section": chunk.section,
-                "metadata": chunk.metadata,
-            }
-            for chunk in chunks
-        ]
 
     def get_all_content(self) -> dict[str, str]:
         """Get all career content from the knowledge base.
@@ -242,6 +232,17 @@ class KnowledgeService:
                 data[key] = content
 
         return data
+
+    def clear_source(self, source: KnowledgeSource) -> int:
+        """Clear all chunks for a source."""
+        return self.store.clear_source(source)
+
+    def clear_all(self) -> int:
+        """Clear all knowledge data."""
+        total = 0
+        for source in KnowledgeSource:
+            total += self.store.clear_source(source)
+        return total
 
     def get_stats(self) -> dict[str, Any]:
         """Get knowledge base statistics."""
