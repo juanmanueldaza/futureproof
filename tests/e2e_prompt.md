@@ -1,6 +1,6 @@
 # FutureProof E2E Test Prompt
 
-Paste the prompt below into `futureproof chat` to exercise all 37 agent tools.
+Paste the prompt below into `futureproof chat` to exercise all 39 agent tools.
 
 **Prerequisites:**
 - LinkedIn ZIP at `data/raw/Complete_LinkedInDataExport_02-07-2026.zip.zip`
@@ -60,13 +60,15 @@ I want to do a complete setup, data gathering, analysis, and evaluation of my ca
 - Analyze my overall career alignment
 - Give me strategic career advice for transitioning to "Staff Engineer"
 
-## 8. Market Intelligence (all 6 tools)
+## 8. Market Intelligence & Financial (all 8 tools)
 - Gather comprehensive market data from all sources (trends, jobs, content)
 - Search for remote "AI Engineer" jobs, limit to 10
 - Get the latest tech trends focused on "AI"
 - Get salary insights for "Staff Engineer" in remote positions
 - Analyze my market fit based on current demands
 - Analyze which market skills I should develop
+- Convert 28138400 ARS to USD using convert_currency
+- Compare a salary of 28138400 ARS in Argentina against the US using compare_salary_ppp
 
 ## 9. CV Draft
 - Generate a CV draft for "AI/ML Engineer" — show me the preview

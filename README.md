@@ -4,14 +4,14 @@
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
-Career intelligence agent — 37 tools, 12 MCP clients, 12.7k lines of Python across 85 files. Gathers career data from 5 sources, searches 7+ job boards, and generates ATS-optimized CVs through conversational chat. Built with LangChain, LangGraph, and ChromaDB.
+Career intelligence agent — 39 tools, 12 MCP clients, 12.7k lines of Python across 85 files. Gathers career data from 5 sources, searches 7+ job boards, and generates ATS-optimized CVs through conversational chat. Built with LangChain, LangGraph, and ChromaDB.
 
 ## Architecture at a Glance
 
 ```mermaid
 graph LR
     User <-->|Rich UI, HITL| Chat[Chat Client]
-    Chat <--> Agent[Single Agent<br/>37 tools]
+    Chat <--> Agent[Single Agent<br/>39 tools]
 
     Agent --> Gather[Gatherers]
     Agent --> MCP[12 MCP Clients]
@@ -28,7 +28,7 @@ graph LR
     LLM -->|Purpose-based routing| Agent
 ```
 
-- **Single agent** with `create_agent()` + 37 tools — no multi-agent routing
+- **Single agent** with `create_agent()` + 39 tools — no multi-agent routing
 - **Database-first pipeline** — gatherers index directly to ChromaDB, no intermediate files
 - **Purpose-based LLM routing** — different models for tool calling, analysis, and summarization
 - **Custom `ToolCallRepairMiddleware`** — fixes orphaned parallel tool results after HITL resume
@@ -38,7 +38,7 @@ graph LR
 
 ### Multi-agent → Single agent
 
-GPT-4.1 over-delegated across agents, approximated with wrong tools, and didn't continue after handoff returns. Collapsed to a single agent with all 37 tools. Result: reliable tool selection, simpler state management, no routing logic.
+GPT-4.1 over-delegated across agents, approximated with wrong tools, and didn't continue after handoff returns. Collapsed to a single agent with all 39 tools. Result: reliable tool selection, simpler state management, no routing logic.
 
 ### File-based → Database-first pipeline
 
@@ -109,7 +109,7 @@ src/futureproof/
 │   ├── orchestrator.py     # LangGraph Functional API for analysis
 │   ├── state.py            # TypedDict state definitions
 │   ├── helpers/            # Orchestrator support
-│   └── tools/              # 37 tools by domain
+│   └── tools/              # 39 tools by domain
 ├── chat/                   # Streaming client with HITL, Rich UI
 ├── gatherers/
 │   ├── linkedin.py         # LinkedIn ZIP → CSV parser

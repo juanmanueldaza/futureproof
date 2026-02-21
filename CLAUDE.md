@@ -24,7 +24,7 @@ src/futureproof/
 │   ├── orchestrator.py  # LangGraph Functional API (@entrypoint/@task) for analysis
 │   ├── state.py         # TypedDict state definitions (CareerState, etc.)
 │   ├── helpers/         # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
-│   └── tools/           # 37 agent tools organized by domain
+│   └── tools/           # 39 agent tools organized by domain
 ├── chat/                # Streaming client with HITL, Rich verbose UI, summary echo stripping
 ├── gatherers/           # Data collection from external sources
 │   ├── linkedin.py      # LinkedIn ZIP direct CSV parser (17 CSVs, 3 tiers)
@@ -42,7 +42,7 @@ src/futureproof/
 │   ├── embeddings.py    # Azure OpenAI embedding functions with caching
 │   ├── checkpointer.py  # SQLite conversation persistence
 │   └── profile.py       # User profile (YAML, secure permissions)
-├── mcp/                 # MCP client implementations (11 clients)
+├── mcp/                 # MCP client implementations (12 clients)
 ├── prompts/             # LLM prompt templates (analysis, CV, advice)
 ├── services/            # Business logic layer
 │   └── exceptions.py   # ServiceError, NoDataError, AnalysisError
@@ -77,7 +77,7 @@ ruff check . --fix                  # Auto-fix
 
 All functionality is accessible through the **chat interface** via a single agent built with LangChain's `create_agent()`:
 
-- **Single agent**: One agent with all 37 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, memory
+- **Single agent**: One agent with all 39 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, financial, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
 - **State repair**: `ToolCallRepairMiddleware` detects orphaned `tool_calls` (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages so the model can proceed
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 32k tokens, keeps last 20 messages, uses separate cheaper model)
@@ -87,7 +87,7 @@ All functionality is accessible through the **chat interface** via a single agen
 - **LLM**: `FallbackLLMManager` with purpose-based model routing — agent (tool calling), analysis, summarization can each use a different Azure deployment
 - **Caching**: Agent singleton (`_cached_agent`), checkpointer singleton, embedding function singleton
 
-### Agent Tools (37 tools in `agents/tools/`)
+### Agent Tools (39 tools in `agents/tools/`)
 
 - **Profile** (7): `get_user_profile`, `update_user_name`, `update_current_role`, `update_salary_info`, `update_user_skills`, `set_target_roles`, `update_user_goal`
 - **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — all sources index directly to ChromaDB
@@ -97,6 +97,7 @@ All functionality is accessible through the **chat interface** via a single agen
 - **Analysis** (3): `analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`
 - **Generation** (2): `generate_cv` (HITL), `generate_cv_draft`
 - **Market** (6): `search_jobs`, `get_tech_trends`, `get_salary_insights`, `gather_market_data`, `analyze_market_fit`, `analyze_market_skills`
+- **Financial** (2): `convert_currency`, `compare_salary_ppp` — real-time forex via ExchangeRate-API, PPP via World Bank
 - **Memory** (4): `remember_decision`, `remember_job_application`, `recall_memories`, `get_memory_stats`
 
 Shared async helper: `_async.py` with `run_async()` for sync tool → async service bridge.
@@ -122,14 +123,15 @@ Uses `init_chat_model()` with `azure_openai` provider.
 
 ## MCP Clients (`mcp/`)
 
-11 MCP client implementations with registry pattern via `factory.py`:
+12 MCP client implementations with registry pattern via `factory.py`:
 
 - **Code platforms**: `github_client.py` (stdio MCP)
 - **Search**: `tavily_client.py` (Tavily Search API, 1000 free queries/month)
 - **Hacker News**: `hn_client.py` (Algolia API — stories, hiring trends, job postings with salary parsing)
 - **Job boards**: `jobspy_client.py` (LinkedIn/Indeed/Glassdoor/ZipRecruiter via python-jobspy), `remoteok_client.py`, `himalayas_client.py`, `jobicy_client.py`, `weworkremotely_client.py`, `remotive_client.py`
 - **Content trends**: `devto_client.py`, `stackoverflow_client.py`
-- **Infrastructure**: `base.py` (abstract base `MCPClient`), `http_client.py` (shared httpx client for 9 API-based clients), `job_schema.py` (unified job model), `salary_parser.py`
+- **Financial data**: `financial_client.py` (ExchangeRate-API for forex, World Bank for PPP — no auth required)
+- **Infrastructure**: `base.py` (abstract base `MCPClient`), `http_client.py` (shared httpx client for 10 API-based clients), `job_schema.py` (unified job model), `salary_parser.py`
 
 ## Security
 
@@ -201,6 +203,7 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `MARKET_CACHE_HOURS` — Tech trends cache TTL (default: `24`)
 - `JOB_CACHE_HOURS` — Job data cache TTL (default: `12`)
 - `CONTENT_CACHE_HOURS` — Content trends cache TTL (default: `12`)
+- `FOREX_CACHE_HOURS` — Exchange rate cache TTL (default: `4`)
 
 ### Knowledge Base
 - `KNOWLEDGE_AUTO_INDEX` — Auto-index after gather (default: `true`)
@@ -210,7 +213,7 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 ## Key Modules
 
 ### `chat/ui.py`
-Rich-based terminal UI components. Verbose mode display functions: `display_tool_start()` (category badge + args), `display_tool_result()` (full output in bordered Panel), `display_model_info()`, `display_model_switch()`, `display_timing()`, `display_node_transition()`, `display_indexing_result()`, `display_gather_result()`. Tool category styling maps all 37 tools to categories (profile, gathering, github, gitlab, knowledge, analysis, generation, market, memory) with unique colors.
+Rich-based terminal UI components. Verbose mode display functions: `display_tool_start()` (category badge + args), `display_tool_result()` (full output in bordered Panel), `display_model_info()`, `display_model_switch()`, `display_timing()`, `display_node_transition()`, `display_indexing_result()`, `display_gather_result()`. Tool category styling maps all 39 tools to categories (profile, gathering, github, gitlab, knowledge, analysis, generation, market, financial, memory) with unique colors.
 
 ### `chat/client.py`
 Streaming chat client with HITL interrupt loop (iterative, not recursive), summary echo stripping, fallback retry, tool timing. Always shows Rich UI output (tool badges, timing, model info) via `chat/ui.py`. `_stream_response()` handles the full stream lifecycle including sequential HITL interrupts via `while True` loop.

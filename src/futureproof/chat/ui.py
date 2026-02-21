@@ -88,6 +88,9 @@ _TOOL_TO_CATEGORY: dict[str, str] = {
     "gather_market_data": "market",
     "analyze_market_fit": "market",
     "analyze_market_skills": "market",
+    # Financial (maps to market category)
+    "convert_currency": "market",
+    "compare_salary_ppp": "market",
     # Memory
     "remember_decision": "memory",
     "remember_job_application": "memory",

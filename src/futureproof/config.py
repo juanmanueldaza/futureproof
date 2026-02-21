@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     market_cache_hours: int = 24  # Tech trends
     job_cache_hours: int = 12  # Jobs change faster
     content_cache_hours: int = 12  # Dev.to/SO content trends
+    forex_cache_hours: int = 4  # Exchange rates (updated daily)
 
     # Knowledge Base Configuration (RAG)
     knowledge_auto_index: bool = True  # Auto-index after gather

@@ -22,6 +22,7 @@ MCPServerType = Literal[
     "stackoverflow",
     "weworkremotely",
     "remotive",
+    "financial",
 ]
 
 
@@ -54,6 +55,8 @@ class MCPClientFactory:
         "weworkremotely": lambda: True,
         "remotive": lambda: True,
         "stackoverflow": lambda: True,  # 300/day without key
+        # Financial data (no auth required)
+        "financial": lambda: True,
     }
 
     @classmethod
@@ -61,6 +64,7 @@ class MCPClientFactory:
         """Lazy-load client classes to avoid circular imports."""
         if cls._clients is None:
             from .devto_client import DevToMCPClient
+            from .financial_client import FinancialMCPClient
             from .github_client import GitHubMCPClient
             from .himalayas_client import HimalayasMCPClient
             from .hn_client import HackerNewsMCPClient
@@ -88,6 +92,8 @@ class MCPClientFactory:
                 # RSS-based job sources (better salary data)
                 "weworkremotely": WeWorkRemotelyMCPClient,
                 "remotive": RemotiveMCPClient,
+                # Financial data (forex, PPP)
+                "financial": FinancialMCPClient,
             }
         return cls._clients
 

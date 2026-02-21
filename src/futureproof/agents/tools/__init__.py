@@ -5,12 +5,14 @@ Tools are organized by domain:
 - gathering: collect data from portfolio, LinkedIn, assessments
 - analysis: skill gaps, career alignment, advice
 - market: job search, tech trends, salary insights, market fit/skills analysis
+- financial: real-time currency conversion, purchasing power parity comparison
 - generation: CV drafts and documents
 - knowledge: RAG search and indexing over career data
 - memory: episodic memory (decisions, applications)
 """
 
 from .analysis import analyze_career_alignment, analyze_skill_gaps, get_career_advice
+from .financial import compare_salary_ppp, convert_currency
 from .gathering import (
     gather_all_career_data,
     gather_assessment_data,
@@ -92,6 +94,9 @@ _ALL_TOOLS = [
     analyze_market_fit,
     analyze_market_skills,
     gather_market_data,
+    # Financial
+    convert_currency,
+    compare_salary_ppp,
     # Generation
     generate_cv,
     generate_cv_draft,
@@ -141,6 +146,9 @@ __all__ = [
     "analyze_market_fit",
     "analyze_market_skills",
     "gather_market_data",
+    # Financial
+    "convert_currency",
+    "compare_salary_ppp",
     # Generation
     "generate_cv",
     "generate_cv_draft",
@@ -157,7 +165,7 @@ __all__ = [
 def get_all_tools() -> list:
     """Get all career intelligence tools for the agent.
 
-    Returns all 37 tools: profile, gathering, github, gitlab, analysis,
-    market, generation, knowledge, and memory.
+    Returns all 39 tools: profile, gathering, github, gitlab, analysis,
+    market, financial, generation, knowledge, and memory.
     """
     return list(_ALL_TOOLS)
