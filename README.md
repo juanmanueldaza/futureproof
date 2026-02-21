@@ -97,8 +97,6 @@ futureproof ask "Analyze my gaps"   # One-off question
 futureproof memory --threads        # List conversation threads
 ```
 
-See [docs/SOURCES.md](docs/SOURCES.md) for the complete configuration guide — GitHub, GitLab, market intelligence, model routing, and more.
-
 ## Project Structure
 
 ```

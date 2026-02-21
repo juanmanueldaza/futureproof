@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://futureproof.daza.ar/sitemap.xml
