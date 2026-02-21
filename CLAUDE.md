@@ -31,9 +31,11 @@ src/futureproof/
 │   ├── cliftonstrengths.py  # CliftonStrengths PDF parser (~850 lines)
 │   ├── portfolio/       # Decomposed: Fetcher, HTMLExtractor, JSExtractor, MarkdownWriter
 │   └── market/          # Job market, tech trends, content trends gatherers
+│       └── source_registry.py  # OCP job source registry (JobSourceConfig)
 ├── generators/          # CV generation (Markdown + PDF via WeasyPrint)
 ├── llm/                 # FallbackLLMManager with init_chat_model()
 ├── memory/
+│   ├── chromadb_store.py # ChromaDB base class (shared by knowledge + episodic)
 │   ├── knowledge.py     # ChromaDB knowledge store (RAG)
 │   ├── episodic.py      # ChromaDB episodic memory store
 │   ├── chunker.py       # Markdown text chunker for indexing
@@ -43,6 +45,7 @@ src/futureproof/
 ├── mcp/                 # MCP client implementations (11 clients)
 ├── prompts/             # LLM prompt templates (analysis, CV, advice)
 ├── services/            # Business logic layer
+│   └── exceptions.py   # ServiceError, NoDataError, AnalysisError
 └── utils/               # Security, data loading, logging, console
 ```
 
@@ -130,20 +133,14 @@ Uses `init_chat_model()` with `azure_openai` provider.
 
 ## Security
 
-### Prompt Injection Protection (`utils/security.py`)
-- 13 compiled regex patterns detect injection attempts
-- `detect_prompt_injection(text)` → returns list of detected patterns
-- `sanitize_user_input(text, strict)` → returns `SanitizationResult` with safety status
-- Blocks: "ignore previous instructions", "reveal system prompt", system tag injection, etc.
-
-### PII Anonymization
-- `anonymize_career_data(data, preserve_professional_emails)` redacts emails, phones, addresses, social usernames
+### PII Anonymization (`utils/security.py`)
+- `anonymize_career_data(data, preserve_professional_emails)` — redacts emails, phones, addresses, social usernames (5 regex patterns)
 - Applied before sending career data to external LLMs (in `CVGenerator`)
-- `anonymize_pii(text)` — general PII anonymization (9 patterns: email, phone, SSN, card, address, ZIP, ID, DOB)
+- Optional `preserve_professional_emails` mode keeps work email domains (e.g., `[USER]@company.com`)
 
 ### Other Protections
-- **SSRF**: Portfolio fetcher blocks private IP ranges, validates resolved hostnames
-- **Command injection**: `subprocess.run()` with list args, no `shell=True`, 5-min timeout
+- **SSRF**: Portfolio fetcher blocks private IP ranges via `ipaddress.is_private`, validates resolved hostnames
+- **Command injection**: `subprocess.run()` with list args, no `shell=True`, 30s timeout
 - **File permissions**: Sensitive output files (CVs, profile) created with `0o600`
 
 ## Git Commits
@@ -178,7 +175,6 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `AZURE_OPENAI_API_VERSION` — Azure API version (default: `2024-12-01-preview`)
 - `AZURE_CHAT_DEPLOYMENT` — Azure chat model deployment name
 - `AZURE_EMBEDDING_DEPLOYMENT` — Azure embedding deployment name
-- `LLM_MODEL` — Override model name (empty = provider default)
 - `LLM_TEMPERATURE` — Generation temperature (default: `0.3`)
 - `CV_TEMPERATURE` — CV generation temperature (default: `0.2`)
 
@@ -189,13 +185,13 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 
 ### Data Sources
 - `PORTFOLIO_URL` — Portfolio website URL
-- `DEFAULT_LANGUAGE` — `en` or `es` (default: `en`)
 
 ### MCP Servers
 - `GITHUB_PERSONAL_ACCESS_TOKEN` — GitHub API token
 - `GITHUB_MCP_TOKEN` — Alternative GitHub token for MCP
 - `GITHUB_MCP_USE_DOCKER` — Use Docker for GitHub MCP server (default: `true`)
 - `GITHUB_MCP_IMAGE` — Docker image (default: `ghcr.io/github/github-mcp-server`)
+- `GITHUB_MCP_COMMAND` — Native binary command when not using Docker (default: `github-mcp-server`)
 
 - `TAVILY_API_KEY` — Tavily search API key
 
@@ -231,6 +227,9 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 ### `llm/fallback.py`
 `FallbackLLMManager` with 4-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
+### `memory/chromadb_store.py`
+`ChromaDBStore` — base class for ChromaDB-backed stores. Provides lazy-initialized PersistentClient/collection, shared `_add()`, `_query()`, `_get_by_filter()`, `_count_by_values()`, `_get_stats()` helpers. Inherited by both `CareerKnowledgeStore` and `EpisodicStore`.
+
 ### `memory/knowledge.py`
 `CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Section-based: `index_sections()` accepts `list[Section]` NamedTuples, calls `chunk_section()` on each, batch-indexes to ChromaDB (groups of 100). Chunk metadata uses `section.name` directly (no header parsing). `get_all_content()` retrieves all chunks for a source. `get_filtered_content()` excludes social sections (Connections, Messages, etc.) with Python-side filtering. `search()` supports `excluded_sections`/`excluded_prefixes` params with over-fetch (3x) + post-filter pattern. `KnowledgeSource` enum: linkedin, portfolio, assessment. Methods: `index_sections()`, `get_all_content()`, `get_filtered_content()`, `search()`, `clear_source()`, `get_stats()`.
 
@@ -241,13 +240,19 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 `MarkdownChunker` — splits content into size-bounded chunks. `Section` NamedTuple (name, content) carries section labels as structured data. `chunk_section()` does size-only splitting (merge small, split large) with `section_path=[section.name]` — no header regex parsing. Configurable max/min token limits.
 
 ### `utils/security.py`
-Security utilities: `detect_prompt_injection()`, `sanitize_user_input()`, `anonymize_pii()`, `anonymize_career_data()`, `create_safe_prompt()`.
+PII anonymization for career data. `anonymize_career_data(data, preserve_professional_emails)` — 5 regex patterns redact emails, phones, addresses, social profile URLs. Used by `CVGenerator` before sending data to external LLMs.
 
 ### `utils/data_loader.py`
 Thin wrapper around `KnowledgeService`. Functions: `load_career_data()` → dict (all sources), `load_career_data_for_analysis()` → dict (excludes social sections), `load_career_data_for_cv()` → formatted string (uses filtered data), `combine_career_data()` → combined string. No file I/O — all data comes from ChromaDB.
 
 ### `services/`
 Business logic layer: `GathererService` (gathering + auto-indexing with timing), `AnalysisService` (LangGraph orchestrator invocation), `KnowledgeService` (indexing/search/filtering with social exclusion via `_EXCLUDED_SECTIONS`/`_EXCLUDED_PREFIXES`, `include_social` toggle, `get_filtered_content()`). CV generation is called directly via `CVGenerator` from agent tools.
+
+### `gatherers/market/source_registry.py`
+OCP-compliant job source registry. `JobSourceConfig` dataclass defines each source (name, tool, args builder, post-processor). `JOB_SOURCE_REGISTRY` list holds 6 job sources; `SALARY_SOURCE` holds Tavily salary config. Adding a new job source requires only a new registry entry.
+
+### `services/exceptions.py`
+Service layer exception hierarchy: `ServiceError` (base), `NoDataError` (no career data available), `AnalysisError` (analysis failure).
 
 ### `gatherers/portfolio/`
 Decomposed portfolio scraper (SRP): `PortfolioFetcher` (SSRF-protected HTTP), `HTMLExtractor` (BeautifulSoup), `JSExtractor` (JavaScript content), `MarkdownWriter` (output formatting).

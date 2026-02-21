@@ -21,6 +21,7 @@ dependencies = [
     # Core
     "typer>=0.15",
     "pydantic-settings>=2",
+    "pyyaml>=6",
     "rich>=14",
     # AI/LLM
     "langchain>=0.3",
@@ -31,9 +32,7 @@ dependencies = [
     "beautifulsoup4>=4",
     # MCP (Model Context Protocol)
     "mcp>=1.26",
-    "nest-asyncio>=1.6",
     # Generation
-    "jinja2>=3",
     "weasyprint>=62",
     "markdown>=3.10.1",
     "python-jobspy>=1.1.82",
