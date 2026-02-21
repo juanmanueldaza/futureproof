@@ -15,7 +15,6 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 from .chromadb_store import ChromaDBStore
@@ -40,10 +39,6 @@ class EpisodicMemory:
     context: str
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.now)
-
-    def to_document(self) -> str:
-        """Convert to searchable document string."""
-        return self.content
 
     def to_metadata(self) -> dict[str, Any]:
         """Convert to ChromaDB metadata format."""
@@ -80,16 +75,12 @@ class EpisodicStore(ChromaDBStore):
     """
 
     collection_name = "career_memories"
-    collection_description = "Career decisions and experiences"
-
-    def __init__(self, persist_dir: Path | None = None) -> None:
-        super().__init__(persist_dir)
 
     def remember(self, memory: EpisodicMemory) -> str:
         """Store a new episodic memory."""
         self._add(
             ids=[memory.id],
-            documents=[memory.to_document()],
+            documents=[memory.content],
             metadatas=[memory.to_metadata()],
         )
         logger.info("Stored memory: %s (%s)", memory.id, memory.memory_type.value)
@@ -128,7 +119,6 @@ def remember_decision(
     decision: str,
     context: str,
     outcome: str | None = None,
-    alternatives_considered: list[str] | None = None,
 ) -> EpisodicMemory:
     """Create a decision memory.
 
@@ -136,7 +126,6 @@ def remember_decision(
         decision: The decision that was made
         context: Context/reasoning behind the decision
         outcome: Optional outcome of the decision
-        alternatives_considered: Other options that were considered
 
     Returns:
         EpisodicMemory ready to be stored
@@ -148,7 +137,6 @@ def remember_decision(
         context=context,
         metadata={
             "outcome": outcome or "",
-            "alternatives": ",".join(alternatives_considered or []),
         },
     )
 

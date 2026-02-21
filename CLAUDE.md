@@ -231,16 +231,16 @@ LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `Ana
 `FallbackLLMManager` with 4-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
 ### `memory/chromadb_store.py`
-`ChromaDBStore` — base class for ChromaDB-backed stores. Provides lazy-initialized PersistentClient/collection, shared `_add()`, `_query()`, `_get_by_filter()`, `_count_by_values()`, `_get_stats()` helpers. Inherited by both `CareerKnowledgeStore` and `EpisodicStore`.
+`ChromaDBStore` — base class for ChromaDB-backed stores. Provides lazy-initialized PersistentClient/collection, shared `_add()`, `_query()`, `get_ids_by_filter()`, `delete_by_ids()`, `_count_by_values()`, `_get_stats()` helpers. Inherited by both `CareerKnowledgeStore` and `EpisodicStore`.
 
 ### `memory/knowledge.py`
-`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Section-based: `index_sections()` accepts `list[Section]` NamedTuples, calls `chunk_section()` on each, batch-indexes to ChromaDB (groups of 100). Chunk metadata uses `section.name` directly (no header parsing). `get_all_content()` retrieves all chunks for a source. `get_filtered_content()` excludes social sections (Connections, Messages, etc.) with Python-side filtering. `search()` supports `excluded_sections`/`excluded_prefixes` params with over-fetch (3x) + post-filter pattern. `KnowledgeSource` enum: linkedin, portfolio, assessment. Methods: `index_sections()`, `get_all_content()`, `get_filtered_content()`, `search()`, `clear_source()`, `get_stats()`.
+`CareerKnowledgeStore` — ChromaDB wrapper for career data vectors. Collection: `career_knowledge`. Section-based: `index_sections()` accepts `list[Section]` NamedTuples, calls `chunk_section()` on each, builds metadata inline, batch-indexes to ChromaDB (groups of 100). No intermediate `KnowledgeChunk` class — metadata dicts built directly. `_fetch_sorted_docs()` shared helper for content retrieval. `search()` returns `list[dict]` with `excluded_sections`/`excluded_prefixes` over-fetch (3x) + post-filter. `KnowledgeSource` enum: linkedin, portfolio, assessment. Methods: `index_sections()`, `get_all_content()`, `get_filtered_content()`, `search()`, `clear_source()`, `get_stats()`.
 
 ### `memory/episodic.py`
-`EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION, CONVERSATION, MILESTONE, LEARNING, FEEDBACK. Methods: `remember()`, `recall()`, `get_recent()`, `forget()`, `stats()`.
+`EpisodicStore` — ChromaDB wrapper for episodic memories. Collection: `career_memories`. `MemoryType` enum: DECISION, APPLICATION. Methods: `remember()`, `recall()`, `stats()`.
 
 ### `memory/chunker.py`
-`MarkdownChunker` — splits content into size-bounded chunks. `Section` NamedTuple (name, content) carries section labels as structured data. `chunk_section()` does size-only splitting (merge small, split large) with `section_path=[section.name]` — no header regex parsing. Configurable max/min token limits.
+`MarkdownChunker` — splits content into size-bounded chunks. `Section` NamedTuple (name, content) carries section labels as structured data. `MarkdownChunk` has only `content` + `section_path`. `chunk_section()` does size-only splitting (split large by paragraphs) with `section_path=[section.name]` — no merge step, no header regex. Configurable max/min token limits.
 
 ### `utils/security.py`
 PII anonymization for career data. `anonymize_career_data(data, preserve_professional_emails)` — 5 regex patterns redact emails, phones, addresses, social profile URLs. Used by `CVGenerator` before sending data to external LLMs.
@@ -249,7 +249,7 @@ PII anonymization for career data. `anonymize_career_data(data, preserve_profess
 Thin wrapper around `KnowledgeService`. Functions: `load_career_data()` → dict (all sources), `load_career_data_for_analysis()` → dict (excludes social sections), `load_career_data_for_cv()` → formatted string (uses filtered data), `combine_career_data()` → combined string. No file I/O — all data comes from ChromaDB.
 
 ### `services/`
-Business logic layer: `GathererService` (gathering + auto-indexing with timing), `AnalysisService` (LangGraph orchestrator invocation), `KnowledgeService` (indexing/search/filtering with social exclusion via `_EXCLUDED_SECTIONS`/`_EXCLUDED_PREFIXES`, `include_social` toggle, `get_filtered_content()`). CV generation is called directly via `CVGenerator` from agent tools.
+Business logic layer: `GathererService` (gathering + auto-indexing with timing), `AnalysisService` (LangGraph orchestrator invocation), `KnowledgeService` (indexing/search/filtering with social exclusion via `_EXCLUDED_SECTIONS`/`_EXCLUDED_PREFIXES`, `include_social` toggle, `get_filtered_content()`, `clear_source()`, `clear_all()`). CV generation is called directly via `CVGenerator` from agent tools.
 
 ### `gatherers/market/source_registry.py`
 OCP-compliant job source registry. `JobSourceConfig` dataclass defines each source (name, tool, args builder, post-processor). `JOB_SOURCE_REGISTRY` list holds 6 job sources; `SALARY_SOURCE` holds Tavily salary config. Adding a new job source requires only a new registry entry.
