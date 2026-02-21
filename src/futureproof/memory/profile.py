@@ -172,6 +172,8 @@ class UserProfile:
             parts.append(f"Target Roles: {', '.join(self.target_roles)}")
         if self.deal_breakers:
             parts.append(f"Deal Breakers: {', '.join(self.deal_breakers)}")
+        if self.salary_expectations:
+            parts.append(f"Compensation: {self.salary_expectations}")
 
         return "\n".join(parts) if parts else "No profile information available."
 

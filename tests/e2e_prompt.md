@@ -1,6 +1,6 @@
 # FutureProof E2E Test Prompt
 
-Paste the prompt below into `futureproof chat` to exercise all 36 agent tools.
+Paste the prompt below into `futureproof chat` to exercise all 37 agent tools.
 
 **Prerequisites:**
 - LinkedIn ZIP at `data/raw/Complete_LinkedInDataExport_02-07-2026.zip.zip`

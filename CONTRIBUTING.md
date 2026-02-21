@@ -68,7 +68,7 @@ refactor: extract job parsing into shared utility
 
 ## Architecture
 
-The project follows a chat-first architecture — all functionality is accessible through a single LangChain agent with 36 tools. See `CLAUDE.md` for detailed architecture documentation.
+The project follows a chat-first architecture — all functionality is accessible through a single LangChain agent with 37 tools. See `CLAUDE.md` for detailed architecture documentation.
 
 Key areas:
 - `agents/tools/` — Agent tools organized by domain

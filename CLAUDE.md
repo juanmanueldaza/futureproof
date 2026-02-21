@@ -24,7 +24,7 @@ src/futureproof/
 │   ├── orchestrator.py  # LangGraph Functional API (@entrypoint/@task) for analysis
 │   ├── state.py         # TypedDict state definitions (CareerState, etc.)
 │   ├── helpers/         # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
-│   └── tools/           # 36 agent tools organized by domain
+│   └── tools/           # 37 agent tools organized by domain
 ├── chat/                # Streaming client with HITL, Rich verbose UI, summary echo stripping
 ├── gatherers/           # Data collection from external sources
 │   ├── linkedin.py      # LinkedIn ZIP direct CSV parser (17 CSVs, 3 tiers)
@@ -77,7 +77,7 @@ ruff check . --fix                  # Auto-fix
 
 All functionality is accessible through the **chat interface** via a single agent built with LangChain's `create_agent()`:
 
-- **Single agent**: One agent with all 36 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, memory
+- **Single agent**: One agent with all 37 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
 - **State repair**: `ToolCallRepairMiddleware` detects orphaned `tool_calls` (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages so the model can proceed
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 32k tokens, keeps last 20 messages, uses separate cheaper model)
@@ -87,9 +87,9 @@ All functionality is accessible through the **chat interface** via a single agen
 - **LLM**: `FallbackLLMManager` with purpose-based model routing — agent (tool calling), analysis, summarization can each use a different Azure deployment
 - **Caching**: Agent singleton (`_cached_agent`), checkpointer singleton, embedding function singleton
 
-### Agent Tools (36 tools in `agents/tools/`)
+### Agent Tools (37 tools in `agents/tools/`)
 
-- **Profile** (6): `get_user_profile`, `update_user_name`, `update_current_role`, `update_user_skills`, `set_target_roles`, `update_user_goal`
+- **Profile** (7): `get_user_profile`, `update_user_name`, `update_current_role`, `update_salary_info`, `update_user_skills`, `set_target_roles`, `update_user_goal`
 - **Gathering** (5): `gather_portfolio_data`, `gather_linkedin_data`, `gather_assessment_data`, `gather_all_career_data` (HITL), `get_stored_career_data` — all sources index directly to ChromaDB
 - **GitHub** (3): `search_github_repos`, `get_github_repo`, `get_github_profile` — live queries via GitHub MCP server
 - **GitLab** (3): `search_gitlab_projects`, `get_gitlab_project`, `get_gitlab_file` — live queries via glab CLI
@@ -210,7 +210,7 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 ## Key Modules
 
 ### `chat/ui.py`
-Rich-based terminal UI components. Verbose mode display functions: `display_tool_start()` (category badge + args), `display_tool_result()` (full output in bordered Panel), `display_model_info()`, `display_model_switch()`, `display_timing()`, `display_node_transition()`, `display_indexing_result()`, `display_gather_result()`. Tool category styling maps all 36 tools to categories (profile, gathering, github, gitlab, knowledge, analysis, generation, market, memory) with unique colors.
+Rich-based terminal UI components. Verbose mode display functions: `display_tool_start()` (category badge + args), `display_tool_result()` (full output in bordered Panel), `display_model_info()`, `display_model_switch()`, `display_timing()`, `display_node_transition()`, `display_indexing_result()`, `display_gather_result()`. Tool category styling maps all 37 tools to categories (profile, gathering, github, gitlab, knowledge, analysis, generation, market, memory) with unique colors.
 
 ### `chat/client.py`
 Streaming chat client with HITL interrupt loop (iterative, not recursive), summary echo stripping, fallback retry, tool timing. Always shows Rich UI output (tool badges, timing, model info) via `chat/ui.py`. `_stream_response()` handles the full stream lifecycle including sequential HITL interrupts via `while True` loop.

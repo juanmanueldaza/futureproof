@@ -45,6 +45,7 @@ from .profile import (
     get_user_profile,
     set_target_roles,
     update_current_role,
+    update_salary_info,
     update_user_goal,
     update_user_name,
     update_user_skills,
@@ -57,6 +58,7 @@ _ALL_TOOLS = [
     get_user_profile,
     update_user_name,
     update_current_role,
+    update_salary_info,
     update_user_skills,
     set_target_roles,
     update_user_goal,
@@ -105,6 +107,7 @@ __all__ = [
     "get_user_profile",
     "update_user_name",
     "update_current_role",
+    "update_salary_info",
     "update_user_skills",
     "set_target_roles",
     "update_user_goal",
@@ -154,7 +157,7 @@ __all__ = [
 def get_all_tools() -> list:
     """Get all career intelligence tools for the agent.
 
-    Returns all 36 tools: profile, gathering, github, gitlab, analysis,
+    Returns all 37 tools: profile, gathering, github, gitlab, analysis,
     market, generation, knowledge, and memory.
     """
     return list(_ALL_TOOLS)
