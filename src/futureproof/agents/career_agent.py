@@ -24,12 +24,14 @@ from typing import Any
 from langchain.agents import create_agent
 from langchain.agents.middleware.summarization import SummarizationMiddleware
 
-from futureproof.agents.middleware import ToolCallRepairMiddleware
+from futureproof.agents.middleware import (
+    AnalysisSynthesisMiddleware,
+    ToolCallRepairMiddleware,
+    build_dynamic_prompt,
+)
 from futureproof.agents.tools import get_all_tools
 from futureproof.llm.fallback import get_model_with_fallback
 from futureproof.memory.checkpointer import get_checkpointer
-from futureproof.memory.profile import load_profile
-from futureproof.prompts import load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -59,42 +61,38 @@ def _get_summary_model():
     return model
 
 
-def _get_user_profile_context() -> str:
-    """Get user profile context for system prompts."""
-    profile = load_profile()
-    return profile.summary() if profile.name else "No profile configured yet."
-
-
 def create_career_agent(
     model=None,
     checkpointer=None,
-    profile_context=None,
 ):
     """Create the career intelligence agent (cached singleton).
 
     Accepts optional dependency overrides for testing. When all args are None
     (the default), uses the cached singleton for performance.
 
+    The system prompt is generated dynamically on every model call via
+    build_dynamic_prompt middleware — it injects live profile and knowledge
+    base stats so the model always knows what data is available.
+
     Args:
         model: Optional LLM model override
         checkpointer: Optional checkpointer override
-        profile_context: Optional profile context string override
 
     Returns:
         A compiled agent with all career intelligence tools
     """
     global _cached_agent
-    using_defaults = all(arg is None for arg in (model, checkpointer, profile_context))
+    using_defaults = all(arg is None for arg in (model, checkpointer))
 
     if _cached_agent is not None and using_defaults:
         return _cached_agent
 
     model = model or get_model()
     checkpointer = checkpointer or get_checkpointer()
-    profile_context = profile_context or _get_user_profile_context()
 
     summary_model = _get_summary_model()
     repair = ToolCallRepairMiddleware()
+    analysis_display = AnalysisSynthesisMiddleware()
     summarization = SummarizationMiddleware(
         model=summary_model,
         trigger=("tokens", 32000),
@@ -104,8 +102,7 @@ def create_career_agent(
     agent = create_agent(
         model=model,
         tools=get_all_tools(),
-        system_prompt=load_prompt("system").format(user_profile=profile_context),
-        middleware=[repair, summarization],  # repair runs before summarization
+        middleware=[build_dynamic_prompt, repair, analysis_display, summarization],
         checkpointer=checkpointer,
     )
 

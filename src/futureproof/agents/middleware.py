@@ -1,13 +1,210 @@
-"""Agent middleware for state repair."""
+"""Agent middleware for state repair and dynamic prompt injection."""
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
-from langchain.agents.middleware.types import AgentMiddleware, AgentState
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain.agents.middleware import dynamic_prompt
+from langchain.agents.middleware.types import (
+    AgentMiddleware,
+    AgentState,
+    ModelRequest,
+    ModelResponse,
+)
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.runtime import Runtime
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Dynamic Prompt — injects live profile + knowledge stats into system prompt
+# =============================================================================
+
+
+@dynamic_prompt
+def build_dynamic_prompt(request: ModelRequest) -> str:
+    """Build system prompt with live profile and knowledge base availability.
+
+    Runs on every model call via wrap_model_call, replacing the static
+    system_prompt. This ensures the model always sees current data
+    availability as facts, not instructions it can ignore.
+    """
+    from futureproof.memory.profile import load_profile
+    from futureproof.prompts import load_prompt
+    from futureproof.services.knowledge_service import KnowledgeService
+
+    # Build profile context — show summary if any field is populated
+    profile = load_profile()
+    summary = profile.summary()
+
+    # Auto-populate profile if data exists but profile is empty
+    if summary == "No profile information available.":
+        service = KnowledgeService()
+        stats = service.get_stats()
+        if stats.get("total_chunks", 0) > 0:
+            try:
+                from futureproof.agents.tools.gathering import _auto_populate_profile
+
+                _auto_populate_profile()
+                profile = load_profile()
+                summary = profile.summary()
+            except Exception:
+                pass  # Best-effort; don't break the prompt
+
+    profile_context = summary if summary != "No profile information available." else "No profile configured yet."
+
+    # Build base system prompt with profile
+    base = load_prompt("system").format(user_profile=profile_context)
+
+    # Append live knowledge base stats
+    service = KnowledgeService()
+    stats = service.get_stats()
+    total = stats.get("total_chunks", 0)
+
+    if total > 0:
+        by_source = stats.get("by_source", {})
+        sources = [f"- {src}: {count} chunks" for src, count in by_source.items() if count > 0]
+        data_section = (
+            "\n\n## Data Availability (live)\n"
+            + "\n".join(sources)
+            + "\n\nCareer data is indexed and available. "
+            "Use it immediately — do not ask the user to provide "
+            "information that is already in the knowledge base."
+        )
+    else:
+        data_section = (
+            "\n\n## Data Availability (live)\n"
+            "No career data indexed yet. "
+            "You CANNOT answer career questions without data. "
+            "Call `gather_all_career_data` immediately — the user will "
+            "be asked to confirm before it runs."
+        )
+
+    return base + data_section
+
+
+# Analysis tools whose results are displayed directly to the user in Rich panels.
+# The outer agent doesn't need to see (and rewrite) these — it just needs to know
+# the analysis ran successfully.
+_ANALYSIS_TOOLS = frozenset({
+    "analyze_skill_gaps",
+    "analyze_career_alignment",
+    "get_career_advice",
+})
+
+_ANALYSIS_MARKER = (
+    "[Detailed analysis was displayed directly to the user. "
+    "Do not repeat or summarize it. Instead: reference salary data, "
+    "ask about current compensation if unknown, and suggest "
+    "1-2 concrete next steps.]"
+)
+
+
+class AnalysisSynthesisMiddleware(AgentMiddleware):
+    """Two-pass middleware: masks analysis results, then synthesizes the final response.
+
+    Pass 1 (before model): Replaces analysis tool results with short markers so
+    the agent model (GPT-4o) can't rewrite them into generic advice. The user
+    already sees full results in Rich UI panels during streaming.
+
+    Pass 2 (after model): When the agent produces its final response (no more
+    tool_calls) and analysis tools were used, the generic response is DISCARDED
+    and replaced with a focused synthesis from a separate LLM call that sees
+    the actual tool data and has a narrow, specific task.
+
+    Uses wrap_model_call so modifications are ephemeral — the persisted state
+    keeps the original analysis results and the synthesized response.
+    """
+
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelResponse:
+        # Phase 1: Mask analysis tool results with markers
+        modified: list[AnyMessage] = []
+        analysis_results: dict[str, str] = {}  # tool_name → original content
+        for msg in request.messages:
+            if isinstance(msg, ToolMessage) and msg.name in _ANALYSIS_TOOLS:
+                analysis_results[msg.name] = msg.content
+                modified.append(
+                    ToolMessage(
+                        content=_ANALYSIS_MARKER,
+                        name=msg.name,
+                        tool_call_id=msg.tool_call_id,
+                    )
+                )
+            else:
+                modified.append(msg)
+
+        if analysis_results:
+            logger.info(
+                "Masked %d analysis tool result(s)", len(analysis_results)
+            )
+            response = handler(request.override(messages=modified))
+        else:
+            return handler(request)
+
+        # Phase 2: If this is the final response (no tool_calls), synthesize
+        if not response.result:
+            return response
+
+        ai_msg = response.result[0]
+        if not isinstance(ai_msg, AIMessage) or ai_msg.tool_calls:
+            # Agent wants to call more tools — let it continue
+            return response
+
+        # Final response detected — replace with synthesis
+        logger.info("Synthesizing final response (replacing generic agent text)")
+        return self._synthesize(request.messages, analysis_results)
+
+    def _synthesize(
+        self,
+        messages: list[AnyMessage],
+        analysis_results: dict[str, str],
+    ) -> ModelResponse:
+        """Build a focused synthesis from tool results via a separate LLM call."""
+        from futureproof.llm.fallback import get_model_with_fallback
+        from futureproof.prompts import load_prompt
+
+        # Extract the user's question (last HumanMessage)
+        user_question = ""
+        for msg in reversed(messages):
+            if isinstance(msg, HumanMessage):
+                user_question = msg.content
+                break
+
+        # Extract non-analysis tool results (salary, profile, etc.)
+        other_results: list[str] = []
+        for msg in messages:
+            if (
+                isinstance(msg, ToolMessage)
+                and msg.name not in _ANALYSIS_TOOLS
+                and msg.content
+            ):
+                other_results.append(f"**{msg.name}:**\n{msg.content}")
+
+        # Build the tool results context
+        parts: list[str] = []
+        for name, content in analysis_results.items():
+            parts.append(f"**{name}:**\n{content}")
+        parts.extend(other_results)
+        tool_results = "\n\n---\n\n".join(parts)
+
+        # Load synthesis prompt and format
+        prompt_template = load_prompt("synthesis")
+        prompt = prompt_template.format(
+            user_question=user_question,
+            tool_results=tool_results,
+        )
+
+        # Call synthesis model
+        model, config = get_model_with_fallback(purpose="synthesis")
+        logger.info("Synthesis model: %s", config.description)
+        result = model.invoke([SystemMessage(content=prompt)])
+
+        return ModelResponse(result=[result])
 
 
 class ToolCallRepairMiddleware(AgentMiddleware):

@@ -1,24 +1,24 @@
 Identify gaps between stated career goals and actual professional activities.
 
-Base analysis only on provided data. If information is missing for a section, state what's absent rather than speculating.
+Base analysis only on provided data. If information is missing, state what's absent rather than speculating.
 
 {career_data}
 
-## Analysis Framework
+**Keep total output under 600 words.** Use bullet points, not paragraphs. Every bullet must cite specific evidence from the data.
 
-1. **Stated Goals** — extract from LinkedIn headline, summary, "About" section, portfolio mission statement, and any explicit goal statements. If no explicit goals are found, state "No explicit goals provided in the data."
+## Output Format
 
-2. **Actual Activities** — evidence from repositories, programming languages used, project types, contribution patterns, technologies actively practiced. List only what has evidence in the data.
+### Alignment Score: X/100
+One sentence with specific evidence (e.g., "68/100 — claims Agentic AI specialist but no public agentic AI projects in repos").
 
-3. **Gap Identification** — for each gap, cite specific evidence: skills mentioned in goals but absent in activities, technologies required for stated targets but not practiced, misalignment between claimed expertise and demonstrated work.
+### Active Strengths (demonstrated in practice)
+- [Skill/tech]: [evidence — project name, role, contribution] (3-5 bullets)
 
-4. **Alignment Score (0-100)**
-   - 90-100: Goals and activities are closely aligned
-   - 70-89: Strong alignment with minor gaps
-   - 50-69: Moderate alignment, significant gaps present
-   - 30-49: Poor alignment, major discrepancies
-   - 0-29: Goals and activities are largely disconnected
+### Gaps (stated but not demonstrated)
+- [Gap]: [claimed in X but absent from Y] (3-5 bullets)
+- Be specific: "No Python ML projects despite listing ML in skills" not "limited ML experience"
 
-   Explain the score with specific examples from the data.
-
-5. **Recommendations** — top 3 actions to close the largest gaps, ranked by impact. Include concrete steps (e.g., "Build a project using X" rather than "Learn more about X").
+### Top 3 Actions (ranked by impact)
+1. [Action] — closes gap in [specific skill/area]. Concrete step, not vague advice.
+2. [Action] — builds on [specific existing strength/project].
+3. [Action] — addresses [specific missing portfolio piece or credential].

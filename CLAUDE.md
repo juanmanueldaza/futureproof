@@ -20,7 +20,7 @@ FutureProof is a career intelligence system powered by a conversational AI agent
 src/futureproof/
 ├── agents/
 │   ├── career_agent.py  # Single agent with create_agent(), system prompt, caching
-│   ├── middleware.py    # ToolCallRepairMiddleware (fixes orphaned parallel tool results)
+│   ├── middleware.py    # build_dynamic_prompt (live system prompt) + ToolCallRepairMiddleware
 │   ├── orchestrator.py  # LangGraph Functional API (@entrypoint/@task) for analysis
 │   ├── state.py         # TypedDict state definitions (CareerState, etc.)
 │   ├── helpers/         # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
@@ -79,6 +79,7 @@ All functionality is accessible through the **chat interface** via a single agen
 
 - **Single agent**: One agent with all 39 tools — profile, gathering, github, gitlab, analysis, generation, knowledge, market, financial, memory
 - **Human-in-the-loop**: `interrupt()` on `generate_cv`, `gather_all_career_data`, and `clear_career_knowledge` for user confirmation
+- **Dynamic system prompt**: `build_dynamic_prompt` (`@dynamic_prompt` middleware) generates the system prompt on every model call, injecting live profile summary and knowledge base stats (chunk counts per source) so the model knows what data is available without calling tools
 - **State repair**: `ToolCallRepairMiddleware` detects orphaned `tool_calls` (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages so the model can proceed
 - **Context management**: `SummarizationMiddleware` auto-summarizes old messages (triggers at 32k tokens, keeps last 20 messages, uses separate cheaper model)
 - **Memory**: ChromaDB for persistent episodic memory (decisions, applications) and career knowledge RAG
@@ -219,10 +220,10 @@ Rich-based terminal UI components. Verbose mode display functions: `display_tool
 Streaming chat client with HITL interrupt loop (iterative, not recursive), summary echo stripping, fallback retry, tool timing. Always shows Rich UI output (tool badges, timing, model info) via `chat/ui.py`. `_stream_response()` handles the full stream lifecycle including sequential HITL interrupts via `while True` loop.
 
 ### `agents/career_agent.py`
-Single agent with `create_agent()`, unified system prompt, `ToolCallRepairMiddleware` + `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `get_agent_config()`, `get_agent_model_name()`, `reset_career_agent()`.
+Single agent with `create_agent()`, dynamic system prompt via `build_dynamic_prompt`, `ToolCallRepairMiddleware` + `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `get_agent_config()`, `get_agent_model_name()`, `reset_career_agent()`.
 
 ### `agents/middleware.py`
-`ToolCallRepairMiddleware` — detects orphaned `tool_calls` in message history (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages. Runs as a `before_model` hook before `SummarizationMiddleware`.
+`build_dynamic_prompt` — `@dynamic_prompt` middleware that generates the system prompt on every model call. Injects live profile summary and knowledge base stats (chunk counts per source) so the model knows what data is available without needing to call tools. `ToolCallRepairMiddleware` — detects orphaned `tool_calls` in message history (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages. Middleware order: `[build_dynamic_prompt, repair, summarization]`.
 
 ### `agents/orchestrator.py`
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).

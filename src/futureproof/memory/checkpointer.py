@@ -73,8 +73,9 @@ def clear_thread_history(thread_id: str) -> None:
     conn = sqlite3.connect(str(db_path))
     try:
         cursor = conn.cursor()
-        # LangGraph stores checkpoints with thread_id in the config
+        # LangGraph stores data across both tables with thread_id
         cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
+        cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
         conn.commit()
     finally:
         conn.close()
@@ -95,7 +96,10 @@ def list_threads() -> list[str]:
     conn = sqlite3.connect(str(db_path))
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
+        cursor.execute(
+            "SELECT DISTINCT thread_id FROM checkpoints "
+            "UNION SELECT DISTINCT thread_id FROM writes"
+        )
         return [row[0] for row in cursor.fetchall()]
     except sqlite3.OperationalError:
         # Table doesn't exist yet

@@ -1,7 +1,11 @@
 """Data gathering tools for the career agent."""
 
+import logging
+
 from langchain_core.tools import tool
 from langgraph.types import interrupt
+
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -19,6 +23,92 @@ def gather_portfolio_data(url: str | None = None) -> str:
     service = GathererService()
     service.gather_portfolio(url)
     return "Portfolio data gathered and indexed to knowledge base."
+
+
+def _auto_populate_profile() -> str | None:
+    """Populate empty profile fields from knowledge base after gathering.
+
+    Searches for name, role, and location from LinkedIn data and updates
+    the profile. Returns a summary of what was populated, or None.
+    """
+    from futureproof.memory.profile import edit_profile, load_profile
+    from futureproof.services.knowledge_service import KnowledgeService
+
+    profile = load_profile()
+    if profile.name and profile.current_role:
+        return None  # Already populated
+
+    service = KnowledgeService()
+    updates: list[str] = []
+
+    # Search for profile headline (contains name, role, location)
+    results = service.search(
+        query="headline name title location",
+        limit=3,
+        sources=["linkedin"],
+        section="Profile",
+    )
+    if not results:
+        # Fallback: broader search
+        results = service.search(
+            query="name role title company",
+            limit=3,
+            sources=["linkedin"],
+        )
+
+    if not results:
+        return None
+
+    # Parse the top result for name, role, location
+    content = results[0].get("content", "")
+    lines = content.strip().split("\n")
+
+    def _clean(text: str) -> str:
+        """Strip markdown bold markers and whitespace."""
+        return text.strip().strip("*").strip()
+
+    name = ""
+    role = ""
+    location = ""
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        lower = line.lower()
+        # Common LinkedIn profile patterns (may have **bold** markdown)
+        if "name:" in lower or "first name:" in lower:
+            name = _clean(line.split(":", 1)[1])
+        elif "headline:" in lower:
+            role = _clean(line.split(":", 1)[1])
+        elif "location:" in lower or "geo location:" in lower:
+            location = _clean(line.split(":", 1)[1])
+
+    # If structured parsing didn't work, use first non-empty line as name
+    if not name and lines:
+        first = _clean(lines[0])
+        # Heuristic: first line is often the name if it's short and has no colons
+        if first and ":" not in first and len(first) < 60:
+            name = first
+
+    def _update(p):
+        if not p.name and name:
+            p.name = name
+            updates.append(f"name={name}")
+        if not p.current_role and role:
+            p.current_role = role
+            updates.append(f"role={role}")
+        if not p.location and location:
+            p.location = location
+            updates.append(f"location={location}")
+
+    if name or role or location:
+        edit_profile(_update)
+
+    if updates:
+        msg = f"Auto-populated profile: {', '.join(updates)}"
+        logger.info(msg)
+        return msg
+    return None
 
 
 @tool
@@ -57,6 +147,15 @@ def gather_all_career_data() -> str:
     successful = sum(1 for s in results.values() if s)
     total = len(results)
     result_parts.append(f"\n{successful}/{total} sources gathered and indexed.")
+
+    # Auto-populate profile from gathered data
+    if successful > 0:
+        try:
+            populated = _auto_populate_profile()
+            if populated:
+                result_parts.append(f"\n{populated}")
+        except Exception as e:
+            logger.warning("Auto-populate profile failed: %s", e)
 
     return "\n".join(result_parts)
 

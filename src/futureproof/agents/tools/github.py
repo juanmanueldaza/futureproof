@@ -65,13 +65,62 @@ def get_github_repo(owner: str, repo: str, path: str = "") -> str:
 
 
 @tool
-def get_github_profile() -> str:
+def get_github_profile(include_repos: bool = False) -> str:
     """Get the authenticated GitHub user's profile.
 
     Returns the current user's GitHub profile information including
     username, name, bio, public repos, followers, etc.
 
+    Args:
+        include_repos: If True, also fetches the user's recent repos
+            (sorted by last updated). Use this for career analysis so
+            the agent can see what the user is actually building.
+
     Use this when the user asks about their GitHub profile or to identify
     their GitHub username.
     """
-    return run_async(_github_call("get_me", {}))
+    return run_async(_get_github_profile(include_repos))
+
+
+async def _get_github_profile(include_repos: bool) -> str:
+    """Fetch profile and optionally recent repos in one connection."""
+    from futureproof.mcp.base import MCPClientError
+    from futureproof.mcp.github_client import GitHubMCPClient
+
+    client = GitHubMCPClient()
+    try:
+        await client.connect()
+        profile_result = await client.call_tool("get_me", {})
+        if profile_result.is_error:
+            return f"GitHub API error: {profile_result.error_message or profile_result.content}"
+
+        if not include_repos:
+            return profile_result.content
+
+        # Extract username from profile JSON
+        import json
+        try:
+            profile_data = json.loads(profile_result.content)
+            username = profile_data.get("login", "")
+        except (json.JSONDecodeError, TypeError):
+            return profile_result.content
+
+        if not username:
+            return profile_result.content
+
+        # Fetch user's repos sorted by recently updated
+        repos_result = await client.call_tool(
+            "search_repositories",
+            {"query": f"user:{username} sort:updated", "perPage": 10},
+        )
+        repos_content = ""
+        if not repos_result.is_error:
+            repos_content = f"\n\n## Recent Repositories\n{repos_result.content}"
+
+        return profile_result.content + repos_content
+    except MCPClientError as e:
+        return f"GitHub connection error: {e}"
+    except Exception as e:
+        return f"GitHub error: {e}"
+    finally:
+        await client.disconnect()
