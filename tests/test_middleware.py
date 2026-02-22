@@ -354,6 +354,43 @@ class TestAnalysisSynthesisMiddleware:
         mock_synth.assert_not_called()
         assert response.result[0].content == "Your name is Juan."
 
+    def test_no_synthesis_for_previous_turn_analysis(self):
+        """Analysis tools from a previous turn should NOT trigger synthesis."""
+        messages = [
+            # --- Previous turn: user asked about money, analysis ran ---
+            HumanMessage(content="how to earn more?"),
+            AIMessage(
+                content="",
+                tool_calls=[{"id": "c1", "name": "analyze_career_alignment", "args": {}}],
+            ),
+            ToolMessage(
+                content="Career alignment: 92/100...",
+                tool_call_id="c1",
+                name="analyze_career_alignment",
+            ),
+            AIMessage(content="Target $150K-$190K..."),
+            # --- Current turn: user asks about LinkedIn profile ---
+            HumanMessage(content="what do you think about my linkedin profile?"),
+            AIMessage(
+                content="",
+                tool_calls=[{"id": "c2", "name": "search_career_knowledge", "args": {}}],
+            ),
+            ToolMessage(content="Profile: Juan...", tool_call_id="c2", name="search_career_knowledge"),
+        ]
+        handler, _ = self._make_handler(AIMessage(content="Your LinkedIn looks strong."))
+        request = ModelRequest(
+            model=MagicMock(),
+            messages=messages,
+            system_message=SystemMessage(content="system"),
+        )
+
+        with patch.object(self.middleware, "_synthesize") as mock_synth:
+            response = self.middleware.wrap_model_call(request, handler)
+
+        # Analysis was from a previous turn — should NOT synthesize
+        mock_synth.assert_not_called()
+        assert response.result[0].content == "Your LinkedIn looks strong."
+
     def test_synthesize_extracts_user_question(self):
         """_synthesize extracts the last HumanMessage as the user question."""
         mock_model = MagicMock()

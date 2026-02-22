@@ -122,11 +122,23 @@ class AnalysisSynthesisMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse:
+        # Find the last HumanMessage index — only consider analysis tools
+        # from the current turn (after the last user message)
+        last_human_idx = -1
+        for i in range(len(request.messages) - 1, -1, -1):
+            if isinstance(request.messages[i], HumanMessage):
+                last_human_idx = i
+                break
+
         # Phase 1: Mask analysis tool results with markers
         modified: list[AnyMessage] = []
         analysis_results: dict[str, str] = {}  # tool_name → original content
-        for msg in request.messages:
-            if isinstance(msg, ToolMessage) and msg.name in _ANALYSIS_TOOLS:
+        for idx, msg in enumerate(request.messages):
+            if (
+                isinstance(msg, ToolMessage)
+                and msg.name in _ANALYSIS_TOOLS
+                and idx > last_human_idx
+            ):
                 analysis_results[msg.name] = msg.content
                 modified.append(
                     ToolMessage(
