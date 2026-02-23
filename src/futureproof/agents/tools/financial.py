@@ -12,11 +12,14 @@ async def _call_financial(tool_name: str, args: dict) -> dict:
     from futureproof.mcp.factory import MCPClientFactory
 
     client = MCPClientFactory.create("financial")
-    async with client:
-        result = await client.call_tool(tool_name, args)
-        if result.is_error:
-            return {"error": result.error_message}
-        return json.loads(result.content)
+    try:
+        async with client:
+            result = await client.call_tool(tool_name, args)
+            if result.is_error:
+                return {"error": result.error_message}
+            return json.loads(result.content)
+    except Exception as e:
+        return {"error": f"{tool_name} failed: {e}"}
 
 
 @tool
@@ -111,8 +114,8 @@ def compare_salary_ppp(
         f"Exchange rate: 1 {currency} = {rate} USD",
     ]
 
-    source_ratio = source_ppp.get("ppp_ratio")
-    target_ratio = target_ppp.get("ppp_ratio")
+    source_ratio = source_ppp.get("ppp_ratio") if "error" not in source_ppp else None
+    target_ratio = target_ppp.get("ppp_ratio") if "error" not in target_ppp else None
 
     if source_ratio is not None and target_ratio is not None:
         # PPP adjustment: nominal_usd * (target_ppp / source_ppp)

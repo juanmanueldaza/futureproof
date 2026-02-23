@@ -131,6 +131,8 @@ class FinancialMCPClient(HTTPMCPClient):
     - PPP data: World Bank annual purchasing power parity ratios
     """
 
+    DEFAULT_TIMEOUT = 45.0  # World Bank API can be slow
+
     FOREX_URL = "https://open.er-api.com/v6/latest"
     PPP_URL = "https://api.worldbank.org/v2/country"
     PPP_INDICATOR = "PA.NUS.PPPC.RF"
