@@ -25,7 +25,13 @@ Base advice only on the provided career data. Label predictions about timelines 
 
 ### Underutilized Assets
 - [Asset]: [why it's underused and how to leverage it] (2-3 bullets)
-- If CliftonStrengths data exists, name specific themes and applications
+- If CliftonStrengths data exists, name specific themes and explain how each can be monetized or leveraged (e.g., "Ideation theme → facilitate paid innovation workshops", "Strategic theme → charge premium for advisory/consulting")
+- Consider: projects that could become products, skills suitable for freelancing, communities to join/lead
+
+### Networking & Visibility
+- Specific communities, events, or platforms where the user's skills are in demand
+- How to build reputation (speaking, writing, open source, mentoring)
+- Professional connections that could unlock opportunities
 
 ### Risks
 - [Risk]: [mitigation] (2-3 bullets, only if evidence supports it in the data)

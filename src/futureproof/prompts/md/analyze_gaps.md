@@ -13,10 +13,12 @@ One sentence with specific evidence (e.g., "68/100 — claims Agentic AI special
 
 ### Active Strengths (demonstrated in practice)
 - [Skill/tech]: [evidence — project name, role, contribution] (3-5 bullets)
+- If CliftonStrengths data exists, name the themes that amplify these strengths
 
 ### Gaps (stated but not demonstrated)
 - [Gap]: [claimed in X but absent from Y] (3-5 bullets)
 - Be specific: "No Python ML projects despite listing ML in skills" not "limited ML experience"
+- Include visibility/networking gaps: limited public presence, no speaking, no community contributions
 
 ### Top 3 Actions (ranked by impact)
 1. [Action] — closes gap in [specific skill/area]. Concrete step, not vague advice.

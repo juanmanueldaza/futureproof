@@ -13,12 +13,14 @@ One sentence explaining the score, citing specific evidence (e.g., "75/100 — h
 
 ### Top Strengths (leverage for higher income)
 - [Strength]: [specific evidence from data] (3-5 bullets)
-- If CliftonStrengths data exists, name the specific themes and how they apply
-- Consider income potential beyond employment: freelancing, consulting, products, open source monetization, courses
+- If CliftonStrengths data exists, dedicate 2-3 bullets to the specific themes — name them and explain how each one creates a competitive advantage or income opportunity (e.g., "Ideation + Strategic = natural consultant who sees patterns others miss")
+- Consider income potential beyond employment: freelancing, consulting, products, open source monetization, courses, content creation
+- Consider networking and community: speaking, open source contributions, professional communities that lead to opportunities
 
 ### Critical Gaps (fixing these unlocks higher income)
 - [Gap]: [what's missing and why it matters] (3-5 bullets)
 - Name specific missing skills, certifications, portfolio pieces, or experience types
+- Include gaps in visibility/networking if the data shows limited public presence
 
 ### Action Plan (ranked by income impact)
 1. [Specific action] — closes [specific gap] by [concrete step]. Example: "Add README + demo to FutureProof repo" not "improve documentation".
