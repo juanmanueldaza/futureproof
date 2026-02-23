@@ -20,7 +20,7 @@ FutureProof is a career intelligence system powered by a conversational AI agent
 src/futureproof/
 ├── agents/
 │   ├── career_agent.py  # Single agent with create_agent(), system prompt, caching
-│   ├── middleware.py    # build_dynamic_prompt (live system prompt) + ToolCallRepairMiddleware
+│   ├── middleware.py    # build_dynamic_prompt, AnalysisSynthesisMiddleware, ToolCallRepairMiddleware
 │   ├── orchestrator.py  # LangGraph Functional API (@entrypoint/@task) for analysis
 │   ├── state.py         # TypedDict state definitions (CareerState, etc.)
 │   ├── helpers/         # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
@@ -108,19 +108,21 @@ Shared async helper: `_async.py` with `run_async()` for sync tool → async serv
 `FallbackLLMManager` in `llm/fallback.py` tries models in order, auto-skipping on rate limits or errors:
 
 1. Azure GPT-4.1
-2. Azure GPT-4o
-3. Azure GPT-4.1 Mini
-4. Azure GPT-4o Mini
+2. Azure GPT-5 Mini
+3. Azure GPT-4o
+4. Azure GPT-4.1 Mini
+5. Azure GPT-4o Mini
 
-Uses `init_chat_model()` with `azure_openai` provider.
+Uses `init_chat_model()` with `azure_openai` provider. Reasoning models (o-series prefixes: o1, o3, o4) automatically skip `temperature` parameter.
 
-**Purpose-based routing**: Each LLM call site declares its purpose (`"agent"`, `"analysis"`, `"summary"`). If a purpose-specific deployment is configured (e.g., `AZURE_AGENT_DEPLOYMENT=gpt-5`), that model is prepended to the fallback chain for that purpose. Unconfigured purposes use the default chain. This allows using the best model for tool calling while using cheaper models for analysis, CV generation, and summarization.
+**Purpose-based routing**: Each LLM call site declares its purpose (`"agent"`, `"analysis"`, `"summary"`, `"synthesis"`). If a purpose-specific deployment is configured (e.g., `AZURE_AGENT_DEPLOYMENT=gpt-5-mini`), that model is prepended to the fallback chain for that purpose. Unconfigured purposes use the default chain. Reasoning models (o-series) automatically skip temperature parameter.
 
 | Purpose | Call Sites | Config Var | Recommended Model |
 |---|---|---|---|
-| `agent` | `create_agent()` | `AZURE_AGENT_DEPLOYMENT` | GPT-4o (stable tool calling) or GPT-5/5.2 (best) |
+| `agent` | `create_agent()` | `AZURE_AGENT_DEPLOYMENT` | GPT-5 Mini (best instruction-following) |
 | `analysis` | `invoke_llm()`, `CVGenerator` | `AZURE_ANALYSIS_DEPLOYMENT` | GPT-4.1 |
 | `summary` | `SummarizationMiddleware` | `AZURE_SUMMARY_DEPLOYMENT` | GPT-4o Mini or GPT-4.1 Mini |
+| `synthesis` | `AnalysisSynthesisMiddleware` | `AZURE_SYNTHESIS_DEPLOYMENT` | o4-mini (reasoning, precise instruction-following) |
 
 ## MCP Clients (`mcp/`)
 
@@ -182,9 +184,10 @@ Settings loaded from environment variables via Pydantic (`config.py`). All have 
 - `CV_TEMPERATURE` — CV generation temperature (default: `0.2`)
 
 ### Model Routing (optional)
-- `AZURE_AGENT_DEPLOYMENT` — Deployment for tool calling (e.g. `gpt-4o`, `gpt-5`). Empty = use default chain.
+- `AZURE_AGENT_DEPLOYMENT` — Deployment for tool calling (e.g. `gpt-5-mini`). Empty = use default chain.
 - `AZURE_ANALYSIS_DEPLOYMENT` — Deployment for analysis/CV generation (e.g. `gpt-4.1`). Empty = use default chain.
 - `AZURE_SUMMARY_DEPLOYMENT` — Deployment for summarization (e.g. `gpt-4o-mini`). Empty = use default chain.
+- `AZURE_SYNTHESIS_DEPLOYMENT` — Deployment for post-analysis synthesis (e.g. `o4-mini`). Reasoning models (o-series) supported. Empty = use default chain.
 
 ### Data Sources
 - `PORTFOLIO_URL` — Portfolio website URL
@@ -223,13 +226,13 @@ Streaming chat client with HITL interrupt loop (iterative, not recursive), summa
 Single agent with `create_agent()`, dynamic system prompt via `build_dynamic_prompt`, `ToolCallRepairMiddleware` + `SummarizationMiddleware`. Cached singleton pattern. Episodic memory persisted via ChromaDB (no runtime store). Functions: `create_career_agent()`, `get_agent_config()`, `get_agent_model_name()`, `reset_career_agent()`.
 
 ### `agents/middleware.py`
-`build_dynamic_prompt` — `@dynamic_prompt` middleware that generates the system prompt on every model call. Injects live profile summary and knowledge base stats (chunk counts per source) so the model knows what data is available without needing to call tools. `ToolCallRepairMiddleware` — detects orphaned `tool_calls` in message history (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages. Middleware order: `[build_dynamic_prompt, repair, summarization]`.
+`build_dynamic_prompt` — `@dynamic_prompt` middleware that generates the system prompt on every model call. Injects live profile summary and knowledge base stats. `AnalysisSynthesisMiddleware` — two-pass `wrap_model_call`: (1) masks analysis tool results with markers so the agent can't rewrite them, (2) when the agent produces a final response (no tool_calls) and analysis tools ran in the current turn, discards the generic response and replaces it with a focused synthesis from a separate LLM call (purpose="synthesis", e.g. o4-mini). Only considers analysis tools after the last HumanMessage (current-turn scoping). `ToolCallRepairMiddleware` — detects orphaned `tool_calls` (parallel tool results lost during HITL resume) and injects synthetic error ToolMessages. Middleware order: `[build_dynamic_prompt, repair, analysis_synthesis, summarization]`.
 
 ### `agents/orchestrator.py`
 LangGraph Functional API with `@entrypoint` and `@task` decorators. Used by `AnalysisService` for career analysis workflows (skill gaps, alignment, market analysis, advice).
 
 ### `llm/fallback.py`
-`FallbackLLMManager` with 4-model Azure chain and purpose-based routing. Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
+`FallbackLLMManager` with 5-model Azure chain and purpose-based routing (agent, analysis, summary, synthesis). Uses `init_chat_model()` with `azure_openai` provider. `get_model_with_fallback(purpose=...)` builds purpose-specific chains by prepending configured deployments. Reasoning models (o-series) auto-detected by prefix — `temperature` skipped. Auto-detects rate limits and model errors, marks failed models, tries next in chain.
 
 ### `memory/chromadb_store.py`
 `ChromaDBStore` — base class for ChromaDB-backed stores. Provides lazy-initialized PersistentClient/collection, shared `_add()`, `_query()`, `get_ids_by_filter()`, `delete_by_ids()`, `_count_by_values()`, `_get_stats()` helpers. Inherited by both `CareerKnowledgeStore` and `EpisodicStore`.
