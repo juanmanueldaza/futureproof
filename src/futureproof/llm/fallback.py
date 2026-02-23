@@ -23,11 +23,16 @@ class ModelConfig:
     provider: str
     model: str
     description: str
+    reasoning: bool = False  # Reasoning models (o-series) don't support temperature
 
+
+# Reasoning model prefixes — these don't accept temperature/top_p
+_REASONING_PREFIXES = ("o1", "o3", "o4")
 
 # Default fallback chain - ordered by preference
 DEFAULT_FALLBACK_CHAIN: list[ModelConfig] = [
     ModelConfig("azure", "gpt-4.1", "Azure GPT-4.1"),
+    ModelConfig("azure", "gpt-5-mini", "Azure GPT-5 Mini"),
     ModelConfig("azure", "gpt-4o", "Azure GPT-4o"),
     ModelConfig("azure", "gpt-4.1-mini", "Azure GPT-4.1 Mini"),
     ModelConfig("azure", "gpt-4o-mini", "Azure GPT-4o Mini"),
@@ -104,11 +109,16 @@ class FallbackLLMManager:
             raise ValueError(f"Unknown provider: {config.provider}")
         model_provider = "azure_openai"
 
-        effective_temperature = temperature if temperature is not None else self._temperature
-        kwargs: dict[str, Any] = {
-            "temperature": effective_temperature,
-            "streaming": True,
-        }
+        is_reasoning = config.reasoning or any(
+            config.model.startswith(p) for p in _REASONING_PREFIXES
+        )
+
+        kwargs: dict[str, Any] = {"streaming": True}
+
+        # Reasoning models (o-series) don't support temperature/top_p
+        if not is_reasoning:
+            effective_temperature = temperature if temperature is not None else self._temperature
+            kwargs["temperature"] = effective_temperature
 
         kwargs["azure_deployment"] = config.model
         kwargs["azure_endpoint"] = settings.azure_openai_endpoint
@@ -263,6 +273,7 @@ def get_model_for_purpose(
         "agent": settings.azure_agent_deployment,
         "analysis": settings.azure_analysis_deployment,
         "summary": settings.azure_summary_deployment,
+        "synthesis": settings.azure_synthesis_deployment,
     }
 
     deployment = deployment_map.get(purpose, "")
