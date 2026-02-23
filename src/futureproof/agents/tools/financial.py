@@ -68,7 +68,7 @@ def compare_salary_ppp(
     salary: float,
     currency: str,
     country: str,
-    target_country: str = "United States",
+    target_countries: list[str] | None = None,
 ) -> str:
     """Compare a salary across countries using both exchange rates and PPP.
 
@@ -76,13 +76,19 @@ def compare_salary_ppp(
         salary: Annual salary amount
         currency: Currency code of the salary (e.g., "ARS", "EUR")
         country: Country where the salary is earned (e.g., "Argentina")
-        target_country: Country to compare purchasing power against
-            (default: "United States")
+        target_countries: Countries to compare purchasing power against.
+            Defaults to ["United States"] if not provided. Pass multiple
+            countries for relocation comparison (e.g.,
+            ["United States", "Spain", "Germany", "United Kingdom"]).
 
-    Shows both the nominal USD conversion and the purchasing-power-adjusted
-    equivalent. Use this for cross-country salary comparison — it reveals
-    the real value of a salary beyond just the exchange rate.
+    Shows the nominal USD conversion and purchasing-power-adjusted
+    equivalents for each target country. Use this for cross-country
+    salary comparison — it reveals the real value of a salary beyond
+    just the exchange rate. Especially useful when the user is
+    considering relocation or remote work across borders.
     """
+    targets = target_countries or ["United States"]
+
     # Step 1: Convert to USD
     forex = run_async(
         _call_financial(
@@ -101,46 +107,64 @@ def compare_salary_ppp(
     source_ppp = run_async(
         _call_financial("get_ppp_factor", {"country": country})
     )
-
-    # Step 3: Get PPP factor for target country
-    target_ppp = run_async(
-        _call_financial("get_ppp_factor", {"country": target_country})
+    source_ratio = (
+        source_ppp.get("ppp_ratio") if "error" not in source_ppp else None
     )
 
     parts = [
         f"**Salary comparison: {currency} {salary:,.0f} ({country})**",
         "",
-        f"Nominal conversion: USD {nominal_usd:,.2f}",
+        f"Nominal USD value: **USD {nominal_usd:,.2f}**",
         f"Exchange rate: 1 {currency} = {rate} USD",
     ]
 
-    source_ratio = source_ppp.get("ppp_ratio") if "error" not in source_ppp else None
-    target_ratio = target_ppp.get("ppp_ratio") if "error" not in target_ppp else None
+    if source_ratio is None:
+        parts.append(f"\nNote: PPP data not available for {country}."
+                     f" Nominal conversion only.")
+        return "\n".join(parts)
 
-    if source_ratio is not None and target_ratio is not None:
-        # PPP adjustment: nominal_usd * (target_ppp / source_ppp)
-        ppp_adjusted = nominal_usd * (target_ratio / source_ratio)
-        source_year = source_ppp.get("year", "")
+    source_year = source_ppp.get("year", "")
+
+    # Step 3: Get PPP for each target and build comparison
+    comparisons: list[tuple[str, float]] = []
+    failed: list[str] = []
+
+    for target in targets:
+        target_ppp = run_async(
+            _call_financial("get_ppp_factor", {"country": target})
+        )
+        target_ratio = (
+            target_ppp.get("ppp_ratio") if "error" not in target_ppp else None
+        )
+        if target_ratio is not None:
+            ppp_adjusted = nominal_usd * (target_ratio / source_ratio)
+            comparisons.append((target, ppp_adjusted))
+        else:
+            failed.append(target)
+
+    if comparisons:
+        parts.extend(["", "**Purchasing power equivalents:**", ""])
+
+        # Table header
+        parts.append("| Country | PPP Equivalent | vs Nominal |")
+        parts.append("|---------|---------------|------------|")
+
+        for target, ppp_adjusted in comparisons:
+            multiplier = ppp_adjusted / nominal_usd if nominal_usd else 0
+            parts.append(
+                f"| {target} | USD {ppp_adjusted:,.0f} "
+                f"| {multiplier:.1f}x |"
+            )
+
         parts.extend([
-            "",
-            f"**Purchasing power equivalent in {target_country}:"
-            f" USD {ppp_adjusted:,.0f}**",
             "",
             f"This means {currency} {salary:,.0f} in {country} buys"
-            f" roughly what USD {ppp_adjusted:,.0f} buys in"
-            f" {target_country}.",
+            f" roughly what USD {comparisons[0][1]:,.0f} buys in"
+            f" {comparisons[0][0]}.",
             f"(PPP data: {source_year})",
         ])
-    elif source_ratio is not None:
-        parts.extend([
-            "",
-            f"PPP info: {source_ppp.get('interpretation', 'N/A')}",
-            f"(No PPP data available for {target_country})",
-        ])
-    else:
-        parts.append(
-            f"\nNote: PPP data not available for {country}."
-            f" Nominal conversion only."
-        )
+
+    if failed:
+        parts.append(f"\nNo PPP data available for: {', '.join(failed)}")
 
     return "\n".join(parts)

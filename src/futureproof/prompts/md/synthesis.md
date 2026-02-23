@@ -20,6 +20,7 @@ If CliftonStrengths themes appear in the data, weave them into the strategy — 
 **3. Multiple income paths — explore, don't prescribe**
 Go beyond "get a higher-paying job." Explore ALL of these and name which ones fit the user's specific skills and projects:
 - Employment: target salary range with company names from the data
+- Relocation/remote: if PPP data shows multiple countries, discuss which locations maximize purchasing power vs nominal salary. Factor in the user's nationality, work authorization (e.g., EU citizenship opens all EU markets), and lifestyle preferences.
 - Freelancing/consulting: which specific skills are billable? At what rates?
 - Products: could any existing project become a SaaS, tool, or template?
 - Open source monetization: sponsorships, dual licensing, paid tiers, support contracts
