@@ -4,7 +4,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
-Career intelligence agent — 39 tools, 12 MCP clients, 12.7k lines of Python across 85 files. Gathers career data from 5 sources, searches 7+ job boards, and generates ATS-optimized CVs through conversational chat. Built with LangChain, LangGraph, and ChromaDB.
+Career intelligence agent — 39 tools, 12 MCP clients, 13.3k lines of Python across 85 files. Gathers career data from 5 sources, searches 7+ job boards, and generates ATS-optimized CVs through conversational chat. Built with LangChain, LangGraph, and ChromaDB.
 
 ## Architecture at a Glance
 
@@ -20,7 +20,7 @@ graph LR
 
     Gather -->|LinkedIn CSV, Portfolio,<br/>CliftonStrengths| ChromaDB[(ChromaDB)]
     MCP -->|GitHub, 7 job boards,<br/>HN, Tavily, Dev.to, SO| Agent
-    Analysis --> LLM[LLM Fallback Chain<br/>4 Azure models]
+    Analysis --> LLM[LLM Fallback Chain<br/>5 Azure models]
     Gen -->|Markdown + PDF| Output[CV Output]
 
     ChromaDB -->|RAG search| Agent
@@ -30,9 +30,10 @@ graph LR
 
 - **Single agent** with `create_agent()` + 39 tools — no multi-agent routing
 - **Database-first pipeline** — gatherers index directly to ChromaDB, no intermediate files
-- **Purpose-based LLM routing** — different models for tool calling, analysis, and summarization
+- **Purpose-based LLM routing** — different models for tool calling, analysis, summarization, and synthesis
+- **Two-pass synthesis** — `AnalysisSynthesisMiddleware` replaces generic agent responses with focused, data-driven synthesis from a reasoning model
 - **Custom `ToolCallRepairMiddleware`** — fixes orphaned parallel tool results after HITL resume
-- **4-model fallback chain** with automatic rate-limit recovery
+- **5-model fallback chain** with automatic rate-limit recovery and reasoning model support (o-series)
 
 ## Architecture Decisions
 
@@ -52,8 +53,9 @@ Removed ~2,800 lines across multiple commits — the daemon module, 5 non-Azure 
 
 | What | Where | Why it matters |
 |------|-------|----------------|
+| `AnalysisSynthesisMiddleware` | [`agents/middleware.py`](src/futureproof/agents/middleware.py) | Two-pass: masks analysis results so the agent can't rewrite them, then replaces the generic final response with a focused synthesis from a reasoning model (o4-mini) |
 | `ToolCallRepairMiddleware` | [`agents/middleware.py`](src/futureproof/agents/middleware.py) | Detects orphaned `tool_calls` after HITL resume and injects synthetic ToolMessages — fixes a LangChain Send API edge case |
-| `FallbackLLMManager` | [`llm/fallback.py`](src/futureproof/llm/fallback.py) | 4-model chain with rate-limit detection, automatic failover, and purpose-based routing (`agent`/`analysis`/`summary`) |
+| `FallbackLLMManager` | [`llm/fallback.py`](src/futureproof/llm/fallback.py) | 5-model chain with rate-limit detection, automatic failover, and purpose-based routing (`agent`/`analysis`/`summary`/`synthesis`) |
 | LinkedIn CSV parser | [`gatherers/linkedin.py`](src/futureproof/gatherers/linkedin.py) | Parses 17 CSV files directly from LinkedIn ZIP — no external dependencies, 3-tier priority system |
 | MCP client registry | [`mcp/factory.py`](src/futureproof/mcp/factory.py) | OCP-compliant factory with availability checkers — add a new job board by adding one dict entry |
 | Security layers | [`utils/security.py`](src/futureproof/utils/security.py) | 13 prompt injection patterns, PII anonymization, SSRF protection, command injection prevention |
@@ -105,7 +107,7 @@ src/futureproof/
 ├── config.py               # Pydantic settings from env vars
 ├── agents/
 │   ├── career_agent.py     # Single agent with create_agent()
-│   ├── middleware.py        # ToolCallRepairMiddleware
+│   ├── middleware.py        # Dynamic prompt, AnalysisSynthesisMiddleware, ToolCallRepairMiddleware
 │   ├── orchestrator.py     # LangGraph Functional API for analysis
 │   ├── state.py            # TypedDict state definitions
 │   ├── helpers/            # Orchestrator support
@@ -130,7 +132,7 @@ src/futureproof/
 ```bash
 pip install -r requirements-dev.txt
 
-pytest tests/ -q              # 93 tests in ~1s
+pytest tests/ -q              # 138 tests in ~1s
 pyright src/futureproof       # Type checking
 ruff check .                  # Lint
 ```
