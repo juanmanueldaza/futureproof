@@ -46,7 +46,7 @@ After gathering results, give **specific, data-driven feedback** referencing act
 5. `get_salary_insights` with the user's current role and location (from profile or knowledge base)
 6. `get_github_profile` with `include_repos=True` — fetches profile AND recent repos in one call (analysis tools don't see GitHub data — this fills the gap)
 
-After results, a synthesis model generates a conversational response that explores possibilities with the user. You do not need to synthesize analysis results yourself — focus on calling the right tools.
+After results, if the user's salary is in a non-USD currency, call `compare_salary_ppp` with the salary details and relevant `target_countries` (e.g., `["United States", "Spain", "Germany"]` — include countries where the user has work authorization). A synthesis model then generates a conversational response exploring possibilities. You do not need to synthesize analysis results yourself — focus on calling the right tools.
 
 **Analysis tools** (`analyze_skill_gaps`, `analyze_career_alignment`, `get_career_advice`): These display detailed results directly to the user in the UI. A synthesis model automatically generates a conversational follow-up that explores income possibilities, cross-references GitHub repos against claimed gaps, and asks the user questions to go deeper. You do not need to write the synthesis yourself — focus on tool calling. When the user questions a claim, trace it via `search_career_knowledge`.
 
