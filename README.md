@@ -1,12 +1,29 @@
 # FutureProof
 
-[![CI](https://github.com/juanmanueldaza/futureproof/actions/workflows/ci.yml/badge.svg)](https://github.com/juanmanueldaza/futureproof/actions/workflows/ci.yml)
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
-Career intelligence agent — 39 tools, 12 MCP clients, 13.3k lines of Python across 85 files. Gathers career data from 5 sources, searches 7+ job boards, and generates ATS-optimized CVs through conversational chat. Built with LangChain, LangGraph, and ChromaDB.
+Career intelligence agent that gathers professional data, searches job boards, analyzes career trajectories, and generates ATS-optimized CVs — all through conversational chat. Built with LangChain, LangGraph, and ChromaDB on Azure OpenAI.
 
-## Architecture at a Glance
+## What It Does
+
+```
+You:   Gather all my career data
+Agent: [gathers LinkedIn, portfolio, CliftonStrengths → indexes to ChromaDB]
+
+You:   Analyze my skill gaps for Staff Engineer
+Agent: [runs skill gap analysis using your data + market trends]
+
+You:   Search for remote Python developer jobs in Europe
+Agent: [queries 7 job boards + Hacker News hiring threads]
+
+You:   Generate my CV targeting that Staff Engineer role
+Agent: [generates ATS-optimized CV in Markdown + PDF]
+```
+
+One agent, 39 tools, 12 MCP clients. Data sources: LinkedIn CSV export, GitHub (live MCP), GitLab (glab CLI), portfolio websites, CliftonStrengths PDF, 7 job boards, Hacker News, Dev.to, Stack Overflow, Tavily search.
+
+## Architecture
 
 ```mermaid
 graph LR
@@ -28,61 +45,25 @@ graph LR
     LLM -->|Purpose-based routing| Agent
 ```
 
-- **Single agent** with `create_agent()` + 39 tools — no multi-agent routing
-- **Database-first pipeline** — gatherers index directly to ChromaDB, no intermediate files
-- **Purpose-based LLM routing** — different models for tool calling, analysis, summarization, and synthesis
-- **Two-pass synthesis** — `AnalysisSynthesisMiddleware` replaces generic agent responses with focused, data-driven synthesis from a reasoning model
-- **Custom `ToolCallRepairMiddleware`** — fixes orphaned parallel tool results after HITL resume
-- **5-model fallback chain** with automatic rate-limit recovery and reasoning model support (o-series)
+**Key design decisions:**
 
-## Architecture Decisions
-
-### Multi-agent → Single agent
-
-GPT-4.1 over-delegated across agents, approximated with wrong tools, and didn't continue after handoff returns. Collapsed to a single agent with all 39 tools. Result: reliable tool selection, simpler state management, no routing logic.
-
-### File-based → Database-first pipeline
-
-The markdown chunker merged small entries (2-20 tokens each) into oversized chunks, making individual items unsearchable. Eliminated the entire file I/O layer and the markdown header roundtrip — gatherers now return `Section` NamedTuples and index directly to ChromaDB via `index_sections()`. No intermediate files, no header regex parsing.
-
-### Systematic deletion
-
-Removed ~2,800 lines across multiple commits — the daemon module, 5 non-Azure LLM providers, the multi-agent handoff system, file-based data loading, and pass-through service wrappers. Each removal motivated by SOLID/DRY/YAGNI principles.
-
-## Key Engineering
-
-| What | Where | Why it matters |
-|------|-------|----------------|
-| `AnalysisSynthesisMiddleware` | [`agents/middleware.py`](src/futureproof/agents/middleware.py) | Two-pass: masks analysis results so the agent can't rewrite them, then replaces the generic final response with a focused synthesis from a reasoning model (o4-mini) |
-| `ToolCallRepairMiddleware` | [`agents/middleware.py`](src/futureproof/agents/middleware.py) | Detects orphaned `tool_calls` after HITL resume and injects synthetic ToolMessages — fixes a LangChain Send API edge case |
-| `FallbackLLMManager` | [`llm/fallback.py`](src/futureproof/llm/fallback.py) | 5-model chain with rate-limit detection, automatic failover, and purpose-based routing (`agent`/`analysis`/`summary`/`synthesis`) |
-| LinkedIn CSV parser | [`gatherers/linkedin.py`](src/futureproof/gatherers/linkedin.py) | Parses 17 CSV files directly from LinkedIn ZIP — no external dependencies, 3-tier priority system |
-| MCP client registry | [`mcp/factory.py`](src/futureproof/mcp/factory.py) | OCP-compliant factory with availability checkers — add a new job board by adding one dict entry |
-| Security layers | [`utils/security.py`](src/futureproof/utils/security.py) | 13 prompt injection patterns, PII anonymization, SSRF protection, command injection prevention |
-| `SummarizationMiddleware` tuning | [`agents/career_agent.py`](src/futureproof/agents/career_agent.py) | Trigger at 32k tokens (not 8k default) — aggressive summarization causes models to lose multi-step instructions |
-
-## What It Does
-
-- **Data gathering** — `"Gather all my career data"` — LinkedIn, GitHub, GitLab, portfolio, CliftonStrengths
-- **Knowledge base** — `"Search my knowledge base for Python projects"` — RAG search over ChromaDB
-- **Career analysis** — `"Analyze my skill gaps for Staff Engineer"` — skill gaps, alignment, market fit
-- **Market intelligence** — `"Search for remote Python developer jobs"` — 7+ job boards, HN trends, salary data
-- **CV generation** — `"Generate my CV in ATS format"` — English/Spanish, ATS/creative, Markdown + PDF
-- **Episodic memory** — `"What job applications have I tracked?"` — decisions, applications across sessions
+- **Single agent** — multi-agent handoffs failed with GPT-4.1 (over-delegation, lost context). One agent with all tools is simpler and more reliable.
+- **Database-first pipeline** — gatherers return `Section` NamedTuples and index directly to ChromaDB. No intermediate files, no markdown header roundtrip.
+- **Two-pass synthesis** — GPT-4o genericizes analysis responses regardless of prompt engineering. `AnalysisSynthesisMiddleware` lets the agent do tool calling, then replaces its generic response with focused synthesis from a reasoning model.
+- **5-model fallback chain** — GPT-4.1 → GPT-5 Mini → GPT-4o → GPT-4.1 Mini → GPT-4o Mini, with automatic rate-limit recovery and purpose-based routing (agent/analysis/summary/synthesis).
+- **HITL confirmation** — destructive or expensive operations (CV generation, full data gathering, knowledge clearing) require user approval via LangGraph's `interrupt()`.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/juanmanueldaza/futureproof.git
 cd futureproof
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
 cp .env.example .env
 ```
 
-Minimum configuration (edit `.env`):
+Edit `.env` with your Azure OpenAI credentials:
 
 ```bash
 AZURE_OPENAI_API_KEY=your-key
@@ -90,8 +71,6 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_CHAT_DEPLOYMENT=gpt-4.1
 AZURE_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 ```
-
-Then start chatting:
 
 ```bash
 futureproof chat                    # Interactive session
@@ -103,28 +82,21 @@ futureproof memory --threads        # List conversation threads
 
 ```
 src/futureproof/
-├── cli.py                  # Typer CLI (chat, ask, memory)
-├── config.py               # Pydantic settings from env vars
 ├── agents/
-│   ├── career_agent.py     # Single agent with create_agent()
-│   ├── middleware.py        # Dynamic prompt, AnalysisSynthesisMiddleware, ToolCallRepairMiddleware
-│   ├── orchestrator.py     # LangGraph Functional API for analysis
-│   ├── state.py            # TypedDict state definitions
-│   ├── helpers/            # Orchestrator support
-│   └── tools/              # 39 tools by domain
-├── chat/                   # Streaming client with HITL, Rich UI
-├── gatherers/
-│   ├── linkedin.py         # LinkedIn ZIP → CSV parser
-│   ├── cliftonstrengths.py # CliftonStrengths PDF parser
-│   ├── portfolio/          # Website scraper (SSRF-protected)
-│   └── market/             # Job market, tech trends
-├── generators/             # CV generation (Markdown + PDF)
-├── llm/                    # FallbackLLMManager, purpose-based routing
-├── memory/                 # ChromaDB knowledge + episodic memory
-├── mcp/                    # 12 MCP clients (GitHub, job boards, HN, etc.)
-├── prompts/                # LLM prompt templates
-├── services/               # Business logic layer
-└── utils/                  # Security, data loading, logging
+│   ├── career_agent.py     # Single agent: create_agent(), 4 middlewares, singleton cache
+│   ├── middleware.py        # Dynamic prompt, synthesis, tool repair, summarization
+│   ├── orchestrator.py      # LangGraph Functional API for analysis workflows
+│   ├── helpers/             # Orchestrator support (data pipeline, LLM invoker)
+│   └── tools/              # 39 tools by domain (profile, gathering, analysis, market, etc.)
+├── chat/                   # Streaming client, HITL interrupt loop, Rich UI
+├── gatherers/              # LinkedIn CSV, CliftonStrengths PDF, portfolio scraper, market data
+├── generators/             # CV generation (Markdown + PDF via WeasyPrint)
+├── llm/                    # FallbackLLMManager: 5-model chain, purpose-based routing
+├── memory/                 # ChromaDB (knowledge RAG + episodic), chunker, profile, embeddings
+├── mcp/                    # 12 MCP clients: GitHub, Tavily, 6 job boards, HN, financial, content
+├── prompts/                # System + analysis + CV prompt templates
+├── services/               # GathererService, AnalysisService, KnowledgeService
+└── utils/                  # PII anonymization, data loading, logging
 ```
 
 ## Development
@@ -132,15 +104,16 @@ src/futureproof/
 ```bash
 pip install -r requirements-dev.txt
 
-pytest tests/ -q              # 138 tests in ~1s
+pytest tests/ -q              # Unit tests
+pytest tests/eval/ -m eval    # Eval tests (need Azure credentials)
 pyright src/futureproof       # Type checking
 ruff check .                  # Lint
 ```
 
 ## Tech Stack
 
-**Python 3.13+** · [LangChain](https://python.langchain.com/) + [LangGraph](https://langchain-ai.github.io/langgraph/) · [ChromaDB](https://www.trychroma.com/) · [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) · [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) · [WeasyPrint](https://weasyprint.org/) · [httpx](https://www.python-httpx.org/)
+**Python 3.13** · [LangChain](https://python.langchain.com/) + [LangGraph](https://langchain-ai.github.io/langgraph/) · [ChromaDB](https://www.trychroma.com/) · [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) · [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) · [WeasyPrint](https://weasyprint.org/) · [httpx](https://www.python-httpx.org/)
 
 ---
 
-Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under [GPL-2.0](LICENSE).
+Licensed under [GPL-2.0](LICENSE).
