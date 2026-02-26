@@ -1,9 +1,5 @@
 # Pull Request Template
 
-Thank you for contributing to FutureProof!
-
-Please make sure you have read the [**CONTRIBUTING.md**](https://github.com/juanmanueldaza/futureproof/blob/main/CONTRIBUTING.md) file.
-
 ## Type of change
 
 - [ ] Bug fix (non-breaking change which fixes an issue)
