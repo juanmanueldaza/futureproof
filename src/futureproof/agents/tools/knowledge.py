@@ -70,7 +70,12 @@ def search_career_knowledge(
         result_parts.append(f"\n**{i}. [{source}] {section}**")
         result_parts.append(content)
 
-    return "\n".join(result_parts)
+    output = "\n".join(result_parts)
+    if len(output) > 8000:
+        output = output[:8000] + (
+            f"\n\n... (truncated, {len(output)} chars total)"
+        )
+    return output
 
 
 @tool

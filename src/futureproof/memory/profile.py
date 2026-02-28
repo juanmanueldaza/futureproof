@@ -44,6 +44,7 @@ class UserProfile:
     name: str = ""
     email: str = ""
     location: str = ""
+    github_username: str = ""
 
     # Professional summary
     current_role: str = ""
@@ -76,6 +77,7 @@ class UserProfile:
                 "name": self.name,
                 "email": self.email,
                 "location": self.location,
+                "github_username": self.github_username,
             },
             "professional": {
                 "current_role": self.current_role,
@@ -140,6 +142,7 @@ class UserProfile:
             name=identity.get("name", ""),
             email=identity.get("email", ""),
             location=identity.get("location", ""),
+            github_username=identity.get("github_username", ""),
             current_role=professional.get("current_role", ""),
             years_experience=professional.get("years_experience", 0),
             industries=professional.get("industries", []),
@@ -162,6 +165,8 @@ class UserProfile:
 
         if self.name:
             parts.append(f"Name: {self.name}")
+        if self.github_username:
+            parts.append(f"GitHub: {self.github_username}")
         if self.current_role:
             parts.append(f"Current Role: {self.current_role}")
         if self.years_experience:

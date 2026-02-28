@@ -7,9 +7,10 @@ from langchain.agents.middleware.types import AgentState, ModelRequest, ModelRes
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from futureproof.agents.middleware import (
+    _ANALYSIS_MARKER,
     AnalysisSynthesisMiddleware,
     ToolCallRepairMiddleware,
-    _ANALYSIS_MARKER,
+    _invalidate_prompt_cache,
     build_dynamic_prompt,
 )
 
@@ -26,6 +27,12 @@ def _make_runtime():
 
 class TestBuildDynamicPrompt:
     """Tests for build_dynamic_prompt middleware."""
+
+    def setup_method(self):
+        _invalidate_prompt_cache()
+
+    def teardown_method(self):
+        _invalidate_prompt_cache()
 
     def _call_middleware(self, mock_profile, mock_stats):
         """Invoke wrap_model_call and capture the system message passed to handler."""
@@ -99,6 +106,85 @@ class TestBuildDynamicPrompt:
         # Zero-chunk sources should not appear in the data availability section
         assert "portfolio: 0" not in content
         assert "assessment: 0" not in content
+
+    def test_ttl_cache_avoids_repeated_io(self):
+        """Second call within TTL reuses cached prompt, no extra I/O."""
+        profile = MagicMock()
+        profile.name = "Juan"
+        profile.summary.return_value = "Name: Juan"
+        stats = {"total_chunks": 10, "by_source": {"linkedin": 10}}
+
+        mock_load = MagicMock(return_value=profile)
+        mock_get_stats = MagicMock(return_value=stats)
+
+        def handler(request):
+            return MagicMock()
+
+        request = ModelRequest(
+            model=MagicMock(),
+            messages=[HumanMessage(content="hello")],
+            system_message=SystemMessage(content="original"),
+        )
+
+        with (
+            patch(
+                "futureproof.memory.profile.load_profile",
+                mock_load,
+            ),
+            patch(
+                "futureproof.services.knowledge_service."
+                "KnowledgeService.get_stats",
+                mock_get_stats,
+            ),
+        ):
+            # First call — should hit I/O
+            build_dynamic_prompt.wrap_model_call(
+                request, handler,
+            )
+            assert mock_load.call_count == 1
+            assert mock_get_stats.call_count == 1
+
+            # Second call — should hit cache
+            build_dynamic_prompt.wrap_model_call(
+                request, handler,
+            )
+            assert mock_load.call_count == 1
+            assert mock_get_stats.call_count == 1
+
+    def test_get_stats_called_once_per_invocation(self):
+        """get_stats is called exactly once (not twice) per build."""
+        profile = MagicMock()
+        profile.summary.return_value = (
+            "No profile information available."
+        )
+        stats = {"total_chunks": 0, "by_source": {}}
+
+        mock_get_stats = MagicMock(return_value=stats)
+
+        def handler(request):
+            return MagicMock()
+
+        request = ModelRequest(
+            model=MagicMock(),
+            messages=[HumanMessage(content="hello")],
+            system_message=SystemMessage(content="original"),
+        )
+
+        with (
+            patch(
+                "futureproof.memory.profile.load_profile",
+                return_value=profile,
+            ),
+            patch(
+                "futureproof.services.knowledge_service."
+                "KnowledgeService.get_stats",
+                mock_get_stats,
+            ),
+        ):
+            build_dynamic_prompt.wrap_model_call(
+                request, handler,
+            )
+            assert mock_get_stats.call_count == 1
 
 
 class TestAnalysisSynthesisMiddleware:
@@ -417,7 +503,7 @@ class TestAnalysisSynthesisMiddleware:
                 return_value="Q: {user_question}\nR: {tool_results}",
             ),
         ):
-            result = self.middleware._synthesize(messages, analysis_results)
+            result = self.middleware._synthesize(messages, analysis_results, 1)
 
         # Verify the synthesis model was called
         mock_model.invoke.assert_called_once()
@@ -456,7 +542,7 @@ class TestAnalysisSynthesisMiddleware:
                 return_value="Q: {user_question}\nR: {tool_results}",
             ),
         ):
-            self.middleware._synthesize(messages, analysis_results)
+            self.middleware._synthesize(messages, analysis_results, 0)
 
         call_args = mock_model.invoke.call_args[0][0]
         prompt_content = call_args[0].content

@@ -115,10 +115,11 @@ class FallbackLLMManager:
 
         kwargs: dict[str, Any] = {"streaming": True}
 
-        # Reasoning models (o-series) don't support temperature/top_p
+        # Reasoning models (o-series) don't support temperature/top_p/max_tokens
         if not is_reasoning:
             effective_temperature = temperature if temperature is not None else self._temperature
             kwargs["temperature"] = effective_temperature
+            kwargs["max_tokens"] = 4096
 
         kwargs["azure_deployment"] = config.model
         kwargs["azure_endpoint"] = settings.azure_openai_endpoint

@@ -105,11 +105,21 @@ class ChromaDBStore:
         field: str,
         values: list[str],
     ) -> dict[str, int]:
-        """Count documents for each value of a metadata field."""
-        counts = {}
-        for value in values:
-            ids = self.get_ids_by_filter({field: value})
-            counts[value] = len(ids)
+        """Count documents for each value of a metadata field.
+
+        Uses a single ``$in`` query instead of N separate queries.
+        """
+        counts: dict[str, int] = {v: 0 for v in values}
+        if not values:
+            return counts
+        results = self.collection.get(
+            where={field: {"$in": values}},  # type: ignore[arg-type]
+            include=["metadatas"],
+        )
+        for meta in results["metadatas"] or []:
+            val = str(meta.get(field, ""))  # type: ignore[union-attr]
+            if val in counts:
+                counts[val] += 1
         return counts
 
     def _get_stats(

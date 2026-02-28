@@ -95,7 +95,7 @@ def create_career_agent(
     analysis_display = AnalysisSynthesisMiddleware()
     summarization = SummarizationMiddleware(
         model=summary_model,
-        trigger=("tokens", 32000),
+        trigger=("tokens", 16000),
         keep=("messages", 20),
     )
 

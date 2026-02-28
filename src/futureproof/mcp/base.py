@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from mcp import types as mcp_types
+
 
 @dataclass
 class MCPToolResult:
@@ -39,6 +41,30 @@ class MCPToolError(MCPClientError):
     """Raised when MCP tool call fails."""
 
     pass
+
+
+def extract_mcp_content(result: mcp_types.CallToolResult) -> tuple[str, bool]:
+    """Extract text content from an MCP CallToolResult.
+
+    Handles all MCP content types: TextContent, EmbeddedResource
+    (TextResourceContents and BlobResourceContents). Use this in any
+    stdio MCP client to avoid silently dropping file content.
+
+    Returns:
+        Tuple of (joined text content, is_error flag).
+    """
+    parts: list[str] = []
+    for item in result.content:
+        if isinstance(item, mcp_types.TextContent):
+            parts.append(item.text)
+        elif isinstance(item, mcp_types.EmbeddedResource):
+            res = item.resource
+            if isinstance(res, mcp_types.TextResourceContents) and res.text:
+                parts.append(res.text)
+            elif isinstance(res, mcp_types.BlobResourceContents) and res.blob:
+                parts.append(f"[binary content, {len(res.blob)} bytes]")
+    is_error = getattr(result, "isError", False)
+    return "\n".join(parts), is_error
 
 
 class MCPClient(ABC):

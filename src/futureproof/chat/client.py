@@ -307,15 +307,16 @@ def _stream_response(
     stream_start = time.monotonic()
     logger.debug("Stream started")
 
-    for chunk, metadata in _stream_iter():
-        if _verbose_print(chunk, metadata):
-            continue
-        acc.accumulate(chunk)
-    # Render only the final AI response once
-    display_text = _strip_summary_echo(acc.msg_buf)
-    if display_text:
-        console.print()
-        console.print(Markdown(display_text))
+    with Live(
+        Markdown(""), console=console, refresh_per_second=10,
+    ) as live:
+        for chunk, metadata in _stream_iter():
+            if _verbose_print(chunk, metadata):
+                continue
+            if acc.accumulate(chunk):
+                display_text = _strip_summary_echo(acc.msg_buf)
+                if display_text:
+                    live.update(Markdown(display_text))
     display_timing(time.monotonic() - stream_start)
 
     logger.debug("Stream ended (%.1fs)", time.monotonic() - stream_start)
@@ -353,18 +354,22 @@ def _stream_response(
         resume_start = time.monotonic()
         logger.debug("Resume stream started")
 
-        for chunk, metadata in agent.stream(
-            Command(resume=approved),
-            cast(RunnableConfig, config),
-            stream_mode="messages",
-        ):
-            if _verbose_print(chunk, metadata):
-                continue
-            resume_acc.accumulate(chunk)
-        display_text = _strip_summary_echo(resume_acc.msg_buf)
-        if display_text:
-            console.print()
-            console.print(Markdown(display_text))
+        with Live(
+            Markdown(""), console=console, refresh_per_second=10,
+        ) as resume_live:
+            for chunk, metadata in agent.stream(
+                Command(resume=approved),
+                cast(RunnableConfig, config),
+                stream_mode="messages",
+            ):
+                if _verbose_print(chunk, metadata):
+                    continue
+                if resume_acc.accumulate(chunk):
+                    display_text = _strip_summary_echo(
+                        resume_acc.msg_buf,
+                    )
+                    if display_text:
+                        resume_live.update(Markdown(display_text))
         display_timing(time.monotonic() - resume_start)
 
         logger.debug("Resume stream ended (%.1fs)", time.monotonic() - resume_start)

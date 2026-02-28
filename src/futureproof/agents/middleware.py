@@ -1,6 +1,8 @@
 """Agent middleware for state repair and dynamic prompt injection."""
 
 import logging
+import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +18,13 @@ from langgraph.runtime import Runtime
 
 logger = logging.getLogger(__name__)
 
+# TTL cache for build_dynamic_prompt — avoids repeated disk I/O
+# and ChromaDB queries across the 3-5 model calls per user message.
+_prompt_cache: str | None = None
+_prompt_cache_time: float = 0.0
+_prompt_cache_lock = threading.Lock()
+_PROMPT_TTL = 5.0  # seconds
+
 
 # =============================================================================
 # Dynamic Prompt — injects live profile + knowledge stats into system prompt
@@ -24,27 +33,51 @@ logger = logging.getLogger(__name__)
 
 @dynamic_prompt
 def build_dynamic_prompt(request: ModelRequest) -> str:
-    """Build system prompt with live profile and knowledge base availability.
+    """Build system prompt with live profile and knowledge base stats.
 
     Runs on every model call via wrap_model_call, replacing the static
-    system_prompt. This ensures the model always sees current data
-    availability as facts, not instructions it can ignore.
+    system_prompt. Uses a 5-second TTL cache to avoid repeated disk I/O
+    and ChromaDB queries across the 3-5 model calls per user message.
     """
+    global _prompt_cache, _prompt_cache_time
+
+    now = time.monotonic()
+    with _prompt_cache_lock:
+        if (
+            _prompt_cache is not None
+            and (now - _prompt_cache_time) < _PROMPT_TTL
+        ):
+            return _prompt_cache
+
+    result = _build_prompt_uncached()
+
+    with _prompt_cache_lock:
+        _prompt_cache = result
+        _prompt_cache_time = time.monotonic()
+
+    return result
+
+
+def _build_prompt_uncached() -> str:
+    """Generate the full system prompt (no caching)."""
     from futureproof.memory.profile import load_profile
     from futureproof.prompts import load_prompt
     from futureproof.services.knowledge_service import KnowledgeService
 
-    # Build profile context — show summary if any field is populated
+    # Single stats call — reused for auto-populate and data section
+    service = KnowledgeService()
+    stats = service.get_stats()
+
     profile = load_profile()
     summary = profile.summary()
 
     # Auto-populate profile if data exists but profile is empty
     if summary == "No profile information available.":
-        service = KnowledgeService()
-        stats = service.get_stats()
         if stats.get("total_chunks", 0) > 0:
             try:
-                from futureproof.agents.tools.gathering import _auto_populate_profile
+                from futureproof.agents.tools.gathering import (
+                    _auto_populate_profile,
+                )
 
                 _auto_populate_profile()
                 profile = load_profile()
@@ -52,19 +85,25 @@ def build_dynamic_prompt(request: ModelRequest) -> str:
             except Exception:
                 pass  # Best-effort; don't break the prompt
 
-    profile_context = summary if summary != "No profile information available." else "No profile configured yet."
-
-    # Build base system prompt with profile
-    base = load_prompt("system").format(user_profile=profile_context)
+    profile_context = (
+        summary
+        if summary != "No profile information available."
+        else "No profile configured yet."
+    )
+    base = load_prompt("system").format(
+        user_profile=profile_context,
+    )
 
     # Append live knowledge base stats
-    service = KnowledgeService()
-    stats = service.get_stats()
     total = stats.get("total_chunks", 0)
 
     if total > 0:
         by_source = stats.get("by_source", {})
-        sources = [f"- {src}: {count} chunks" for src, count in by_source.items() if count > 0]
+        sources = [
+            f"- {src}: {count} chunks"
+            for src, count in by_source.items()
+            if count > 0
+        ]
         data_section = (
             "\n\n## Data Availability (live)\n"
             + "\n".join(sources)
@@ -77,11 +116,18 @@ def build_dynamic_prompt(request: ModelRequest) -> str:
             "\n\n## Data Availability (live)\n"
             "No career data indexed yet. "
             "You CANNOT answer career questions without data. "
-            "Call `gather_all_career_data` immediately — the user will "
-            "be asked to confirm before it runs."
+            "Call `gather_all_career_data` immediately — the user "
+            "will be asked to confirm before it runs."
         )
 
     return base + data_section
+
+
+def _invalidate_prompt_cache() -> None:
+    """Clear the dynamic prompt TTL cache. For tests."""
+    global _prompt_cache
+    with _prompt_cache_lock:
+        _prompt_cache = None
 
 
 # Analysis tools whose results are displayed directly to the user in Rich panels.
@@ -169,12 +215,15 @@ class AnalysisSynthesisMiddleware(AgentMiddleware):
 
         # Final response detected — replace with synthesis
         logger.info("Synthesizing final response (replacing generic agent text)")
-        return self._synthesize(request.messages, analysis_results)
+        return self._synthesize(
+            request.messages, analysis_results, last_human_idx,
+        )
 
     def _synthesize(
         self,
         messages: list[AnyMessage],
         analysis_results: dict[str, str],
+        last_human_idx: int,
     ) -> ModelResponse:
         """Build a focused synthesis from tool results via a separate LLM call."""
         from futureproof.llm.fallback import get_model_with_fallback
@@ -187,9 +236,9 @@ class AnalysisSynthesisMiddleware(AgentMiddleware):
                 user_question = msg.content
                 break
 
-        # Extract non-analysis tool results (salary, profile, etc.)
+        # Only collect tool results from current turn (after last user msg)
         other_results: list[str] = []
-        for msg in messages:
+        for msg in messages[last_human_idx:]:
             if (
                 isinstance(msg, ToolMessage)
                 and msg.name not in _ANALYSIS_TOOLS

@@ -7,12 +7,11 @@ with the official GitHub MCP server.
 import logging
 from typing import Any
 
-from mcp import types
 from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from ..config import settings
-from .base import MCPClient, MCPConnectionError, MCPToolError, MCPToolResult
+from .base import MCPClient, MCPConnectionError, MCPToolError, MCPToolResult, extract_mcp_content
 
 logger = logging.getLogger(__name__)
 
@@ -124,16 +123,10 @@ class GitHubMCPClient(MCPClient):
 
         try:
             result = await self._session.call_tool(tool_name, arguments)
-
-            content_parts = []
-            for content in result.content:
-                if isinstance(content, types.TextContent):
-                    content_parts.append(content.text)
-
-            is_error = getattr(result, "isError", False)
+            content, is_error = extract_mcp_content(result)
 
             return MCPToolResult(
-                content="\n".join(content_parts),
+                content=content,
                 raw_response=result,
                 tool_name=tool_name,
                 is_error=is_error,
