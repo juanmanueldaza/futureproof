@@ -116,7 +116,7 @@ def gather_all_career_data() -> str:
     """Gather data from all configured sources.
 
     Gathers from Portfolio (if configured), and also auto-detects
-    LinkedIn ZIP exports and CliftonStrengths PDFs in data/raw/.
+    LinkedIn ZIP exports and CliftonStrengths PDFs in ~/.futureproof/data/raw/.
 
     Use this to refresh all career data at once. This may take a minute.
     """
@@ -127,7 +127,7 @@ def gather_all_career_data() -> str:
             "details": (
                 "This will fetch from Portfolio, "
                 "and auto-detect LinkedIn exports and CliftonStrengths PDFs "
-                "in data/raw/. May take a minute."
+                "in ~/.futureproof/data/raw/. May take a minute."
             ),
         }
     )
@@ -165,7 +165,8 @@ def gather_linkedin_data(zip_path: str) -> str:
     """Process a LinkedIn data export ZIP file.
 
     Args:
-        zip_path: Path to the LinkedIn export ZIP file (e.g., "data/raw/LinkedIn.zip")
+        zip_path: Path to the LinkedIn export ZIP file
+            (e.g., "~/.futureproof/data/raw/LinkedIn.zip")
 
     Use this when the user has downloaded their LinkedIn data export and wants
     to import it. LinkedIn exports can be requested from LinkedIn Settings >
@@ -188,7 +189,7 @@ def gather_assessment_data(input_dir: str = "") -> str:
     """Process CliftonStrengths assessment PDFs from Gallup.
 
     Args:
-        input_dir: Directory containing Gallup PDF files. Defaults to data/raw/.
+        input_dir: Directory containing Gallup PDF files. Defaults to ~/.futureproof/data/raw/.
 
     Use this when the user has Gallup CliftonStrengths PDF reports and wants
     to import their strengths data. Looks for PDF files with names containing
@@ -203,7 +204,7 @@ def gather_assessment_data(input_dir: str = "") -> str:
     try:
         service.gather_assessment(dir_path)
     except FileNotFoundError:
-        search_dir = input_dir or "data/raw/"
+        search_dir = input_dir or "~/.futureproof/data/raw/"
         return f"No Gallup PDF files found in '{search_dir}'."
     return "CliftonStrengths assessment processed and indexed to knowledge base."
 

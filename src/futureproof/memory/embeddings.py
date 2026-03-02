@@ -35,7 +35,11 @@ class AzureOpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
     ) -> None:
         self._api_key = api_key or settings.azure_openai_api_key
         self._endpoint = endpoint or settings.azure_openai_endpoint
-        self._deployment = deployment or settings.azure_embedding_deployment
+        self._deployment = (
+            deployment
+            or settings.azure_embedding_deployment
+            or "text-embedding-3-small"
+        )
         self._api_version = api_version or settings.azure_openai_api_version
         self._client: Any = None
 
@@ -246,7 +250,7 @@ def get_embedding_function() -> EmbeddingFunction[Documents]:
     model = settings.embedding_model
     base: EmbeddingFunction[Documents] | None = None
 
-    if provider == "azure" and settings.azure_embedding_deployment:
+    if provider == "azure":
         logger.info("Using Azure OpenAI embeddings")
         base = AzureOpenAIEmbeddingFunction()
 

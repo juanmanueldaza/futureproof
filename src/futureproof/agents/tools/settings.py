@@ -50,7 +50,7 @@ _RESTART_KEYS = {
 _SENSITIVE_KEYS = {
     "futureproof_proxy_key", "openai_api_key", "anthropic_api_key",
     "google_api_key", "azure_openai_api_key", "azure_openai_endpoint",
-    "azure_chat_deployment", "azure_embedding_deployment",
+    "azure_embedding_deployment",
     "github_personal_access_token", "github_mcp_token", "tavily_api_key",
 }
 

@@ -38,11 +38,16 @@ class Settings(BaseSettings):
     azure_openai_api_key: str = ""  # https://ai.azure.com/
     azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com/
     azure_openai_api_version: str = "2024-12-01-preview"
-    azure_chat_deployment: str = ""  # e.g. "gpt-4.1"
-    azure_embedding_deployment: str = ""  # e.g. "text-embedding-3-small"
+    azure_embedding_deployment: str = "text-embedding-3-small"
 
-    # Ollama (local models)
-    ollama_base_url: str = "http://localhost:11434"
+    # Azure purpose-specific deployments (predefined, overridable via env)
+    azure_agent_deployment: str = "gpt-5-mini"
+    azure_analysis_deployment: str = "gpt-4.1"
+    azure_summary_deployment: str = "gpt-4o-mini"
+    azure_synthesis_deployment: str = "o4-mini"
+
+    # Ollama (local models — set explicitly via /setup to enable)
+    ollama_base_url: str = ""
 
     # Purpose-specific models (provider-agnostic, optional)
     agent_model: str = ""      # e.g. "gpt-5-mini", "claude-sonnet-4-20250514"
@@ -50,12 +55,6 @@ class Settings(BaseSettings):
     summary_model: str = ""    # e.g. "gpt-4o-mini", "claude-haiku-4-5-20251001"
     synthesis_model: str = ""  # e.g. "o4-mini"
     embedding_model: str = ""  # e.g. "text-embedding-3-small", "nomic-embed-text"
-
-    # Legacy Azure purpose-specific deployments (backward compat, prefer above)
-    azure_agent_deployment: str = ""
-    azure_analysis_deployment: str = ""
-    azure_summary_deployment: str = ""
-    azure_synthesis_deployment: str = ""
 
     # User profiles
     portfolio_url: str = "https://daza.ar"
@@ -173,17 +172,11 @@ class Settings(BaseSettings):
         """Get the market data cache directory."""
         return self.data_dir / "cache" / "market"
 
-    # Paths (computed from project root)
-    @property
-    def project_root(self) -> Path:
-        """Get the project root directory."""
-        # config.py is at src/futureproof/config.py, so go up 3 levels
-        return Path(__file__).parent.parent.parent
-
+    # Paths (user-level, under ~/.futureproof/)
     @property
     def data_dir(self) -> Path:
-        """Get the data directory."""
-        return self.project_root / "data"
+        """Get the data directory (~/.futureproof/data/)."""
+        return Path.home() / ".futureproof" / "data"
 
     @property
     def raw_dir(self) -> Path:
