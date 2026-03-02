@@ -117,8 +117,8 @@ class Settings(BaseSettings):
 
     @property
     def has_openai(self) -> bool:
-        """Check if OpenAI is configured."""
-        return bool(self.openai_api_key)
+        """Check if OpenAI is configured (key must start with sk-)."""
+        return bool(self.openai_api_key and self.openai_api_key.startswith("sk-"))
 
     @property
     def has_anthropic(self) -> bool:
