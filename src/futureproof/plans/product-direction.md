@@ -4,13 +4,13 @@
 
 FutureProof is a **free, local-first** career intelligence tool. All data stays on the user's machine — ChromaDB, SQLite conversations, YAML profile, generated CVs. It is not a SaaS. Not a hosted platform. A tool you install and own.
 
-All 41 tools, all analysis workflows, CV generation — free with no gates. The only variable cost is LLM compute, which users control: use the FutureProof proxy (default), bring your own API keys, or run local models with Ollama.
+All tools, all analysis workflows, CV generation — free with no gates. The only variable cost is LLM compute, which users control: use the FutureProof proxy (default), bring your own API keys, or run local models with Ollama.
 
 ---
 
 ## Architecture Overview
 
-The core architecture is unchanged. What changes is LLM provider support (Azure-only → multi-provider).
+The core architecture is unchanged. Multi-provider LLM support is fully implemented.
 
 ```
 CLI (Typer)
@@ -20,7 +20,7 @@ CLI (Typer)
             ├─ ChromaDB PersistentClient (~/.futureproof/episodic/)
             ├─ SqliteSaver checkpointer (~/.futureproof/memory.db)
             ├─ Profile YAML (~/.futureproof/profile.yaml)
-            ├─ MCP Clients (12: GitHub, Tavily, job boards, HN, financial)
+            ├─ MCP Clients (13: GitHub, Tavily, job boards, HN, financial, content)
             └─ Services (KnowledgeService, GathererService, AnalysisService)
 ```
 
@@ -44,11 +44,13 @@ Multi-provider LLM support is implemented in `src/futureproof/llm/fallback.py` a
 
 ## Monetization: FutureProof LLM Proxy
 
+> **Status: Planned** — The proxy is not yet operational. The sections below describe the target experience.
+
 ### The Model
 
 Following Zed Editor and Warp Terminal: free tool with hosted LLM compute as the **default** experience.
 
-**New users get free starter tokens** — enough for several career analysis sessions. `pip install futureproof` → works immediately, no API key setup, no provider configuration. This eliminates onboarding friction entirely.
+**New users will get free starter tokens** — enough for several career analysis sessions. Once published to PyPI, `pip install futureproof` will work immediately with no API key setup or provider configuration, eliminating onboarding friction entirely.
 
 **After free tokens**: pay-as-you-go at API cost + ~10% markup, or switch to BYOK/Ollama at any time. No lock-in.
 

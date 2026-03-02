@@ -35,7 +35,7 @@ src/futureproof/
 ├── generators/              # CV generation (Markdown + PDF via WeasyPrint)
 ├── llm/                     # FallbackLLMManager, multi-provider fallback, purpose routing
 ├── memory/                  # ChromaDB stores (knowledge + episodic), chunker, profile, embeddings
-├── mcp/                     # 12 clients: GitHub, Tavily, job boards, HN, financial, content
+├── mcp/                     # 13 clients: GitHub, Tavily, job boards, HN, financial, content
 ├── prompts/                 # System + analysis + CV prompt templates (markdown files)
 ├── services/                # GathererService, AnalysisService, KnowledgeService
 └── utils/                   # PII anonymization, data loading, logging
