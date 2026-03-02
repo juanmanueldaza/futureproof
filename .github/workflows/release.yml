@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tools
+        run: |
+          pip install build
+          sudo apt-get update
+          sudo apt-get install -y ruby-fpm
+
+      - name: Build wheel
+        run: python -m build
+
+      - name: Create staging venv
+        run: |
+          python3.13 -m venv /tmp/futureproof-staging
+          /tmp/futureproof-staging/bin/pip install dist/futureproof-*.whl
+
+      - name: Verify binary works
+        run: /tmp/futureproof-staging/bin/futureproof --version
+
+      - name: Build .deb
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p /tmp/deb-scripts
+
+          cat > /tmp/deb-scripts/after-install.sh << 'SCRIPT'
+          #!/bin/bash
+          ln -sf /opt/futureproof/bin/futureproof /usr/local/bin/futureproof
+          SCRIPT
+
+          cat > /tmp/deb-scripts/after-remove.sh << 'SCRIPT'
+          #!/bin/bash
+          rm -f /usr/local/bin/futureproof
+          SCRIPT
+
+          chmod +x /tmp/deb-scripts/*.sh
+
+          fpm \
+            -s dir \
+            -t deb \
+            --name futureproof \
+            --version "$VERSION" \
+            --architecture amd64 \
+            --description "Career intelligence system — AI-powered career analysis and CV generation" \
+            --url "https://github.com/juanmanueldaza/futureproof" \
+            --license "GPL-2.0-only" \
+            --maintainer "Juan Manuel Daza" \
+            --depends "libpango-1.0-0" \
+            --depends "libpangoft2-1.0-0" \
+            --depends "libcairo2" \
+            --depends "libfontconfig1" \
+            --depends "libgdk-pixbuf-2.0-0" \
+            --after-install /tmp/deb-scripts/after-install.sh \
+            --after-remove /tmp/deb-scripts/after-remove.sh \
+            /tmp/futureproof-staging/=/opt/futureproof/
+
+      - name: Test .deb install
+        run: |
+          sudo dpkg -i futureproof_*.deb || true
+          sudo apt-get install -f -y
+          futureproof --version
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: |
+            dist/futureproof-*.whl
+            dist/futureproof-*.tar.gz
+            futureproof_*.deb
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-github:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: packages/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            packages/futureproof-*.whl
+            packages/futureproof-*.tar.gz
+            packages/futureproof_*.deb

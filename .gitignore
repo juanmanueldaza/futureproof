@@ -91,3 +91,4 @@ logs/
 *.zip
 data/cache/
 uv.lock
+*.deb
