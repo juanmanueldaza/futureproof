@@ -44,6 +44,7 @@ _TOOL_CATEGORIES: dict[str, tuple[str, str]] = {
     "generation": ("\u2605", "#fbbf24"),  # ★  amber
     "market": ("\u25cf", "#34d399"),  # ●  mint
     "memory": ("\u25a0", "#a78bfa"),  # ■  violet
+    "settings": ("\u2699", "#94a3b8"),  # ⚙  slate
 }
 
 _TOOL_TO_CATEGORY: dict[str, str] = {
@@ -96,6 +97,9 @@ _TOOL_TO_CATEGORY: dict[str, str] = {
     "remember_job_application": "memory",
     "recall_memories": "memory",
     "get_memory_stats": "memory",
+    # Settings
+    "get_current_config": "settings",
+    "update_setting": "settings",
 }
 
 
@@ -256,6 +260,8 @@ def display_welcome() -> None:
         ("Get career strategy advice\n\n", "#e0d8c0"),
         (" /help", "#415a77"),
         (" \u00b7 ", "#415a77"),
+        ("/setup", "#415a77"),
+        (" \u00b7 ", "#415a77"),
         ("/profile", "#415a77"),
         (" \u00b7 ", "#415a77"),
         ("/quit", "#415a77"),
@@ -298,6 +304,7 @@ def display_help() -> None:
 | Command | Description |
 |---------|-------------|
 | `/help` or `/h` | Show this help message |
+| `/setup` | Configure LLM providers and API keys |
 | `/profile` | View your career profile |
 | `/goals` | View your career goals |
 | `/clear` | Clear conversation history |

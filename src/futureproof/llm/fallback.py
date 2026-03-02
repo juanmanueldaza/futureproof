@@ -324,6 +324,15 @@ def get_fallback_manager() -> FallbackLLMManager:
     return _fallback_manager
 
 
+def reset_fallback_manager() -> None:
+    """Reset the global fallback manager, forcing re-creation on next use.
+
+    Call after settings reload when LLM provider config changes.
+    """
+    global _fallback_manager
+    _fallback_manager = None
+
+
 def _build_purpose_chain(
     model_name: str, provider: str, description: str
 ) -> list[ModelConfig]:

@@ -2,14 +2,18 @@
 
 from pathlib import Path
 
+from dotenv import set_key
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# User-level config lives alongside profile and memory data.
+_USER_ENV_PATH = Path.home() / ".futureproof" / ".env"
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", str(_USER_ENV_PATH)),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -204,3 +208,33 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+
+def get_user_env_path() -> Path:
+    """Path to the user-level .env file (~/.futureproof/.env)."""
+    return _USER_ENV_PATH
+
+
+def write_user_setting(key: str, value: str) -> None:
+    """Write a key=value pair to the user-level .env file.
+
+    Creates the file with 0o600 permissions if it doesn't exist.
+    Uses python-dotenv's set_key() for safe read-modify-write.
+    """
+    env_path = get_user_env_path()
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    if not env_path.exists():
+        env_path.touch(mode=0o600)
+    set_key(str(env_path), key, value)
+    env_path.chmod(0o600)
+
+
+def reload_settings() -> None:
+    """Reload settings from env files, updating the global singleton in-place.
+
+    All modules that imported ``settings`` by name keep their reference to
+    the same object, so mutating it ensures everyone sees the new values.
+    """
+    new = Settings()
+    for field_name in Settings.model_fields:
+        setattr(settings, field_name, getattr(new, field_name))

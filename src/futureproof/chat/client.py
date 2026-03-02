@@ -41,6 +41,7 @@ from futureproof.chat.ui import (
     display_tool_start,
     display_welcome,
 )
+from futureproof.config import settings
 from futureproof.llm.fallback import get_fallback_manager
 from futureproof.memory.checkpointer import get_data_dir
 
@@ -394,6 +395,12 @@ def run_chat(thread_id: str = "main") -> None:
     # Display welcome message
     display_welcome()
 
+    # First-run: if no LLM provider configured, launch setup wizard
+    if not settings.active_provider:
+        from futureproof.chat.setup import run_setup
+
+        run_setup(console, session, first_run=True)
+
     # Create agent
     try:
         agent = create_career_agent()
@@ -416,6 +423,17 @@ def run_chat(thread_id: str = "main") -> None:
 
             # Handle commands
             if user_input.startswith("/"):
+                if user_input.strip().lower() == "/setup":
+                    from futureproof.chat.setup import run_setup
+
+                    changed = run_setup(console, session)
+                    if changed:
+                        reset_career_agent()
+                        agent = create_career_agent()
+                        model_name = get_agent_model_name()
+                        if model_name:
+                            display_model_info(model_name)
+                    continue
                 if handle_command(user_input):
                     break
                 continue

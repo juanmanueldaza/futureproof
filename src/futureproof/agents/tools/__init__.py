@@ -52,6 +52,7 @@ from .profile import (
     update_user_name,
     update_user_skills,
 )
+from .settings import get_current_config, update_setting
 
 # Single source of truth for all agent tools.
 # Imports above make them available; this list drives __all__ and get_all_tools().
@@ -105,6 +106,9 @@ _ALL_TOOLS = [
     remember_job_application,
     recall_memories,
     get_memory_stats,
+    # Settings
+    get_current_config,
+    update_setting,
 ]
 
 __all__ = [
@@ -157,6 +161,9 @@ __all__ = [
     "remember_job_application",
     "recall_memories",
     "get_memory_stats",
+    # Settings
+    "get_current_config",
+    "update_setting",
     # Helper
     "get_all_tools",
 ]
@@ -165,7 +172,7 @@ __all__ = [
 def get_all_tools() -> list:
     """Get all career intelligence tools for the agent.
 
-    Returns all 39 tools: profile, gathering, github, gitlab, analysis,
-    market, financial, generation, knowledge, and memory.
+    Returns all 41 tools: profile, gathering, github, gitlab, analysis,
+    market, financial, generation, knowledge, memory, and settings.
     """
     return list(_ALL_TOOLS)
