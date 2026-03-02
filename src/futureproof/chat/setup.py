@@ -7,7 +7,7 @@ input -- never through the LLM agent. Used for:
 """
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from prompt_toolkit import PromptSession
 from rich import box
@@ -24,46 +24,46 @@ logger = logging.getLogger(__name__)
 _PROVIDERS: dict[str, dict] = {
     "futureproof": {
         "name": "FutureProof Proxy",
-        "description": "Zero-config, free starter tokens",
+        "description": "Zero-config, free starter tokens (not available yet)",
         "keys": [
             ("FUTUREPROOF_PROXY_KEY", "API key (from futureproof.dev/signup)", True),
         ],
     },
     "openai": {
         "name": "OpenAI",
-        "description": "GPT-4.1, GPT-5 Mini, GPT-4o",
+        "description": "GPT-4.1, GPT-5 Mini, GPT-4o (coming soon)",
         "keys": [
             ("OPENAI_API_KEY", "API key (sk-...)", True),
         ],
     },
     "anthropic": {
         "name": "Anthropic",
-        "description": "Claude Sonnet 4, Claude Haiku 4.5",
+        "description": "Claude Sonnet 4, Claude Haiku 4.5 (coming soon)",
         "keys": [
             ("ANTHROPIC_API_KEY", "API key (sk-ant-...)", True),
         ],
     },
     "google": {
         "name": "Google Gemini",
-        "description": "Gemini 2.5 Flash, Gemini 2.5 Pro",
+        "description": "Gemini 2.5 Flash, Gemini 2.5 Pro (coming soon)",
         "keys": [
             ("GOOGLE_API_KEY", "API key", True),
         ],
     },
     "azure": {
         "name": "Azure OpenAI",
-        "description": "GPT-4.1, GPT-5 Mini via Azure",
+        "description": "GPT-4.1, GPT-5 Mini via Azure ($200 free trial)",
         "keys": [
             ("AZURE_OPENAI_API_KEY", "API key", True),
-            ("AZURE_OPENAI_ENDPOINT", "Endpoint (https://...openai.azure.com/)", False),
-            ("AZURE_CHAT_DEPLOYMENT", "Chat deployment name (e.g. gpt-4.1)", False),
+            ("AZURE_OPENAI_ENDPOINT", "Endpoint URL", False),
         ],
+        "guide": "azure",
     },
     "ollama": {
         "name": "Ollama (local)",
-        "description": "Free, offline — requires Ollama installed",
+        "description": "Free, offline (coming soon)",
         "keys": [
-            ("OLLAMA_BASE_URL", "Base URL (default: http://localhost:11434)", False),
+            ("OLLAMA_BASE_URL", "Base URL", False, "http://localhost:11434"),
         ],
     },
 }
@@ -86,8 +86,11 @@ _INTEGRATIONS: dict[str, dict] = {
 }
 
 # Ordered lists for menu display
-_PROVIDER_ORDER = ["futureproof", "openai", "anthropic", "google", "azure", "ollama"]
+_PROVIDER_ORDER = ["azure", "futureproof", "openai", "anthropic", "google", "ollama"]
 _INTEGRATION_ORDER = ["github", "tavily"]
+
+# Providers not yet available for selection
+_LOCKED_PROVIDERS = {"futureproof", "openai", "anthropic", "google", "ollama"}
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -145,6 +148,14 @@ def display_config_status(console: Console) -> None:
     lines.append(Text("LLM Providers", style="bold #ffd700"))
     for pid in _PROVIDER_ORDER:
         info = _PROVIDERS[pid]
+        locked = pid in _LOCKED_PROVIDERS
+        if locked:
+            lines.append(Text.assemble(
+                ("  \u2014 ", "#555555"),
+                (info["name"], "#555555"),
+                (f" — {info['description']}", "#555555"),
+            ))
+            continue
         configured = _provider_status(pid)
         icon = "\u2714" if configured else "\u2718"
         color = "#10b981" if configured else "#ff6b6b"
@@ -187,6 +198,12 @@ def _display_menu(console: Console) -> None:
     console.print("[bold #ffd700]LLM Providers[/bold #ffd700]")
     for i, pid in enumerate(_PROVIDER_ORDER, 1):
         info = _PROVIDERS[pid]
+        if pid in _LOCKED_PROVIDERS:
+            console.print(
+                f"  [#555555]\u2014 [{i}] "
+                f"{info['name']}[/#555555]"
+            )
+            continue
         configured = _provider_status(pid)
         status = "[#10b981]\u2714[/#10b981]" if configured else "[#ff6b6b]\u2718[/#ff6b6b]"
         console.print(f"  {status} [{i}] {info['name']}")
@@ -205,6 +222,61 @@ def _display_menu(console: Console) -> None:
     console.print()
 
 
+# ── Provider guides ────────────────────────────────────────────────────
+
+_AZURE_MODELS = [
+    "gpt-5-mini",
+    "gpt-4.1",
+    "gpt-4o-mini",
+    "o4-mini",
+    "text-embedding-3-small",
+]
+
+
+def _show_azure_guide(console: Console) -> None:
+    """Show step-by-step Azure OpenAI setup instructions."""
+    model_list = "\n".join(f"     [bold #5bc0be]{m}[/bold #5bc0be]" for m in _AZURE_MODELS)
+    console.print(Panel(
+        (
+            "[bold #ffd700]Step 1[/bold #ffd700]"
+            " [#e0d8c0]Create a free Azure account[/#e0d8c0]\n"
+            "  [#5bc0be]https://azure.microsoft.com/free[/#5bc0be]\n"
+            "  [#415a77]New accounts get $200 free credit"
+            " for 30 days.[/#415a77]\n"
+            "\n"
+            "[bold #ffd700]Step 2[/bold #ffd700]"
+            " [#e0d8c0]Go to Azure AI Foundry[/#e0d8c0]\n"
+            "  [#5bc0be]https://ai.azure.com[/#5bc0be]\n"
+            "  [#415a77]Create a new project (this creates"
+            " an OpenAI resource).[/#415a77]\n"
+            "\n"
+            "[bold #ffd700]Step 3[/bold #ffd700]"
+            " [#e0d8c0]Deploy these models[/#e0d8c0]\n"
+            "  [#415a77]Go to Models + endpoints > Deploy"
+            " model.[/#415a77]\n"
+            "  [#415a77]Deploy each of these (use the exact"
+            " name as deployment name):[/#415a77]\n"
+            f"{model_list}\n"
+            "\n"
+            "[bold #ffd700]Step 4[/bold #ffd700]"
+            " [#e0d8c0]Get your credentials[/#e0d8c0]\n"
+            "  [#415a77]Go to your project > Overview.[/#415a77]\n"
+            "  [#415a77]Copy the [bold]API key[/bold]"
+            " and [bold]Endpoint URL[/bold].[/#415a77]"
+        ),
+        title="[bold #ffd700]Azure OpenAI Setup Guide[/bold #ffd700]",
+        border_style="#ffd700",
+        box=box.ROUNDED,
+        padding=(1, 2),
+    ))
+    console.print()
+
+
+_GUIDES: dict[str, Callable[[Console], None]] = {
+    "azure": _show_azure_guide,
+}
+
+
 # ── Core setup flow ─────────────────────────────────────────────────────
 
 
@@ -212,7 +284,7 @@ def _prompt_keys(
     session: PromptSession,  # type: ignore[type-arg]
     console: Console,
     name: str,
-    keys: Sequence[tuple[str, str, bool]],
+    keys: Sequence[tuple[str, str, bool] | tuple[str, str, bool, str]],
 ) -> bool:
     """Prompt the user for each key in a provider/integration.
 
@@ -220,7 +292,7 @@ def _prompt_keys(
         session: prompt_toolkit session for input
         console: Rich console for output
         name: Display name (e.g. "OpenAI")
-        keys: List of (ENV_VAR_NAME, label, is_secret) tuples
+        keys: List of (ENV_VAR_NAME, label, is_secret[, default]) tuples
 
     Returns:
         True if any value was set.
@@ -229,16 +301,21 @@ def _prompt_keys(
     console.print("[#415a77]Press Enter to skip a field.[/#415a77]\n")
 
     changed = False
-    for env_key, label, is_secret in keys:
+    for key_entry in keys:
+        env_key, label, is_secret = key_entry[0], key_entry[1], key_entry[2]
+        default = key_entry[3] if len(key_entry) > 3 else ""
+        prompt_label = f"  {label} [{default}]: " if default else f"  {label}: "
         try:
             value = session.prompt(
-                f"  {label}: ",
+                prompt_label,
                 is_password=is_secret,
             ).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[#415a77]Cancelled.[/#415a77]")
             return changed
 
+        if not value and default:
+            value = default
         if value:
             write_user_setting(env_key, value)
             display = _redact(value) if is_secret else value
@@ -310,7 +387,16 @@ def run_setup(
         offset = len(_PROVIDER_ORDER)
         if 1 <= idx <= offset:
             pid = _PROVIDER_ORDER[idx - 1]
+            if pid in _LOCKED_PROVIDERS:
+                console.print(
+                    "[#555555]This provider is not available"
+                    " yet. Please use Azure OpenAI.[/#555555]\n"
+                )
+                continue
             info = _PROVIDERS[pid]
+            guide_id = info.get("guide")
+            if guide_id and guide_id in _GUIDES:
+                _GUIDES[guide_id](console)
             changed = _prompt_keys(session, console, info["name"], info["keys"])
         elif offset < idx <= offset + len(_INTEGRATION_ORDER):
             iid = _INTEGRATION_ORDER[idx - offset - 1]
