@@ -4,7 +4,7 @@
 
 FutureProof is a **free, local-first** career intelligence tool. All data stays on the user's machine — ChromaDB, SQLite conversations, YAML profile, generated CVs. It is not a SaaS. Not a hosted platform. A tool you install and own.
 
-All 39 tools, all analysis workflows, CV generation — free with no gates. The only variable cost is LLM compute, which users control: use the FutureProof proxy (default), bring your own API keys, or run local models with Ollama.
+All 41 tools, all analysis workflows, CV generation — free with no gates. The only variable cost is LLM compute, which users control: use the FutureProof proxy (default), bring your own API keys, or run local models with Ollama.
 
 ---
 
@@ -15,7 +15,7 @@ The core architecture is unchanged. What changes is LLM provider support (Azure-
 ```
 CLI (Typer)
   └─ Chat Client (prompt_toolkit, Rich UI, streaming)
-       └─ LangGraph Agent (create_agent, 39 tools, 4 middlewares)
+       └─ LangGraph Agent (create_agent, 41 tools, 4 middlewares)
             ├─ Multi-Provider LLM (FutureProof proxy / BYOK / Ollama)
             ├─ ChromaDB PersistentClient (~/.futureproof/episodic/)
             ├─ SqliteSaver checkpointer (~/.futureproof/memory.db)
@@ -38,7 +38,7 @@ Users shouldn't be locked to Azure OpenAI. FutureProof supports multiple LLM pro
 | 2 | **BYOK cloud** — OpenAI, Anthropic, Google, Azure | User provides API keys in `.env` | User pays provider directly |
 | 3 | **Ollama** (local) | Install Ollama, pull a model | Free, offline, private |
 
-See [multi-provider-llm.md](multi-provider-llm.md) for the engineering implementation plan.
+Multi-provider LLM support is implemented in `src/futureproof/llm/fallback.py` and `src/futureproof/config.py`.
 
 ---
 
@@ -162,4 +162,4 @@ Default to requiring users to configure their own API keys. **Rejected**: create
 $15/month for a credit pool of LLM usage. **Rejected**: pass-through + markup is simpler, more honest, and avoids the sticker shock that caused Cursor's backlash. Users see exactly what they consume.
 
 ### Multi-agent architecture
-Split 39 tools across specialized agents with a router. **Rejected**: the single-agent with middleware stack already works. Multi-agent adds latency and handoff complexity for no proven benefit.
+Split 41 tools across specialized agents with a router. **Rejected**: the single-agent with middleware stack already works. Multi-agent adds latency and handoff complexity for no proven benefit.

@@ -29,9 +29,9 @@ src/futureproof/
 │   ├── orchestrator.py      # LangGraph Functional API for analysis workflows
 │   ├── state.py             # TypedDict state definitions
 │   ├── helpers/             # Orchestrator support (data_pipeline, llm_invoker, result_mapper)
-│   └── tools/               # 39 tools: profile, gathering, github, gitlab, knowledge,
-│                            #   analysis, generation, market, financial, memory
-├── chat/                    # Streaming client, HITL loop, Rich UI
+│   └── tools/               # 41 tools: profile, gathering, github, gitlab, knowledge,
+│                            #   analysis, generation, market, financial, memory, settings
+├── chat/                    # Streaming client, HITL loop, Rich UI, /setup wizard
 ├── gatherers/               # LinkedIn CSV, CliftonStrengths PDF, portfolio scraper, market data
 ├── generators/              # CV generation (Markdown + PDF via WeasyPrint)
 ├── llm/                     # FallbackLLMManager, multi-provider fallback, purpose routing
@@ -44,7 +44,7 @@ src/futureproof/
 
 ## Architecture
 
-- **Single agent** with `create_agent()` — all 39 tools, no multi-agent handoffs
+- **Single agent** with `create_agent()` — all 41 tools, no multi-agent handoffs
 - **4 middlewares** (in order): `build_dynamic_prompt` (injects live profile + knowledge stats), `ToolCallRepairMiddleware` (fixes orphaned tool_calls after HITL), `AnalysisSynthesisMiddleware` (two-pass: masks tool results, replaces generic response with focused synthesis), `SummarizationMiddleware` (32k token trigger, cheaper model)
 - **Data flow**: Gatherers return `list[Section]` → `index_sections()` → ChromaDB → search/retrieval via `KnowledgeService`
 - **HITL**: `interrupt()` on `generate_cv`, `gather_all_career_data`, `clear_career_knowledge`
@@ -86,4 +86,5 @@ All code, plans, and architecture docs must pass a DRY/KISS/YAGNI audit:
 - PII anonymization (`utils/security.py`) before sending career data to LLMs
 - SSRF protection in portfolio fetcher (blocks private IPs)
 - `subprocess.run()` with list args, no `shell=True`, 30s timeout
-- Sensitive files (CVs, profile) created with `0o600` permissions
+- Sensitive files (CVs, profile, `~/.futureproof/.env`) created with `0o600` permissions
+- API keys entered via `/setup` terminal prompt — never pass through the LLM agent

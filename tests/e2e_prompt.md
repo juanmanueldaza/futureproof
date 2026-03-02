@@ -1,6 +1,6 @@
 # FutureProof E2E Test Prompt
 
-Paste the prompt below into `futureproof chat` to exercise all 39 agent tools.
+Paste the prompt below into `futureproof chat` to exercise all 41 agent tools.
 
 **Prerequisites:**
 - LinkedIn ZIP at `data/raw/Complete_LinkedInDataExport_02-07-2026.zip.zip`
@@ -90,7 +90,12 @@ I want to do a complete setup, data gathering, analysis, and evaluation of my ca
 - Recall memories about "job applications"
 - Show memory statistics — I expect at least 1 decision and 2 applications
 
-## 13. Final Review
+## 13. Settings (2 tools)
+- Show my current configuration using get_current_config
+- Update the llm_temperature setting to 0.5 using update_setting
+- Show the config again to confirm the change took effect
+
+## 14. Final Review
 - Show my complete profile one more time
 - Show knowledge base stats (should have linkedin + portfolio + assessment data)
 - Show memory stats (should have 3+ memories)
