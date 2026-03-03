@@ -1,21 +1,14 @@
 """Financial tools for currency conversion and PPP comparison."""
 
-import json
-
 from langchain_core.tools import tool
 
-from futureproof.mcp.pool import call_tool
+from futureproof.mcp.pool import call_mcp
 
 
 def _financial(tool_name: str, args: dict) -> dict:
     """Call financial MCP via pool, return parsed result."""
-    try:
-        result = call_tool("financial", tool_name, args)
-        if result.is_error:
-            return {"error": result.error_message}
-        return json.loads(result.content)
-    except Exception as e:
-        return {"error": f"{tool_name} failed: {e}"}
+    result = call_mcp("financial", tool_name, args, parse_json=True)
+    return result if isinstance(result, dict) else {"error": result}
 
 
 @tool

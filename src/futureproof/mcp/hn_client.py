@@ -109,15 +109,6 @@ class HackerNewsMCPClient(HTTPMCPClient):
         ],
     }
 
-    # Salary patterns for extraction
-    SALARY_PATTERNS: list[str] = [
-        r"\$(\d{2,3})[kK]?\s*[-–—to]+\s*\$?(\d{2,3})[kK]",  # $150k-$200k
-        r"(\d{2,3})[kK]\s*[-–—to]+\s*(\d{2,3})[kK]",  # 150k-200k
-        r"\$(\d{3},?\d{3})\s*[-–—to]+\s*\$?(\d{3},?\d{3})",  # $150,000-$200,000
-        r"(\d{3},?\d{3})\s*[-–—to]+\s*(\d{3},?\d{3})",  # 150,000-200,000
-        r"\$(\d{2,3})[kK]",  # $150k (single value)
-        r"(\d{2,3})[kK]\s*(?:USD|usd|per year|/yr|/year)",  # 150k USD
-    ]
 
     async def list_tools(self) -> list[str]:
         """List available tools."""
@@ -198,23 +189,39 @@ class HackerNewsMCPClient(HTTPMCPClient):
         output = {"results": results, "total": len(results)}
         return self._format_response(output, data, "search_hn")
 
-    async def _get_hiring_threads(self, months: int = 3) -> MCPToolResult:
-        """Get recent 'Who is Hiring?' threads.
+    async def _get_whoishiring_threads(
+        self,
+        query: str,
+        title_filter: str,
+        months: int,
+        tool_name: str,
+        *,
+        exclude_filter: str = "",
+        hits_multiplier: int = 1,
+        include_hn_url: bool = False,
+    ) -> MCPToolResult:
+        """Shared helper for fetching whoishiring threads.
 
-        Uses search_by_date to get the most recent monthly threads posted by 'whoishiring'.
+        Args:
+            query: Algolia search query
+            title_filter: Substring that must appear in the title (lowered)
+            months: Number of threads to return
+            tool_name: Tool name for _format_response
+            exclude_filter: Substring that must NOT appear in the title
+            hits_multiplier: Multiplier for hitsPerPage (use >1 to over-fetch)
+            include_hn_url: If True, adds hn_url to each thread dict
         """
         client = self._ensure_client()
 
-        # Use search_by_date to get recent threads, filter by author 'whoishiring'
-        # and search for "Who is hiring" (not "Who wants to be hired")
         params = {
-            "query": "Who is hiring",
+            "query": query,
             "tags": "story,author_whoishiring",
-            "hitsPerPage": months * 2,  # Fetch extra to filter out "wants to be hired"
+            "hitsPerPage": months * max(hits_multiplier, 1),
         }
 
-        # Use search_by_date endpoint to get most recent first
-        response = await client.get(f"{self.BASE_URL}/search_by_date", params=params)
+        response = await client.get(
+            f"{self.BASE_URL}/search_by_date", params=params,
+        )
         response.raise_for_status()
 
         data = response.json()
@@ -222,21 +229,39 @@ class HackerNewsMCPClient(HTTPMCPClient):
 
         for hit in data.get("hits", []):
             title = hit.get("title", "")
-            # Filter to only "Who is hiring?" threads, not "Who wants to be hired?"
-            if "who is hiring" in title.lower() and "wants to be hired" not in title.lower():
-                threads.append(
-                    {
-                        "title": title,
-                        "objectID": hit.get("objectID", ""),
-                        "created_at": hit.get("created_at", ""),
-                        "num_comments": hit.get("num_comments", 0),
-                    }
+            lower_title = title.lower()
+            if title_filter not in lower_title:
+                continue
+            if exclude_filter and exclude_filter in lower_title:
+                continue
+            thread: dict[str, Any] = {
+                "title": title,
+                "objectID": hit.get("objectID", ""),
+                "created_at": hit.get("created_at", ""),
+                "num_comments": hit.get("num_comments", 0),
+            }
+            if include_hn_url:
+                thread["hn_url"] = (
+                    f"https://news.ycombinator.com/item?"
+                    f"id={hit.get('objectID', '')}"
                 )
-                if len(threads) >= months:
-                    break
+            threads.append(thread)
+            if len(threads) >= months:
+                break
 
         output = {"threads": threads, "total": len(threads)}
-        return self._format_response(output, data, "get_hiring_threads")
+        return self._format_response(output, data, tool_name)
+
+    async def _get_hiring_threads(self, months: int = 3) -> MCPToolResult:
+        """Get recent 'Who is Hiring?' threads."""
+        return await self._get_whoishiring_threads(
+            query="Who is hiring",
+            title_filter="who is hiring",
+            months=months,
+            tool_name="get_hiring_threads",
+            exclude_filter="wants to be hired",
+            hits_multiplier=2,
+        )
 
     async def _analyze_tech_trends(self, months: int = 3) -> MCPToolResult:
         """Analyze tech trends from Who is Hiring threads."""
@@ -339,82 +364,25 @@ class HackerNewsMCPClient(HTTPMCPClient):
         return categories
 
     async def _get_freelancing_threads(self, months: int = 3) -> MCPToolResult:
-        """Get recent 'Freelancer? Seeking freelancer?' threads.
-
-        These monthly threads contain freelance opportunities and
-        people offering freelance services.
-        """
-        client = self._ensure_client()
-
-        params = {
-            "query": "Freelancer Seeking freelancer",
-            "tags": "story,author_whoishiring",
-            "hitsPerPage": months,
-        }
-
-        # Use search_by_date to get most recent first
-        response = await client.get(f"{self.BASE_URL}/search_by_date", params=params)
-        response.raise_for_status()
-
-        data = response.json()
-        threads = []
-
-        for hit in data.get("hits", []):
-            title = hit.get("title", "")
-            if "freelancer" in title.lower():
-                threads.append(
-                    {
-                        "title": title,
-                        "id": hit.get("objectID", ""),
-                        "created_at": hit.get("created_at", ""),
-                        "num_comments": hit.get("num_comments", 0),
-                        "hn_url": f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}",
-                    }
-                )
-                if len(threads) >= months:
-                    break
-
-        output = {"threads": threads, "total": len(threads)}
-        return self._format_response(output, data, "get_freelancing_threads")
+        """Get recent 'Freelancer? Seeking freelancer?' threads."""
+        return await self._get_whoishiring_threads(
+            query="Freelancer Seeking freelancer",
+            title_filter="freelancer",
+            months=months,
+            tool_name="get_freelancing_threads",
+            include_hn_url=True,
+        )
 
     async def _get_seeking_work_threads(self, months: int = 3) -> MCPToolResult:
-        """Get recent 'Who wants to be hired?' threads.
-
-        These monthly threads contain people looking for work,
-        useful for understanding how others position themselves.
-        """
-        client = self._ensure_client()
-
-        params = {
-            "query": "Who wants to be hired",
-            "tags": "story,author_whoishiring",
-            "hitsPerPage": months * 2,  # Fetch extra to filter
-        }
-
-        # Use search_by_date to get most recent first
-        response = await client.get(f"{self.BASE_URL}/search_by_date", params=params)
-        response.raise_for_status()
-
-        data = response.json()
-        threads = []
-
-        for hit in data.get("hits", []):
-            title = hit.get("title", "")
-            if "wants to be hired" in title.lower():
-                threads.append(
-                    {
-                        "title": title,
-                        "id": hit.get("objectID", ""),
-                        "created_at": hit.get("created_at", ""),
-                        "num_comments": hit.get("num_comments", 0),
-                        "hn_url": f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}",
-                    }
-                )
-                if len(threads) >= months:
-                    break
-
-        output = {"threads": threads, "total": len(threads)}
-        return self._format_response(output, data, "get_seeking_work_threads")
+        """Get recent 'Who wants to be hired?' threads."""
+        return await self._get_whoishiring_threads(
+            query="Who wants to be hired",
+            title_filter="wants to be hired",
+            months=months,
+            tool_name="get_seeking_work_threads",
+            hits_multiplier=2,
+            include_hn_url=True,
+        )
 
     async def _extract_job_postings(self, months: int = 1, limit: int = 100) -> MCPToolResult:
         """Extract and parse individual job postings from hiring threads.
@@ -613,41 +581,16 @@ class HackerNewsMCPClient(HTTPMCPClient):
 
     def _extract_salary(self, text: str) -> dict[str, Any]:
         """Extract salary information from text."""
-        result: dict[str, Any] = {"min": None, "max": None, "raw": None}
+        from .salary_parser import parse_salary
 
-        for pattern in self.SALARY_PATTERNS:
-            match = re.search(pattern, text)
-            if match:
-                result["raw"] = match.group(0)
-                groups = match.groups()
-
-                if len(groups) >= 2:
-                    # Range: min-max
-                    try:
-                        min_val = int(groups[0].replace(",", ""))
-                        max_val = int(groups[1].replace(",", ""))
-                        # Convert to full amounts if in K
-                        if min_val < 1000:
-                            min_val *= 1000
-                        if max_val < 1000:
-                            max_val *= 1000
-                        result["min"] = min_val
-                        result["max"] = max_val
-                    except (ValueError, TypeError):
-                        pass
-                elif len(groups) == 1:
-                    # Single value
-                    try:
-                        val = int(groups[0].replace(",", ""))
-                        if val < 1000:
-                            val *= 1000
-                        result["min"] = val
-                        result["max"] = val
-                    except (ValueError, TypeError):
-                        pass
-                break
-
-        return result
+        parsed = parse_salary(text)
+        if parsed is None:
+            return {"min": None, "max": None, "raw": None}
+        return {
+            "min": parsed.min_amount,
+            "max": parsed.max_amount,
+            "raw": parsed.raw,
+        }
 
     def _extract_tech_stack(self, text: str) -> list[str]:
         """Extract mentioned technologies from text."""

@@ -7,14 +7,15 @@ from langgraph.types import interrupt
 def _parse_source(source: str):
     """Parse and validate a KnowledgeSource string.
 
-    Returns KnowledgeSource on success, or None on invalid source.
+    Returns KnowledgeSource on success, or an error string on invalid source.
     """
     from futureproof.memory.knowledge import KnowledgeSource
 
     try:
         return KnowledgeSource(source)
     except ValueError:
-        return None
+        valid = ", ".join(s.value for s in KnowledgeSource)
+        return f"Invalid source '{source}'. Valid sources: {valid}"
 
 
 @tool
@@ -126,11 +127,8 @@ def index_career_knowledge(source: str = "") -> str:
 
     if source:
         ks = _parse_source(source)
-        if ks is None:
-            from futureproof.memory.knowledge import KnowledgeSource
-
-            valid = ", ".join(s.value for s in KnowledgeSource)
-            return f"Invalid source '{source}'. Valid sources: {valid}"
+        if isinstance(ks, str):
+            return ks
         count = results.get(ks.value, 0)
         if count > 0:
             return f"'{source}' has {count} chunks indexed in the knowledge base."
@@ -172,11 +170,8 @@ def clear_career_knowledge(source: str = "") -> str:
 
     if source:
         ks = _parse_source(source)
-        if ks is None:
-            from futureproof.memory.knowledge import KnowledgeSource
-
-            valid = ", ".join(s.value for s in KnowledgeSource)
-            return f"Invalid source '{source}'. Valid sources: {valid}"
+        if isinstance(ks, str):
+            return ks
         deleted = service.clear_source(ks)
         return f"Cleared {deleted} chunks for '{source}' from the knowledge base."
     else:

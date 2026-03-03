@@ -41,13 +41,10 @@ class CareerState(TypedDict, total=False):
     # Analysis results
     analysis: str | None
     goals: str | None
-    reality: str | None
     gaps: str | None
     market_fit: str | None
     skill_gaps: str | None
     trending_skills: str | None
 
     # Generation results
-    cv_en: str | None
-    cv_es: str | None
     advice: str | None

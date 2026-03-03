@@ -339,22 +339,32 @@ class _ChunkAccumulator:
         return content
 
 
-def _update_live_from_chunk(chunk: Any, acc: _ChunkAccumulator, live: Live) -> None:
-    """Process a single chunk: accumulate and update the Live widget."""
-    if getattr(chunk, "type", None) == "tool":
-        return
-    if acc.accumulate(chunk):
-        display_text = _strip_summary_echo(acc.msg_buf)
-        if display_text:
-            live.update(Markdown(display_text))
+def _stream_to_live(
+    stream_iter,
+    acc: _ChunkAccumulator,
+    con: Console,
+    verbose_fn=None,
+) -> None:
+    """Stream chunks to a Rich Live widget, stripping summary echoes.
 
-
-def _stream_to_live(stream_iter, acc: _ChunkAccumulator, con: Console) -> None:
-    """Stream chunks to a Rich Live widget, stripping summary echoes."""
+    Args:
+        stream_iter: Iterable of (chunk, metadata) pairs
+        acc: Chunk accumulator for the stream
+        con: Rich console for display
+        verbose_fn: Optional callback(chunk, metadata) -> bool.
+            If it returns True, the chunk is considered consumed
+            (tool display) and won't be accumulated.
+    """
+    start = time.monotonic()
     with Live(Markdown(""), console=con, refresh_per_second=10) as live:
         for chunk, metadata in stream_iter:
-            _update_live_from_chunk(chunk, acc, live)
-    con.print()
+            if verbose_fn and verbose_fn(chunk, metadata):
+                continue
+            if acc.accumulate(chunk):
+                display_text = _strip_summary_echo(acc.msg_buf)
+                if display_text:
+                    live.update(Markdown(display_text))
+    display_timing(time.monotonic() - start)
 
 
 def _stream_response(
@@ -408,22 +418,9 @@ def _stream_response(
             stream_mode="messages",
         )
 
-    stream_start = time.monotonic()
     logger.debug("Stream started")
-
-    with Live(
-        Markdown(""), console=console, refresh_per_second=10,
-    ) as live:
-        for chunk, metadata in _stream_iter():
-            if _verbose_print(chunk, metadata):
-                continue
-            if acc.accumulate(chunk):
-                display_text = _strip_summary_echo(acc.msg_buf)
-                if display_text:
-                    live.update(Markdown(display_text))
-    display_timing(time.monotonic() - stream_start)
-
-    logger.debug("Stream ended (%.1fs)", time.monotonic() - stream_start)
+    _stream_to_live(_stream_iter(), acc, console, _verbose_print)
+    logger.debug("Stream ended")
 
     # Use the cleaned version as the final response
     full_response = _strip_summary_echo(acc.full_response) or acc.full_response
@@ -459,28 +456,16 @@ def _stream_response(
 
         # Resume the graph with the user's decision
         resume_acc = _ChunkAccumulator()
-        resume_start = time.monotonic()
         logger.debug("Resume stream started")
 
-        with Live(
-            Markdown(""), console=console, refresh_per_second=10,
-        ) as resume_live:
-            for chunk, metadata in agent.stream(
-                Command(resume=approved),
-                cast(RunnableConfig, config),
-                stream_mode="messages",
-            ):
-                if _verbose_print(chunk, metadata):
-                    continue
-                if resume_acc.accumulate(chunk):
-                    display_text = _strip_summary_echo(
-                        resume_acc.msg_buf,
-                    )
-                    if display_text:
-                        resume_live.update(Markdown(display_text))
-        display_timing(time.monotonic() - resume_start)
+        resume_iter = agent.stream(
+            Command(resume=approved),
+            cast(RunnableConfig, config),
+            stream_mode="messages",
+        )
+        _stream_to_live(resume_iter, resume_acc, console, _verbose_print)
 
-        logger.debug("Resume stream ended (%.1fs)", time.monotonic() - resume_start)
+        logger.debug("Resume stream ended")
 
         resume_text = _strip_summary_echo(resume_acc.full_response) or resume_acc.full_response
         if resume_text:

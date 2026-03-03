@@ -209,25 +209,3 @@ def gather_assessment_data(input_dir: str = "") -> str:
     return "CliftonStrengths assessment processed and indexed to knowledge base."
 
 
-@tool
-def get_stored_career_data() -> str:
-    """Get a summary of all indexed career data in the knowledge base.
-
-    Use this to see what career data is available for search and analysis.
-    """
-    from futureproof.services.knowledge_service import KnowledgeService
-
-    service = KnowledgeService()
-    stats = service.get_stats()
-
-    total = stats.get("total_chunks", 0)
-    if total == 0:
-        return "No career data indexed yet. Use gather_all_career_data() to collect data."
-
-    result_parts = ["Indexed career data summary:"]
-    for source, count in stats.get("by_source", {}).items():
-        if count > 0:
-            result_parts.append(f"\n**{source}:** {count} chunks indexed")
-
-    result_parts.append(f"\nTotal: {total} chunks in knowledge base.")
-    return "\n".join(result_parts)

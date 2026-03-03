@@ -18,7 +18,6 @@ from .gathering import (
     gather_assessment_data,
     gather_linkedin_data,
     gather_portfolio_data,
-    get_stored_career_data,
 )
 from .generation import generate_cv, generate_cv_draft
 from .github import get_github_profile, get_github_repo, search_github_repos
@@ -70,7 +69,6 @@ _ALL_TOOLS = [
     gather_linkedin_data,
     gather_assessment_data,
     gather_all_career_data,
-    get_stored_career_data,
     # GitHub
     search_github_repos,
     get_github_repo,
@@ -111,62 +109,7 @@ _ALL_TOOLS = [
     update_setting,
 ]
 
-__all__ = [
-    # Profile
-    "get_user_profile",
-    "update_user_name",
-    "update_current_role",
-    "update_salary_info",
-    "update_user_skills",
-    "set_target_roles",
-    "update_user_goal",
-    # Gathering
-    "gather_portfolio_data",
-    "gather_linkedin_data",
-    "gather_assessment_data",
-    "gather_all_career_data",
-    "get_stored_career_data",
-    # GitHub
-    "search_github_repos",
-    "get_github_repo",
-    "get_github_profile",
-    # GitLab
-    "search_gitlab_projects",
-    "get_gitlab_project",
-    "get_gitlab_file",
-    # Knowledge
-    "search_career_knowledge",
-    "get_knowledge_stats",
-    "index_career_knowledge",
-    "clear_career_knowledge",
-    # Analysis
-    "analyze_skill_gaps",
-    "analyze_career_alignment",
-    "get_career_advice",
-    # Market
-    "search_jobs",
-    "get_tech_trends",
-    "get_salary_insights",
-    "analyze_market_fit",
-    "analyze_market_skills",
-    "gather_market_data",
-    # Financial
-    "convert_currency",
-    "compare_salary_ppp",
-    # Generation
-    "generate_cv",
-    "generate_cv_draft",
-    # Memory
-    "remember_decision",
-    "remember_job_application",
-    "recall_memories",
-    "get_memory_stats",
-    # Settings
-    "get_current_config",
-    "update_setting",
-    # Helper
-    "get_all_tools",
-]
+__all__ = [t.name for t in _ALL_TOOLS] + ["get_all_tools"]
 
 
 def get_all_tools() -> list:

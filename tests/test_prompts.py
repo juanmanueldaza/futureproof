@@ -79,12 +79,6 @@ class TestBackwardCompat:
         assert isinstance(GENERATE_CV_PROMPT, str)
         assert "ATS" in GENERATE_CV_PROMPT
 
-    def test_system_prompt_import(self):
-        from futureproof.prompts import SYSTEM_PROMPT
-
-        assert isinstance(SYSTEM_PROMPT, str)
-        assert "FutureProof" in SYSTEM_PROMPT
-
     def test_unknown_attr_raises(self):
         with pytest.raises(ImportError):
             from futureproof.prompts import NONEXISTENT_PROMPT  # noqa: F401

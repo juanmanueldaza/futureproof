@@ -139,6 +139,18 @@ class Settings(BaseSettings):
         """Check if Ollama is configured."""
         return bool(self.ollama_base_url)
 
+    def is_provider_configured(self, provider_id: str) -> bool:
+        """Check if a provider has its required keys configured."""
+        checks = {
+            "futureproof": self.has_proxy,
+            "openai": self.has_openai,
+            "anthropic": self.has_anthropic,
+            "google": self.has_google,
+            "azure": self.has_azure,
+            "ollama": self.has_ollama,
+        }
+        return checks.get(provider_id, False)
+
     @property
     def active_provider(self) -> str:
         """Determine the active LLM provider.

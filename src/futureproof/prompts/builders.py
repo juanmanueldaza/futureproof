@@ -24,7 +24,6 @@ class PromptBuilder:
     MARKET_PROMPT_MAP: dict[str, str] = {
         "analyze_market_fit": "market_fit",
         "analyze_skill_gaps": "market_skill_gap",
-        "analyze_trends": "trending_skills",
     }
 
     def build_analysis_prompt(self, action: str, career_data: str) -> str:

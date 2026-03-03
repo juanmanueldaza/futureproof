@@ -153,3 +153,46 @@ def reset() -> None:
 
 
 atexit.register(shutdown)
+
+
+def call_mcp(
+    server: MCPServerType,
+    tool_name: str,
+    args: dict[str, Any],
+    *,
+    parse_json: bool = False,
+) -> str | dict:
+    """High-level MCP call with error handling.
+
+    Wraps ``call_tool`` with the common try/is_error/except pattern
+    used by agent tool wrappers.
+
+    Args:
+        server: MCP server type (e.g. "github", "financial")
+        tool_name: Tool to call
+        args: Tool arguments
+        parse_json: If True, parse result.content as JSON and return dict
+
+    Returns:
+        Tool content as str, or parsed dict if parse_json=True.
+        On error, returns a string (or dict with "error" key if parse_json).
+    """
+    try:
+        result = call_tool(server, tool_name, args)
+        if result.is_error:
+            error_msg = (
+                f"{server.title()} API error: "
+                f"{result.error_message or result.content}"
+            )
+            return {"error": error_msg} if parse_json else error_msg
+        if parse_json:
+            import json
+
+            return json.loads(result.content)
+        return result.content
+    except MCPClientError as e:
+        error_msg = f"{server.title()} connection error: {e}"
+        return {"error": error_msg} if parse_json else error_msg
+    except Exception as e:
+        error_msg = f"{server.title()} error: {e}"
+        return {"error": error_msg} if parse_json else error_msg

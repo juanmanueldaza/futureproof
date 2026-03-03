@@ -105,15 +105,7 @@ def _redact(value: str) -> str:
 
 def _provider_status(provider_id: str) -> bool:
     """Check if a provider has its required keys configured."""
-    checks = {
-        "futureproof": settings.has_proxy,
-        "openai": settings.has_openai,
-        "anthropic": settings.has_anthropic,
-        "google": settings.has_google,
-        "azure": settings.has_azure,
-        "ollama": settings.has_ollama,
-    }
-    return checks.get(provider_id, False)
+    return settings.is_provider_configured(provider_id)
 
 
 def _integration_status(integration_id: str) -> bool:

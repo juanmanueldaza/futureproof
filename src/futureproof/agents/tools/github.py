@@ -4,7 +4,7 @@ import json
 
 from langchain_core.tools import tool
 
-from futureproof.mcp.pool import call_tool
+from futureproof.mcp.pool import call_mcp
 
 
 def _save_github_username(username: str) -> None:
@@ -23,20 +23,8 @@ def _save_github_username(username: str) -> None:
 
 def _github(tool_name: str, args: dict) -> str:
     """Call GitHub MCP via pool, return content or error."""
-    from futureproof.mcp.base import MCPClientError
-
-    try:
-        result = call_tool("github", tool_name, args)
-        if result.is_error:
-            return (
-                f"GitHub API error: "
-                f"{result.error_message or result.content}"
-            )
-        return result.content
-    except MCPClientError as e:
-        return f"GitHub connection error: {e}"
-    except Exception as e:
-        return f"GitHub error: {e}"
+    result = call_mcp("github", tool_name, args)
+    return result if isinstance(result, str) else str(result)
 
 
 @tool

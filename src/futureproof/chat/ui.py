@@ -61,7 +61,6 @@ _TOOL_TO_CATEGORY: dict[str, str] = {
     "gather_linkedin_data": "gathering",
     "gather_assessment_data": "gathering",
     "gather_all_career_data": "gathering",
-    "get_stored_career_data": "gathering",
     # GitHub
     "search_github_repos": "github",
     "get_github_repo": "github",

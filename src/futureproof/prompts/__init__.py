@@ -5,12 +5,6 @@ from .loader import load_prompt
 
 _PROMPT_MAP = {
     "GENERATE_CV_PROMPT": "generate_cv",
-    "ANALYZE_CAREER_PROMPT": "analyze_career",
-    "STRATEGIC_ADVICE_PROMPT": "strategic_advice",
-    "SYSTEM_PROMPT": "system",
-    "MARKET_FIT_PROMPT": "market_fit",
-    "MARKET_SKILL_GAP_PROMPT": "market_skill_gap",
-    "TRENDING_SKILLS_PROMPT": "trending_skills",
 }
 
 

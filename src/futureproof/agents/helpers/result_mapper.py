@@ -12,7 +12,6 @@ ACTION_RESULT_KEYS: dict[str, str] = {
     # Market analysis actions
     "analyze_market_fit": "market_fit",
     "analyze_skill_gaps": "skill_gaps",
-    "analyze_trends": "trending_skills",
     "analyze_market": "analysis",
     "analyze_skills": "skill_gaps",
 }
