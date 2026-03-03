@@ -11,7 +11,7 @@ from ..llm.fallback import get_model_with_fallback
 from ..prompts import GENERATE_CV_PROMPT
 from ..utils.console import console
 from ..utils.data_loader import load_career_data_for_cv
-from ..utils.security import anonymize_career_data
+from ..utils.security import anonymize_career_data, secure_open
 
 logger = logging.getLogger(__name__)
 
@@ -69,17 +69,13 @@ def _render_pdf(markdown_path: Path) -> Path:
 <html>
 <head>
     <meta charset="utf-8">
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap"
-      rel="stylesheet"
-    >
     <style>
         @page {{
             size: A4;
             margin: 1.8cm 2.2cm;
         }}
         body {{
-            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-family: Georgia, 'Times New Roman', 'DejaVu Serif', serif;
             font-size: 11pt;
             line-height: 1.5;
             color: #2c2416;
@@ -184,8 +180,16 @@ def _render_pdf(markdown_path: Path) -> Path:
 </html>
 """
 
+        def _deny_url_fetcher(url, timeout=10, ssl_context=None):
+            """Block all external resource fetches from LLM-generated HTML."""
+            from weasyprint.urls import default_url_fetcher
+
+            if url.startswith("data:"):
+                return default_url_fetcher(url, timeout, ssl_context)
+            raise ValueError(f"External resource fetch blocked: {url}")
+
         pdf_path = markdown_path.with_suffix(".pdf")
-        HTML(string=styled_html).write_pdf(pdf_path)
+        HTML(string=styled_html, url_fetcher=_deny_url_fetcher).write_pdf(pdf_path)
         os.chmod(pdf_path, 0o600)  # Owner read/write only
         console.print(f"  [dim]PDF generated: {pdf_path}[/dim]")
         return pdf_path
@@ -281,8 +285,8 @@ def create_cv(
     # Save markdown with secure permissions
     filename = f"cv_{language}_{format}.md"
     output_path = output_dir / filename
-    output_path.write_text(cv_content)
-    os.chmod(output_path, 0o600)  # Owner read/write only
+    with secure_open(output_path) as f:
+        f.write(cv_content)
     console.print(f"  [dim]Markdown saved: {output_path}[/dim]")
 
     # Convert to PDF
