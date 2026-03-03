@@ -372,6 +372,10 @@ def _stream_to_live(
             if verbose_fn and verbose_fn(chunk, metadata):
                 continue
             if acc.accumulate(chunk):
+                # Defer echo detection until the first line is complete so
+                # partial headers like "NEXT STE" don't leak through.
+                if "\n" not in acc.msg_buf:
+                    continue
                 display_text = _strip_summary_echo(acc.msg_buf)
                 if display_text:
                     live.update(Markdown(display_text))
@@ -413,7 +417,10 @@ def _stream_response(
                     display_tool_start(name, args)
         if getattr(chunk, "type", None) == "tool":
             tool_content = getattr(chunk, "content", "")
-            tool_name = getattr(chunk, "name", "tool")
+            tool_name = getattr(chunk, "name", None)
+            # Skip synthetic repair messages (no name, injected by ToolCallRepairMiddleware)
+            if not tool_name:
+                return True
             elapsed: float | None = None
             if tool_name in tool_start_times:
                 elapsed = time.monotonic() - tool_start_times.pop(tool_name)
