@@ -226,8 +226,10 @@ def save_profile(profile: UserProfile) -> None:
     path = get_profile_path()
     profile.last_updated = datetime.now().isoformat()
 
-    # Write with restricted permissions (owner read/write only)
-    with open(path, "w") as f:
+    from futureproof.utils.security import secure_open
+
+    # Write with restricted permissions (owner read/write only, no TOCTOU)
+    with secure_open(path) as f:
         yaml.dump(
             profile.to_dict(),
             f,
@@ -235,9 +237,6 @@ def save_profile(profile: UserProfile) -> None:
             allow_unicode=True,
             sort_keys=False,
         )
-
-    # Set file permissions to 0600 (owner read/write only)
-    path.chmod(0o600)
 
 
 def edit_profile(modifier: Callable[["UserProfile"], None]) -> "UserProfile":

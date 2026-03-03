@@ -29,8 +29,10 @@ class ChromaDBStore:
         if persist_dir is None:
             persist_dir = get_data_dir() / "episodic"
 
+        from futureproof.utils.security import secure_mkdir
+
         self.persist_dir = persist_dir
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
+        secure_mkdir(self.persist_dir)
 
         self._client = None
         self._collection = None

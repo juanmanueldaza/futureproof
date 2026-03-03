@@ -27,8 +27,10 @@ _checkpointer: SqliteSaver | None = None
 
 def get_data_dir() -> Path:
     """Get or create the FutureProof data directory."""
+    from futureproof.utils.security import secure_mkdir
+
     data_dir = Path.home() / ".futureproof"
-    data_dir.mkdir(parents=True, exist_ok=True)
+    secure_mkdir(data_dir)
     return data_dir
 
 
@@ -51,6 +53,7 @@ def get_checkpointer() -> SqliteSaver:
     db_path = get_data_dir() / "memory.db"
     # Create connection with check_same_thread=False for multi-threaded use
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    db_path.chmod(0o600)
     _checkpointer = SqliteSaver(conn)
     return _checkpointer
 

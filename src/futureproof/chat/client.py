@@ -481,8 +481,11 @@ def run_chat(thread_id: str = "main") -> None:
         thread_id: Conversation thread identifier for persistence
     """
     # Set up prompt session with history
-    history = FileHistory(str(get_history_path()))
+    history_path = get_history_path()
+    history = FileHistory(str(history_path))
     session = PromptSession(history=history)
+    if history_path.exists():
+        history_path.chmod(0o600)
 
     # Display welcome message
     display_welcome()
