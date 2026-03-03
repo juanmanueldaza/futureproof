@@ -11,6 +11,7 @@ Example uses:
 """
 
 import logging
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -179,11 +180,17 @@ def remember_application(
 # =============================================================================
 
 _store: EpisodicStore | None = None
+_store_lock = threading.Lock()
 
 
 def get_episodic_store() -> EpisodicStore:
     """Get the global episodic store instance."""
     global _store
-    if _store is None:
+    if _store is not None:
+        return _store
+
+    with _store_lock:
+        if _store is not None:
+            return _store
         _store = EpisodicStore()
-    return _store
+        return _store

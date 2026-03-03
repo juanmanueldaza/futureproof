@@ -17,12 +17,14 @@ Usage:
     agent.invoke({"messages": [...]}, config)
 """
 
+import threading
 from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 # Cached singleton to avoid creating new connections on every call
 _checkpointer: SqliteSaver | None = None
+_cp_lock = threading.Lock()
 
 
 def get_data_dir() -> Path:
@@ -48,14 +50,18 @@ def get_checkpointer() -> SqliteSaver:
     if _checkpointer is not None:
         return _checkpointer
 
-    import sqlite3
+    with _cp_lock:
+        if _checkpointer is not None:
+            return _checkpointer
 
-    db_path = get_data_dir() / "memory.db"
-    # Create connection with check_same_thread=False for multi-threaded use
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    db_path.chmod(0o600)
-    _checkpointer = SqliteSaver(conn)
-    return _checkpointer
+        import sqlite3
+
+        db_path = get_data_dir() / "memory.db"
+        # Create connection with check_same_thread=False for multi-threaded use
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        db_path.chmod(0o600)
+        _checkpointer = SqliteSaver(conn)
+        return _checkpointer
 
 
 def clear_thread_history(thread_id: str) -> None:

@@ -6,6 +6,7 @@ FutureProof proxy, OpenAI, Anthropic, Google, Azure OpenAI, and Ollama.
 """
 
 import logging
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -152,6 +153,7 @@ class FallbackLLMManager:
             temperature if temperature is not None else settings.llm_temperature
         )
         self._failed_models: set[str] = set()
+        self._lock = threading.Lock()
         self._current_model: ModelConfig | None = None
 
     def _model_key(self, config: ModelConfig) -> str:
@@ -248,7 +250,8 @@ class FallbackLLMManager:
         if not available:
             # Reset failed models and try again
             logger.warning("All models failed, resetting failure state")
-            self._failed_models.clear()
+            with self._lock:
+                self._failed_models.clear()
             available = [
                 config
                 for config in effective_chain
@@ -278,7 +281,8 @@ class FallbackLLMManager:
         if config:
             key = self._model_key(config)
             logger.warning(f"Marking model as failed: {config.description}")
-            self._failed_models.add(key)
+            with self._lock:
+                self._failed_models.add(key)
 
     def handle_error(self, error: Exception) -> bool:
         """Handle an error from model invocation.
@@ -320,14 +324,20 @@ class FallbackLLMManager:
 
 # Global instance for session-wide state
 _fallback_manager: FallbackLLMManager | None = None
+_manager_lock = threading.Lock()
 
 
 def get_fallback_manager() -> FallbackLLMManager:
     """Get the global fallback manager instance."""
     global _fallback_manager
-    if _fallback_manager is None:
+    if _fallback_manager is not None:
+        return _fallback_manager
+
+    with _manager_lock:
+        if _fallback_manager is not None:
+            return _fallback_manager
         _fallback_manager = FallbackLLMManager()
-    return _fallback_manager
+        return _fallback_manager
 
 
 def reset_fallback_manager() -> None:

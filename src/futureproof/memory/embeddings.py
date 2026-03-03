@@ -14,6 +14,7 @@ Usage:
 """
 
 import logging
+import threading
 from typing import Any
 
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
@@ -232,6 +233,7 @@ class CachedEmbeddingFunction(EmbeddingFunction[Documents]):
 
 # Global embedding function instance
 _embedding_function: EmbeddingFunction[Documents] | None = None
+_embed_lock = threading.Lock()
 
 
 def get_embedding_function() -> EmbeddingFunction[Documents]:
@@ -246,45 +248,49 @@ def get_embedding_function() -> EmbeddingFunction[Documents]:
     if _embedding_function is not None:
         return _embedding_function
 
-    provider = settings.active_provider
-    model = settings.embedding_model
-    base: EmbeddingFunction[Documents] | None = None
+    with _embed_lock:
+        if _embedding_function is not None:
+            return _embedding_function
 
-    if provider == "azure":
-        logger.info("Using Azure OpenAI embeddings")
-        base = AzureOpenAIEmbeddingFunction()
+        provider = settings.active_provider
+        model = settings.embedding_model
+        base: EmbeddingFunction[Documents] | None = None
 
-    elif provider in ("openai", "futureproof"):
-        api_key = (
-            settings.futureproof_proxy_key
-            if provider == "futureproof"
-            else settings.openai_api_key
-        )
-        base_url = (
-            settings.futureproof_proxy_url
-            if provider == "futureproof"
-            else None
-        )
-        logger.info("Using %s embeddings", provider)
-        base = OpenAIEmbeddingFunction(
-            api_key=api_key,
-            base_url=base_url,
-            model=model or "text-embedding-3-small",
-        )
+        if provider == "azure":
+            logger.info("Using Azure OpenAI embeddings")
+            base = AzureOpenAIEmbeddingFunction()
 
-    elif provider == "ollama":
-        logger.info("Using Ollama local embeddings")
-        base = OllamaEmbeddingFunction(
-            base_url=settings.ollama_base_url,
-            model=model or "nomic-embed-text",
-        )
+        elif provider in ("openai", "futureproof"):
+            api_key = (
+                settings.futureproof_proxy_key
+                if provider == "futureproof"
+                else settings.openai_api_key
+            )
+            base_url = (
+                settings.futureproof_proxy_url
+                if provider == "futureproof"
+                else None
+            )
+            logger.info("Using %s embeddings", provider)
+            base = OpenAIEmbeddingFunction(
+                api_key=api_key,
+                base_url=base_url,
+                model=model or "text-embedding-3-small",
+            )
 
-    if base is None:
-        logger.warning(
-            "No embedding provider configured. Using default embeddings "
-            "(slow, local). Set an LLM provider for faster performance."
-        )
-        return None  # type: ignore[return-value]
+        elif provider == "ollama":
+            logger.info("Using Ollama local embeddings")
+            base = OllamaEmbeddingFunction(
+                base_url=settings.ollama_base_url,
+                model=model or "nomic-embed-text",
+            )
 
-    _embedding_function = CachedEmbeddingFunction(base)
-    return _embedding_function
+        if base is None:
+            logger.warning(
+                "No embedding provider configured. Using default embeddings "
+                "(slow, local). Set an LLM provider for faster performance."
+            )
+            return None  # type: ignore[return-value]
+
+        _embedding_function = CachedEmbeddingFunction(base)
+        return _embedding_function

@@ -64,10 +64,9 @@ async def _call(
     args: dict[str, Any],
 ) -> MCPToolResult:
     """Execute tool call with connection reuse and retry."""
-    if server_type not in _client_locks:
-        _client_locks[server_type] = asyncio.Lock()
+    lock = _client_locks.setdefault(server_type, asyncio.Lock())
 
-    async with _client_locks[server_type]:
+    async with lock:
         try:
             client = await _get_or_connect(server_type)
             return await client.call_tool(tool_name, args)

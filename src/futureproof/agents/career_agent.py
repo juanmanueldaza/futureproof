@@ -19,6 +19,7 @@ Usage:
 """
 
 import logging
+import threading
 from typing import Any
 
 from langchain.agents import create_agent
@@ -38,6 +39,7 @@ logger = logging.getLogger(__name__)
 # Cached agent singleton to avoid recompiling the graph on every call
 _cached_agent = None
 _cached_model_desc: str | None = None
+_agent_lock = threading.Lock()
 
 
 # =============================================================================
@@ -87,28 +89,33 @@ def create_career_agent(
     if _cached_agent is not None and using_defaults:
         return _cached_agent
 
-    model = model or get_model()
-    checkpointer = checkpointer or get_checkpointer()
+    with _agent_lock:
+        # Double-check after acquiring lock
+        if _cached_agent is not None and using_defaults:
+            return _cached_agent
 
-    summary_model = _get_summary_model()
-    repair = ToolCallRepairMiddleware()
-    analysis_display = AnalysisSynthesisMiddleware()
-    summarization = SummarizationMiddleware(
-        model=summary_model,
-        trigger=("tokens", 16000),
-        keep=("messages", 20),
-    )
+        model = model or get_model()
+        checkpointer = checkpointer or get_checkpointer()
 
-    agent = create_agent(
-        model=model,
-        tools=get_all_tools(),
-        middleware=[build_dynamic_prompt, repair, analysis_display, summarization],
-        checkpointer=checkpointer,
-    )
+        summary_model = _get_summary_model()
+        repair = ToolCallRepairMiddleware()
+        analysis_display = AnalysisSynthesisMiddleware()
+        summarization = SummarizationMiddleware(
+            model=summary_model,
+            trigger=("tokens", 16000),
+            keep=("messages", 20),
+        )
 
-    if using_defaults:
-        _cached_agent = agent
-    return agent
+        agent = create_agent(
+            model=model,
+            tools=get_all_tools(),
+            middleware=[build_dynamic_prompt, repair, analysis_display, summarization],
+            checkpointer=checkpointer,
+        )
+
+        if using_defaults:
+            _cached_agent = agent
+        return agent
 
 
 def get_agent_model_name() -> str | None:

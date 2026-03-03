@@ -6,6 +6,7 @@ This base class extracts that shared pattern.
 """
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ class ChromaDBStore:
     """
 
     collection_name: str = ""
+    _init_lock = threading.Lock()
 
     def __init__(self, persist_dir: Path | None = None) -> None:
         from futureproof.memory.checkpointer import get_data_dir
@@ -40,7 +42,12 @@ class ChromaDBStore:
     @property
     def client(self):
         """Lazy-load ChromaDB client."""
-        if self._client is None:
+        if self._client is not None:
+            return self._client
+
+        with self._init_lock:
+            if self._client is not None:
+                return self._client
             try:
                 import chromadb  # type: ignore[import-not-found]
 
@@ -54,7 +61,12 @@ class ChromaDBStore:
     @property
     def collection(self):
         """Get or create the collection."""
-        if self._collection is None:
+        if self._collection is not None:
+            return self._collection
+
+        with self._init_lock:
+            if self._collection is not None:
+                return self._collection
             embedding_fn = get_embedding_function()
             self._collection = self.client.get_or_create_collection(
                 name=self.collection_name,
