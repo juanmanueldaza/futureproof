@@ -85,11 +85,16 @@ def _build_prompt_uncached() -> str:
             except Exception:
                 pass  # Best-effort; don't break the prompt
 
+    from futureproof.utils.security import anonymize_career_data, sanitize_for_prompt
+
     profile_context = (
         summary
         if summary != "No profile information available."
         else "No profile configured yet."
     )
+    # Anonymize PII and escape XML boundaries before injecting into system prompt
+    if profile_context != "No profile configured yet.":
+        profile_context = sanitize_for_prompt(anonymize_career_data(profile_context))
     base = load_prompt("system").format(
         user_profile=profile_context,
     )
@@ -252,6 +257,13 @@ class AnalysisSynthesisMiddleware(AgentMiddleware):
             parts.append(f"**{name}:**\n{content}")
         parts.extend(other_results)
         tool_results = "\n\n---\n\n".join(parts)
+
+        # Anonymize PII and escape XML boundaries in tool results
+        from futureproof.utils.security import anonymize_career_data, sanitize_for_prompt
+
+        tool_results = sanitize_for_prompt(
+            anonymize_career_data(tool_results, preserve_professional_emails=True)
+        )
 
         # Load synthesis prompt and format
         prompt_template = load_prompt("synthesis")

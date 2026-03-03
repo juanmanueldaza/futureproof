@@ -6,6 +6,8 @@ building logic into a dedicated service.
 
 from typing import Any
 
+from futureproof.utils.security import sanitize_for_prompt
+
 from .loader import load_prompt
 
 
@@ -36,13 +38,14 @@ class PromptBuilder:
         Returns:
             Formatted prompt ready for LLM invocation
         """
+        safe_data = sanitize_for_prompt(career_data)
         name = self.ANALYSIS_TEMPLATES.get(action)
 
         if name:
-            return load_prompt(name).format(career_data=career_data)
+            return load_prompt(name).format(career_data=safe_data)
 
         # Default: full analysis
-        return f"{load_prompt('analyze_career')}\n\n<career_data>\n{career_data}\n</career_data>"
+        return f"{load_prompt('analyze_career')}\n\n<career_data>\n{safe_data}\n</career_data>"
 
     def build_market_context(self, state: dict[str, Any]) -> str:
         """Build market context string from state.
@@ -85,7 +88,10 @@ class PromptBuilder:
             Formatted prompt ready for LLM invocation
         """
         name = self.MARKET_PROMPT_MAP.get(action, "market_fit")
-        return load_prompt(name).format(career_data=career_data, market_data=market_data)
+        return load_prompt(name).format(
+            career_data=sanitize_for_prompt(career_data),
+            market_data=sanitize_for_prompt(market_data),
+        )
 
     def build_advice_prompt(
         self, target: str, career_data: str, market_context: str | None = None
@@ -100,17 +106,17 @@ class PromptBuilder:
         Returns:
             Formatted prompt ready for LLM invocation
         """
-        data_section = career_data
+        safe_data = sanitize_for_prompt(career_data)
         if market_context:
-            data_section = f"{career_data}\n\n## Market Context\n{market_context}"
+            safe_data = f"{safe_data}\n\n## Market Context\n{sanitize_for_prompt(market_context)}"
 
         return f"""{load_prompt("strategic_advice")}
 
-TARGET GOAL: {target}
+TARGET GOAL: {sanitize_for_prompt(target)}
 
 CAREER DATA:
 <career_data>
-{data_section}
+{safe_data}
 </career_data>
 
 Provide strategic, actionable advice for achieving the target goal."""

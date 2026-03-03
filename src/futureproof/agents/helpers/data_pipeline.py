@@ -21,15 +21,17 @@ def prepare_data(
         Combined and anonymized career data string, or empty string if no data
     """
     from ...utils.data_loader import combine_career_data
-    from ...utils.security import anonymize_career_data
+    from ...utils.security import anonymize_career_data, sanitize_for_prompt
 
     combined = combine_career_data(state, include_analysis=include_analysis)
     if not combined:
         return ""
 
-    return anonymize_career_data(
-        combined,
-        preserve_professional_emails=preserve_professional_emails,
+    return sanitize_for_prompt(
+        anonymize_career_data(
+            combined,
+            preserve_professional_emails=preserve_professional_emails,
+        )
     )
 
 
