@@ -90,6 +90,24 @@ def _is_tool_call_state_error(error: Exception) -> bool:
     return "tool_call_ids" in error_str and "response messages" in error_str
 
 
+def _might_be_summary_start(text: str) -> bool:
+    """Check if partial streaming text could be the start of a summary echo.
+
+    Used during streaming to suppress display of text that might become
+    a full summary section header once more chunks arrive. Requires at
+    least 4 characters to avoid false positives on common words.
+    """
+    first_line = text.lower().lstrip().split("\n", 1)[0].strip("#*").strip()
+    if len(first_line) < 4:
+        return False
+    for section in _SUMMARY_SECTIONS:
+        if section.startswith(first_line) or first_line.startswith(section):
+            return True
+    return first_line.startswith(
+        ("here is a summ", "here's a summ", "summary of the")
+    )
+
+
 def _is_summary_echo(text: str) -> bool:
     """Detect if text starts with a SummarizationMiddleware echo.
 
@@ -372,11 +390,15 @@ def _stream_to_live(
             if verbose_fn and verbose_fn(chunk, metadata):
                 continue
             if acc.accumulate(chunk):
-                # Defer echo detection until the first line is complete so
-                # partial headers like "NEXT STE" don't leak through.
-                if "\n" not in acc.msg_buf:
-                    continue
-                display_text = _strip_summary_echo(acc.msg_buf)
+                buf = acc.msg_buf
+                if _might_be_summary_start(buf):
+                    # Potential echo — only strip once we have complete lines
+                    display_text = _strip_summary_echo(buf) if "\n" in buf else ""
+                    if not display_text:
+                        live.update(Markdown(""))  # Clear partial header
+                        continue
+                else:
+                    display_text = buf
                 if display_text:
                     live.update(Markdown(display_text))
     display_timing(time.monotonic() - start)
