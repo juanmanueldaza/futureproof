@@ -11,6 +11,7 @@ RSS feeds provide structured data including:
 
 from html import unescape
 from typing import Any
+from xml.etree.ElementTree import Element
 
 import defusedxml.ElementTree as ET
 
@@ -100,7 +101,7 @@ class WeWorkRemotelyMCPClient(HTTPMCPClient):
 
         return self._format_response(output, response.text, "search_jobs")
 
-    def _parse_item(self, item: ET.Element) -> dict[str, Any] | None:
+    def _parse_item(self, item: Element) -> dict[str, Any] | None:
         """Parse a single RSS item into a job dict."""
         title_raw = item.findtext("title", "")
         link = item.findtext("link", "")
