@@ -1,9 +1,14 @@
-"""Security utilities for PII protection.
+"""Security utilities for PII protection and secure file operations.
 
-This module provides career data anonymization before sending data to external LLMs.
+This module provides career data anonymization before sending data to external LLMs,
+secure file I/O (no TOCTOU), and prompt boundary sanitization.
 """
 
+import contextlib
+import os
 import re
+from collections.abc import Generator
+from pathlib import Path
 
 
 def anonymize_career_data(data: str, preserve_professional_emails: bool = False) -> str:
@@ -82,3 +87,65 @@ def anonymize_career_data(data: str, preserve_professional_emails: bool = False)
     )
 
     return result
+
+
+@contextlib.contextmanager
+def secure_open(
+    path: str | Path, mode: str = "w", *, file_mode: int = 0o600,
+) -> Generator[object, None, None]:
+    """Open file for writing with atomic restrictive permissions.
+
+    Uses ``os.open()`` so the file is *never* world-readable, even for a
+    microsecond (no TOCTOU window between create and chmod).
+
+    Args:
+        path: File path to open.
+        mode: Python file mode (e.g. ``"w"``, ``"wb"``).
+        file_mode: Unix permission bits (default ``0o600``).
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(str(path), flags, file_mode)
+    os.fchmod(fd, file_mode)  # Also update perms on existing files
+    try:
+        with os.fdopen(fd, mode) as f:
+            yield f
+    except BaseException:
+        # fd is already closed by fdopen on success; only close on error
+        # if fdopen itself failed before taking ownership
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
+
+
+def secure_mkdir(path: str | Path, *, mode: int = 0o700) -> Path:
+    """Create directory with restrictive permissions.
+
+    Args:
+        path: Directory to create (parents created as needed).
+        mode: Unix permission bits (default ``0o700``).
+
+    Returns:
+        The directory path.
+    """
+    p = Path(path)
+    p.mkdir(parents=True, exist_ok=True)
+    p.chmod(mode)
+    return p
+
+
+def sanitize_for_prompt(text: str) -> str:
+    """Escape closing XML tags that could break prompt data boundaries.
+
+    Prevents injected content from closing ``<career_data>``,
+    ``<tool_results>``, or similar XML-style boundary markers used in
+    system prompts.
+
+    Args:
+        text: Raw text to sanitize.
+
+    Returns:
+        Text with closing XML tags escaped (``</tag>`` → ``<\\/tag>``).
+    """
+    return re.sub(r"</([\w_]+)>", r"<\\/\1>", text)
