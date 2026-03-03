@@ -36,8 +36,6 @@ _AGENT_CONFIGURABLE: dict[str, str] = {
     "knowledge_auto_index": "Auto-index after data gathering (true/false)",
     "knowledge_chunk_max_tokens": "Max tokens per knowledge chunk",
     "knowledge_chunk_min_tokens": "Min tokens per knowledge chunk",
-    # Other
-    "portfolio_url": "Portfolio URL to scrape",
 }
 
 # Keys that require an agent restart to take effect.
@@ -52,6 +50,7 @@ _SENSITIVE_KEYS = {
     "google_api_key", "azure_openai_api_key", "azure_openai_endpoint",
     "azure_embedding_deployment",
     "github_personal_access_token", "github_mcp_token", "tavily_api_key",
+    "portfolio_url", "futureproof_proxy_url", "ollama_base_url",
 }
 
 # Known valid LLM providers.
@@ -199,7 +198,7 @@ def update_setting(key: str, value: str) -> str:
     cv_temperature, jobspy_enabled, hn_mcp_enabled, market_cache_hours,
     job_cache_hours, content_cache_hours, forex_cache_hours,
     knowledge_auto_index, knowledge_chunk_max_tokens,
-    knowledge_chunk_min_tokens, portfolio_url.
+    knowledge_chunk_min_tokens.
     """
     key = key.lower()
 

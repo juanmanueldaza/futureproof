@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from dotenv import set_key
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # User-level config lives alongside profile and memory data.
@@ -23,19 +24,19 @@ class Settings(BaseSettings):
 
     # FutureProof Proxy (default for new users — zero-config with starter tokens)
     futureproof_proxy_url: str = "https://llm.futureproof.dev"
-    futureproof_proxy_key: str = ""
+    futureproof_proxy_key: str = Field(default="", repr=False)
 
     # OpenAI
-    openai_api_key: str = ""
+    openai_api_key: str = Field(default="", repr=False)
 
     # Anthropic
-    anthropic_api_key: str = ""
+    anthropic_api_key: str = Field(default="", repr=False)
 
     # Google Gemini
-    google_api_key: str = ""
+    google_api_key: str = Field(default="", repr=False)
 
     # Azure OpenAI / AI Foundry
-    azure_openai_api_key: str = ""  # https://ai.azure.com/
+    azure_openai_api_key: str = Field(default="", repr=False)  # https://ai.azure.com/
     azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com/
     azure_openai_api_version: str = "2024-12-01-preview"
     azure_embedding_deployment: str = "text-embedding-3-small"
@@ -65,8 +66,8 @@ class Settings(BaseSettings):
 
     # MCP (Model Context Protocol) Configuration
     # GitHub MCP Server
-    github_personal_access_token: str = ""  # Standard GitHub token env var
-    github_mcp_token: str = ""  # Alternative setting name
+    github_personal_access_token: str = Field(default="", repr=False)
+    github_mcp_token: str = Field(default="", repr=False)
     github_mcp_use_docker: bool = True
     github_mcp_image: str = "ghcr.io/github/github-mcp-server"
     github_mcp_command: str = "github-mcp-server"  # Native binary if not using Docker
@@ -74,7 +75,7 @@ class Settings(BaseSettings):
     # Market Intelligence MCP Configuration
     # Tavily Search (1000 free queries/month, no credit card)
     # Get your key at: https://tavily.com/
-    tavily_api_key: str = ""
+    tavily_api_key: str = Field(default="", repr=False)
 
     # JobSpy (no auth required, MIT licensed)
     jobspy_enabled: bool = True
@@ -206,9 +207,11 @@ class Settings(BaseSettings):
         return self.data_dir / "output"
 
     def ensure_directories(self) -> None:
-        """Create all required directories if they don't exist."""
+        """Create all required directories with restrictive permissions."""
+        from futureproof.utils.security import secure_mkdir
+
         for dir_path in [self.raw_dir, self.processed_dir, self.output_dir]:
-            dir_path.mkdir(parents=True, exist_ok=True)
+            secure_mkdir(dir_path)
 
 
 # Global settings instance
