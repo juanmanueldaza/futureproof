@@ -23,7 +23,7 @@ class ChromaDBStore:
     """
 
     collection_name: str = ""
-    _init_lock = threading.Lock()
+    _init_lock = threading.RLock()
 
     def __init__(self, persist_dir: Path | None = None) -> None:
         from futureproof.memory.checkpointer import get_data_dir
