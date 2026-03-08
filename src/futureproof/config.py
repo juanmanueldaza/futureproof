@@ -1,9 +1,10 @@
 """Configuration management using pydantic-settings."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 from dotenv import set_key
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # User-level config lives alongside profile and memory data.
@@ -37,8 +38,26 @@ class Settings(BaseSettings):
 
     # Azure OpenAI / AI Foundry
     azure_openai_api_key: str = Field(default="", repr=False)  # https://ai.azure.com/
-    azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com/
+    azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com
     azure_openai_api_version: str = "2024-12-01-preview"
+
+    @field_validator("azure_openai_endpoint")
+    @classmethod
+    def _clean_azure_endpoint(cls, v: str) -> str:
+        """Strip AI Foundry project path and validate URL format."""
+        if not v:
+            return v
+        idx = v.find("/api/projects/")
+        if idx != -1:
+            v = v[:idx]
+        v = v.rstrip("/")
+        if not v.startswith(("https://", "http://")):
+            raise ValueError(
+                "Endpoint must be a URL starting with https:// "
+                "(e.g. https://myresource.openai.azure.com). "
+                "Run /setup to fix."
+            )
+        return v
     azure_embedding_deployment: str = "text-embedding-3-small"
 
     # Azure purpose-specific deployments (predefined, overridable via env)
@@ -223,12 +242,28 @@ def get_user_env_path() -> Path:
     return _USER_ENV_PATH
 
 
+def _clean_endpoint_value(value: str) -> str:
+    """Strip AI Foundry project path and trailing slash from endpoint URL."""
+    idx = value.find("/api/projects/")
+    if idx != -1:
+        value = value[:idx]
+    return value.rstrip("/")
+
+
+_SETTING_CLEANERS: dict[str, Callable[[str], str]] = {
+    "AZURE_OPENAI_ENDPOINT": _clean_endpoint_value,
+}
+
+
 def write_user_setting(key: str, value: str) -> None:
     """Write a key=value pair to the user-level .env file.
 
     Creates the file with 0o600 permissions if it doesn't exist.
     Uses python-dotenv's set_key() for safe read-modify-write.
     """
+    cleaner = _SETTING_CLEANERS.get(key)
+    if cleaner:
+        value = cleaner(value)
     env_path = get_user_env_path()
     env_path.parent.mkdir(parents=True, exist_ok=True)
     if not env_path.exists():

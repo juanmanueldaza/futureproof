@@ -182,9 +182,15 @@ class JobSpyMCPClient(MCPClient):
         # Resolve country for Indeed/Glassdoor/Google (they use country-specific domains)
         country = self._resolve_country(location)
 
-        # Glassdoor doesn't support worldwide searches
-        if country == "worldwide":
-            sites = [s for s in sites if s != "glassdoor"]
+        # Exclude Glassdoor for unsupported countries (avoids noisy errors)
+        if "glassdoor" in sites:
+            try:
+                from jobspy.model import Country  # type: ignore[import-not-found]
+
+                c = Country.from_string(country)
+                c.glassdoor_domain_value  # raises if unsupported
+            except Exception:
+                sites = [s for s in sites if s != "glassdoor"]
 
         # Build search parameters
         search_params: dict[str, Any] = {

@@ -6,10 +6,10 @@ input -- never through the LLM agent. Used for:
 2. The /setup slash command for reconfiguration at any time
 """
 
+import getpass
 import logging
 from collections.abc import Callable, Sequence
 
-from prompt_toolkit import PromptSession
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
@@ -254,7 +254,11 @@ def _show_azure_guide(console: Console) -> None:
             " [#e0d8c0]Get your credentials[/#e0d8c0]\n"
             "  [#415a77]Go to your project > Overview.[/#415a77]\n"
             "  [#415a77]Copy the [bold]API key[/bold]"
-            " and [bold]Endpoint URL[/bold].[/#415a77]"
+            " and [bold]Endpoint URL[/bold].[/#415a77]\n"
+            "  [#ff6b6b]Use only the base URL"
+            " (e.g. https://myresource.openai.azure.com).\n"
+            "  Remove /api/projects/... if present."
+            "[/#ff6b6b]"
         ),
         title="[bold #ffd700]Azure OpenAI Setup Guide[/bold #ffd700]",
         border_style="#ffd700",
@@ -273,7 +277,6 @@ _GUIDES: dict[str, Callable[[Console], None]] = {
 
 
 def _prompt_keys(
-    session: PromptSession,  # type: ignore[type-arg]
     console: Console,
     name: str,
     keys: Sequence[tuple[str, str, bool] | tuple[str, str, bool, str]],
@@ -281,7 +284,6 @@ def _prompt_keys(
     """Prompt the user for each key in a provider/integration.
 
     Args:
-        session: prompt_toolkit session for input
         console: Rich console for output
         name: Display name (e.g. "OpenAI")
         keys: List of (ENV_VAR_NAME, label, is_secret[, default]) tuples
@@ -293,21 +295,32 @@ def _prompt_keys(
     console.print("[#415a77]Press Enter to skip a field.[/#415a77]\n")
 
     changed = False
+    is_url_key = frozenset(("ENDPOINT", "URL"))
     for key_entry in keys:
         env_key, label, is_secret = key_entry[0], key_entry[1], key_entry[2]
         default = key_entry[3] if len(key_entry) > 3 else ""
         prompt_label = f"  {label} [{default}]: " if default else f"  {label}: "
-        try:
-            value = session.prompt(
-                prompt_label,
-                is_password=is_secret,
-            ).strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print("\n[#415a77]Cancelled.[/#415a77]")
-            return changed
+        needs_url = not is_secret and any(k in env_key for k in is_url_key)
+        while True:
+            try:
+                if is_secret:
+                    value = getpass.getpass(prompt_label).strip()
+                else:
+                    value = input(prompt_label).strip()
+            except (EOFError, KeyboardInterrupt):
+                console.print("\n[#415a77]Cancelled.[/#415a77]")
+                return changed
 
-        if not value and default:
-            value = default
+            if not value and default:
+                value = default
+            if value and needs_url and not value.startswith(("https://", "http://")):
+                console.print(
+                    "  [#ff6b6b]Must be a URL starting with"
+                    " https:// — please try again.[/#ff6b6b]"
+                )
+                continue
+            break
+
         if value:
             write_user_setting(env_key, value)
             display = _redact(value) if is_secret else value
@@ -319,14 +332,12 @@ def _prompt_keys(
 
 def run_setup(
     console: Console,
-    session: PromptSession,  # type: ignore[type-arg]
     first_run: bool = False,
 ) -> bool:
     """Run the interactive setup wizard.
 
     Args:
         console: Rich console for output
-        session: prompt_toolkit session for input
         first_run: If True, requires at least one LLM provider
 
     Returns:
@@ -355,7 +366,7 @@ def run_setup(
         _display_menu(console)
 
         try:
-            choice = session.prompt("Select [0-8]: ").strip()
+            choice = input("Select [0-8]: ").strip()
         except (EOFError, KeyboardInterrupt):
             break
 
@@ -389,11 +400,11 @@ def run_setup(
             guide_id = info.get("guide")
             if guide_id and guide_id in _GUIDES:
                 _GUIDES[guide_id](console)
-            changed = _prompt_keys(session, console, info["name"], info["keys"])
+            changed = _prompt_keys(console, info["name"], info["keys"])
         elif offset < idx <= offset + len(_INTEGRATION_ORDER):
             iid = _INTEGRATION_ORDER[idx - offset - 1]
             info = _INTEGRATIONS[iid]
-            changed = _prompt_keys(session, console, info["name"], info["keys"])
+            changed = _prompt_keys(console, info["name"], info["keys"])
         else:
             console.print("[#ff6b6b]Invalid choice.[/#ff6b6b]\n")
             continue

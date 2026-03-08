@@ -136,3 +136,71 @@ class TestProviderDetection:
         assert s.has_anthropic is False
         assert s.has_proxy is False
         assert s.has_azure is False
+
+
+class TestAzureEndpointNormalization:
+    """Test Azure endpoint URL cleaning."""
+
+    def test_strips_api_projects_path(self) -> None:
+        """AI Foundry project path is removed."""
+        s = make_settings(
+            azure_openai_endpoint=(
+                "https://res.services.ai.azure.com"
+                "/api/projects/myproject"
+            ),
+        )
+        assert s.azure_openai_endpoint == (
+            "https://res.services.ai.azure.com"
+        )
+
+    def test_strips_trailing_slash(self) -> None:
+        s = make_settings(
+            azure_openai_endpoint=(
+                "https://res.openai.azure.com/"
+            ),
+        )
+        assert s.azure_openai_endpoint == (
+            "https://res.openai.azure.com"
+        )
+
+    def test_preserves_clean_endpoint(self) -> None:
+        s = make_settings(
+            azure_openai_endpoint=(
+                "https://res.openai.azure.com"
+            ),
+        )
+        assert s.azure_openai_endpoint == (
+            "https://res.openai.azure.com"
+        )
+
+    def test_empty_endpoint_unchanged(self) -> None:
+        s = make_settings(azure_openai_endpoint="")
+        assert s.azure_openai_endpoint == ""
+
+    def test_rejects_non_url_endpoint(self) -> None:
+        """API key accidentally pasted into endpoint field is rejected."""
+        import pytest
+
+        with pytest.raises(Exception, match="https://"):
+            make_settings(
+                azure_openai_endpoint="sk-abc123secretkey",
+            )
+
+
+class TestWriteUserSettingCleaning:
+    """Test that write_user_setting cleans values before persisting."""
+
+    def test_cleans_azure_endpoint_on_write(self, tmp_path, monkeypatch) -> None:
+        """AI Foundry project path is stripped before writing to .env."""
+        from futureproof.config import write_user_setting
+
+        env_file = tmp_path / ".env"
+        monkeypatch.setattr("futureproof.config._USER_ENV_PATH", env_file)
+
+        write_user_setting(
+            "AZURE_OPENAI_ENDPOINT",
+            "https://res.services.ai.azure.com/api/projects/myproject",
+        )
+        content = env_file.read_text()
+        assert "/api/projects/" not in content
+        assert "https://res.services.ai.azure.com" in content

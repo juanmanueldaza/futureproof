@@ -6,6 +6,7 @@ with the official GitHub MCP server.
 
 import contextlib
 import logging
+import shutil
 from typing import Any
 
 from mcp.client.session import ClientSession
@@ -47,7 +48,23 @@ class GitHubMCPClient(MCPClient):
                 "Set GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_MCP_TOKEN environment variable."
             )
 
-        if settings.github_mcp_use_docker:
+        use_docker = settings.github_mcp_use_docker
+        # Auto-fallback: if Docker preferred but not installed, try native
+        if use_docker and not shutil.which("docker"):
+            native = shutil.which(settings.github_mcp_command)
+            if native:
+                logger.info(
+                    "Docker not found, using native %s",
+                    settings.github_mcp_command,
+                )
+                use_docker = False
+            else:
+                raise MCPConnectionError(
+                    "Neither docker nor github-mcp-server found. "
+                    "Install Docker or the native binary."
+                )
+
+        if use_docker:
             return StdioServerParameters(
                 command="docker",
                 args=[
@@ -67,7 +84,7 @@ class GitHubMCPClient(MCPClient):
             # Native binary
             return StdioServerParameters(
                 command=settings.github_mcp_command,
-                args=[],
+                args=["stdio"],
                 env={"GITHUB_PERSONAL_ACCESS_TOKEN": token},
             )
 

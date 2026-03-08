@@ -536,7 +536,7 @@ def run_chat(thread_id: str = "main") -> None:
     if not settings.active_provider:
         from futureproof.chat.setup import run_setup
 
-        run_setup(console, session, first_run=True)
+        run_setup(console, first_run=True)
 
     # Create agent
     try:
@@ -547,8 +547,25 @@ def run_chat(thread_id: str = "main") -> None:
         if model_name:
             display_model_info(model_name)
     except Exception as e:
-        display_error(_sanitize_error(f"Failed to initialize agent: {e}"))
-        return
+        from pydantic import ValidationError
+
+        if isinstance(e, ValidationError) or isinstance(e.__cause__, ValidationError):
+            display_error(
+                "Configuration error — check your settings.\n"
+                f"{e}\n\nLaunching /setup to fix..."
+            )
+            from futureproof.chat.setup import run_setup
+
+            run_setup(console, first_run=True)
+            try:
+                agent = create_career_agent()
+                config = get_agent_config(thread_id=thread_id)
+            except Exception as retry_err:
+                display_error(_sanitize_error(f"Still failing: {retry_err}"))
+                return
+        else:
+            display_error(_sanitize_error(f"Failed to initialize agent: {e}"))
+            return
 
     # Mutable state shared with handle_command for /thread switching
     chat_state: dict = {
@@ -572,7 +589,7 @@ def run_chat(thread_id: str = "main") -> None:
                 if user_input.strip().lower() == "/setup":
                     from futureproof.chat.setup import run_setup
 
-                    changed = run_setup(console, session)
+                    changed = run_setup(console)
                     if changed:
                         reset_career_agent()
                         agent = create_career_agent()
