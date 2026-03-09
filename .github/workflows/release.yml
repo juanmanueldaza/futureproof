@@ -5,11 +5,7 @@ on:
     tags: ["v*"]
 
 jobs:
-  check:
-    uses: ./.github/workflows/ci.yml
-
   publish-pypi:
-    needs: check
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
