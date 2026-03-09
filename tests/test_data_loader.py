@@ -2,14 +2,14 @@
 
 from unittest.mock import patch
 
-from futureproof.utils.data_loader import (
+from fu7ur3pr00f.utils.data_loader import (
     combine_career_data,
     load_career_data,
     load_career_data_for_analysis,
     load_career_data_for_cv,
 )
 
-_PATCH_TARGET = "futureproof.services.knowledge_service.KnowledgeService"
+_PATCH_TARGET = "fu7ur3pr00f.services.knowledge_service.KnowledgeService"
 
 
 class TestLoadCareerData:

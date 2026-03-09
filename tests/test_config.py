@@ -1,6 +1,6 @@
 """Tests for configuration management."""
 
-from futureproof.config import Settings
+from fu7ur3pr00f.config import Settings
 
 
 def make_settings(**overrides) -> Settings:
@@ -192,10 +192,10 @@ class TestWriteUserSettingCleaning:
 
     def test_cleans_azure_endpoint_on_write(self, tmp_path, monkeypatch) -> None:
         """AI Foundry project path is stripped before writing to .env."""
-        from futureproof.config import write_user_setting
+        from fu7ur3pr00f.config import write_user_setting
 
         env_file = tmp_path / ".env"
-        monkeypatch.setattr("futureproof.config._USER_ENV_PATH", env_file)
+        monkeypatch.setattr("fu7ur3pr00f.config._USER_ENV_PATH", env_file)
 
         write_user_setting(
             "AZURE_OPENAI_ENDPOINT",

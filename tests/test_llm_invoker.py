@@ -2,11 +2,11 @@
 
 from unittest.mock import MagicMock, patch
 
-from futureproof.agents.helpers.llm_invoker import invoke_llm
+from fu7ur3pr00f.agents.helpers.llm_invoker import invoke_llm
 
 # Patch targets at the source module (lazy imports inside invoke_llm)
-_PATCH_GET_FALLBACK = "futureproof.llm.fallback.get_fallback_manager"
-_PATCH_GET_MODEL = "futureproof.llm.fallback.get_model_with_fallback"
+_PATCH_GET_FALLBACK = "fu7ur3pr00f.llm.fallback.get_fallback_manager"
+_PATCH_GET_MODEL = "fu7ur3pr00f.llm.fallback.get_model_with_fallback"
 
 
 def _make_response(content: str):

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from futureproof.gatherers.linkedin import (
+from fu7ur3pr00f.gatherers.linkedin import (
     LinkedInGatherer,
     _parse_certifications,
     _parse_company_follows,

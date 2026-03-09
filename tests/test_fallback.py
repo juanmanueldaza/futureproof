@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from futureproof.llm.fallback import (
+from fu7ur3pr00f.llm.fallback import (
     FallbackLLMManager,
     ModelConfig,
     _build_provider_kwargs,
@@ -13,26 +13,26 @@ from futureproof.llm.fallback import (
 class TestBuildDefaultChain:
     """Test dynamic fallback chain construction."""
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_openai_chain(self, mock_settings) -> None:
         mock_settings.active_provider = "openai"
         chain = build_default_chain()
         assert len(chain) > 0
         assert all(c.provider == "openai" for c in chain)
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_anthropic_chain(self, mock_settings) -> None:
         mock_settings.active_provider = "anthropic"
         chain = build_default_chain()
         assert len(chain) > 0
         assert all(c.provider == "anthropic" for c in chain)
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_unknown_provider_returns_empty(self, mock_settings) -> None:
         mock_settings.active_provider = "unknown"
         assert build_default_chain() == []
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_empty_provider_returns_empty(self, mock_settings) -> None:
         mock_settings.active_provider = ""
         assert build_default_chain() == []
@@ -41,7 +41,7 @@ class TestBuildDefaultChain:
 class TestBuildProviderKwargs:
     """Test provider-specific kwargs for init_chat_model."""
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_azure_kwargs(self, mock_settings) -> None:
         mock_settings.azure_openai_endpoint = "https://test.openai.azure.com/"
         mock_settings.azure_openai_api_version = "2024-12-01-preview"
@@ -52,7 +52,7 @@ class TestBuildProviderKwargs:
         assert kwargs["azure_endpoint"] == "https://test.openai.azure.com/"
         assert kwargs["api_key"] == "az-key"
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_openai_kwargs(self, mock_settings) -> None:
         mock_settings.openai_api_key = "sk-test"
         config = ModelConfig("openai", "gpt-4.1", "OpenAI GPT-4.1")
@@ -60,7 +60,7 @@ class TestBuildProviderKwargs:
         assert kwargs["api_key"] == "sk-test"
         assert "base_url" not in kwargs
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_futureproof_proxy_kwargs(self, mock_settings) -> None:
         mock_settings.futureproof_proxy_key = "fp-key"
         mock_settings.futureproof_proxy_url = "https://llm.futureproof.dev"
@@ -69,21 +69,21 @@ class TestBuildProviderKwargs:
         assert kwargs["api_key"] == "fp-key"
         assert kwargs["base_url"] == "https://llm.futureproof.dev"
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_anthropic_kwargs(self, mock_settings) -> None:
         mock_settings.anthropic_api_key = "sk-ant-test"
         config = ModelConfig("anthropic", "claude-sonnet-4-20250514", "Claude")
         kwargs = _build_provider_kwargs(config)
         assert kwargs["api_key"] == "sk-ant-test"
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_google_kwargs(self, mock_settings) -> None:
         mock_settings.google_api_key = "AIza-test"
         config = ModelConfig("google", "gemini-2.5-flash", "Gemini")
         kwargs = _build_provider_kwargs(config)
         assert kwargs["google_api_key"] == "AIza-test"
 
-    @patch("futureproof.llm.fallback.settings")
+    @patch("fu7ur3pr00f.llm.fallback.settings")
     def test_ollama_kwargs(self, mock_settings) -> None:
         mock_settings.ollama_base_url = "http://localhost:11434"
         config = ModelConfig("ollama", "qwen3", "Ollama Qwen3")

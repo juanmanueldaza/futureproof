@@ -2,7 +2,7 @@
 
 import pytest
 
-from futureproof.gatherers.portfolio.html_extractor import ExtractedContent, HTMLExtractor
+from fu7ur3pr00f.gatherers.portfolio.html_extractor import ExtractedContent, HTMLExtractor
 
 
 class TestHTMLExtractor:

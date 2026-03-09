@@ -92,7 +92,7 @@ src/futureproof/
 ## Development
 
 ```bash
-git clone https://github.com/juanmanueldaza/futureproof.git
+git clone https://github.com/juanmanueldaza/fu7ur3pr00f.git
 cd futureproof
 pip install -e .
 pip install pyright pytest ruff    # dev tools

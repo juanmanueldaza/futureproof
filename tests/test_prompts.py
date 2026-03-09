@@ -2,7 +2,7 @@
 
 import pytest
 
-from futureproof.prompts.loader import load_prompt
+from fu7ur3pr00f.prompts.loader import load_prompt
 
 # All prompt file stems that must exist
 ALL_PROMPTS = [
@@ -74,11 +74,11 @@ class TestBackwardCompat:
     """Tests for backward-compatible module-level attribute access."""
 
     def test_generate_cv_prompt_import(self):
-        from futureproof.prompts import GENERATE_CV_PROMPT
+        from fu7ur3pr00f.prompts import GENERATE_CV_PROMPT
 
         assert isinstance(GENERATE_CV_PROMPT, str)
         assert "ATS" in GENERATE_CV_PROMPT
 
     def test_unknown_attr_raises(self):
         with pytest.raises(ImportError):
-            from futureproof.prompts import NONEXISTENT_PROMPT  # noqa: F401
+            from fu7ur3pr00f.prompts import NONEXISTENT_PROMPT  # noqa: F401

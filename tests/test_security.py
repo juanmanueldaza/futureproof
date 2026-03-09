@@ -3,7 +3,7 @@
 import stat
 from pathlib import Path
 
-from futureproof.utils.security import (
+from fu7ur3pr00f.utils.security import (
     anonymize_career_data,
     sanitize_for_prompt,
     secure_mkdir,

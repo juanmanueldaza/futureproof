@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from langchain.agents.middleware.types import AgentState, ModelRequest, ModelResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from futureproof.agents.middleware import (
+from fu7ur3pr00f.agents.middleware import (
     _ANALYSIS_MARKER,
     AnalysisSynthesisMiddleware,
     ToolCallRepairMiddleware,
@@ -49,9 +49,9 @@ class TestBuildDynamicPrompt:
         )
 
         with (
-            patch("futureproof.memory.profile.load_profile", return_value=mock_profile),
+            patch("fu7ur3pr00f.memory.profile.load_profile", return_value=mock_profile),
             patch(
-                "futureproof.services.knowledge_service.KnowledgeService.get_stats",
+                "fu7ur3pr00f.services.knowledge_service.KnowledgeService.get_stats",
                 return_value=mock_stats,
             ),
         ):
@@ -128,11 +128,11 @@ class TestBuildDynamicPrompt:
 
         with (
             patch(
-                "futureproof.memory.profile.load_profile",
+                "fu7ur3pr00f.memory.profile.load_profile",
                 mock_load,
             ),
             patch(
-                "futureproof.services.knowledge_service."
+                "fu7ur3pr00f.services.knowledge_service."
                 "KnowledgeService.get_stats",
                 mock_get_stats,
             ),
@@ -172,11 +172,11 @@ class TestBuildDynamicPrompt:
 
         with (
             patch(
-                "futureproof.memory.profile.load_profile",
+                "fu7ur3pr00f.memory.profile.load_profile",
                 return_value=profile,
             ),
             patch(
-                "futureproof.services.knowledge_service."
+                "fu7ur3pr00f.services.knowledge_service."
                 "KnowledgeService.get_stats",
                 mock_get_stats,
             ),
@@ -500,11 +500,11 @@ class TestAnalysisSynthesisMiddleware:
 
         with (
             patch(
-                "futureproof.llm.fallback.get_model_with_fallback",
+                "fu7ur3pr00f.llm.fallback.get_model_with_fallback",
                 return_value=(mock_model, MagicMock(description="test-model")),
             ),
             patch(
-                "futureproof.prompts.load_prompt",
+                "fu7ur3pr00f.prompts.load_prompt",
                 return_value="Q: {user_question}\nR: {tool_results}",
             ),
         ):
@@ -543,11 +543,11 @@ class TestAnalysisSynthesisMiddleware:
 
         with (
             patch(
-                "futureproof.llm.fallback.get_model_with_fallback",
+                "fu7ur3pr00f.llm.fallback.get_model_with_fallback",
                 return_value=(mock_model, MagicMock(description="test-model")),
             ),
             patch(
-                "futureproof.prompts.load_prompt",
+                "fu7ur3pr00f.prompts.load_prompt",
                 return_value="Q: {user_question}\nR: {tool_results}",
             ),
         ):

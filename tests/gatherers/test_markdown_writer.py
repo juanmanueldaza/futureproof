@@ -2,10 +2,10 @@
 
 import pytest
 
-from futureproof.gatherers.portfolio.html_extractor import ExtractedContent
-from futureproof.gatherers.portfolio.js_extractor import JSContent
-from futureproof.gatherers.portfolio.markdown_writer import PortfolioMarkdownWriter
-from futureproof.memory.chunker import Section
+from fu7ur3pr00f.gatherers.portfolio.html_extractor import ExtractedContent
+from fu7ur3pr00f.gatherers.portfolio.js_extractor import JSContent
+from fu7ur3pr00f.gatherers.portfolio.markdown_writer import PortfolioMarkdownWriter
+from fu7ur3pr00f.memory.chunker import Section
 
 
 def _find(sections: list[Section], name: str) -> Section | None:

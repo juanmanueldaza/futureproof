@@ -1,0 +1,283 @@
+"""Configuration management using pydantic-settings."""
+
+from collections.abc import Callable
+from pathlib import Path
+
+from dotenv import set_key
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# User-level config lives alongside profile and memory data.
+_USER_ENV_PATH = Path.home() / ".futureproof" / ".env"
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=(".env", str(_USER_ENV_PATH)),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # LLM Provider (auto-detected from available keys if empty)
+    llm_provider: str = ""  # "futureproof", "openai", "anthropic", "google", "azure", "ollama"
+
+    # FutureProof Proxy (default for new users — zero-config with starter tokens)
+    futureproof_proxy_url: str = "https://llm.futureproof.dev"
+    futureproof_proxy_key: str = Field(default="", repr=False)
+
+    # OpenAI
+    openai_api_key: str = Field(default="", repr=False)
+
+    # Anthropic
+    anthropic_api_key: str = Field(default="", repr=False)
+
+    # Google Gemini
+    google_api_key: str = Field(default="", repr=False)
+
+    # Azure OpenAI / AI Foundry
+    azure_openai_api_key: str = Field(default="", repr=False)  # https://ai.azure.com/
+    azure_openai_endpoint: str = ""  # e.g. https://your-resource.openai.azure.com
+    azure_openai_api_version: str = "2024-12-01-preview"
+
+    @field_validator("azure_openai_endpoint")
+    @classmethod
+    def _clean_azure_endpoint(cls, v: str) -> str:
+        """Strip AI Foundry project path and validate URL format."""
+        if not v:
+            return v
+        idx = v.find("/api/projects/")
+        if idx != -1:
+            v = v[:idx]
+        v = v.rstrip("/")
+        if not v.startswith(("https://", "http://")):
+            raise ValueError(
+                "Endpoint must be a URL starting with https:// "
+                "(e.g. https://myresource.openai.azure.com). "
+                "Run /setup to fix."
+            )
+        return v
+    azure_embedding_deployment: str = "text-embedding-3-small"
+
+    # Azure purpose-specific deployments (predefined, overridable via env)
+    azure_agent_deployment: str = "gpt-5-mini"
+    azure_analysis_deployment: str = "gpt-4.1"
+    azure_summary_deployment: str = "gpt-4o-mini"
+    azure_synthesis_deployment: str = "o4-mini"
+
+    # Ollama (local models — set explicitly via /setup to enable)
+    ollama_base_url: str = ""
+
+    # Purpose-specific models (provider-agnostic, optional)
+    agent_model: str = ""      # e.g. "gpt-5-mini", "claude-sonnet-4-20250514"
+    analysis_model: str = ""   # e.g. "gpt-4.1", "claude-sonnet-4-20250514"
+    summary_model: str = ""    # e.g. "gpt-4o-mini", "claude-haiku-4-5-20251001"
+    synthesis_model: str = ""  # e.g. "o4-mini"
+    embedding_model: str = ""  # e.g. "text-embedding-3-small", "nomic-embed-text"
+
+    # User profiles
+    portfolio_url: str = "https://daza.ar"
+
+    # LLM Configuration
+    llm_temperature: float = 0.3
+    cv_temperature: float = 0.2  # Lower for more consistent CV output
+
+    # MCP (Model Context Protocol) Configuration
+    # GitHub MCP Server
+    github_personal_access_token: str = Field(default="", repr=False)
+    github_mcp_token: str = Field(default="", repr=False)
+    github_mcp_use_docker: bool = True
+    github_mcp_image: str = "ghcr.io/github/github-mcp-server"
+    github_mcp_command: str = "github-mcp-server"  # Native binary if not using Docker
+
+    # Market Intelligence MCP Configuration
+    # Tavily Search (1000 free queries/month, no credit card)
+    # Get your key at: https://tavily.com/
+    tavily_api_key: str = Field(default="", repr=False)
+
+    # JobSpy (no auth required, MIT licensed)
+    jobspy_enabled: bool = True
+
+    # Hacker News (no auth required, uses Algolia API)
+    hn_mcp_enabled: bool = True
+
+    # Market data caching (hours)
+    market_cache_hours: int = 24  # Tech trends
+    job_cache_hours: int = 12  # Jobs change faster
+    content_cache_hours: int = 12  # Dev.to/SO content trends
+    forex_cache_hours: int = 4  # Exchange rates (updated daily)
+
+    # Knowledge Base Configuration (RAG)
+    knowledge_auto_index: bool = True  # Auto-index after gather
+    knowledge_chunk_max_tokens: int = 500  # Max tokens per chunk
+    knowledge_chunk_min_tokens: int = 50  # Min tokens per chunk (merge if smaller)
+
+    @property
+    def github_mcp_token_resolved(self) -> str:
+        """Get GitHub MCP token from various sources."""
+        # Check explicit MCP token setting first
+        if self.github_mcp_token:
+            return self.github_mcp_token
+        # Fall back to standard GitHub token
+        if self.github_personal_access_token:
+            return self.github_personal_access_token
+        return ""
+
+    @property
+    def has_github_mcp(self) -> bool:
+        """Check if GitHub MCP is configured."""
+        return bool(self.github_mcp_token_resolved)
+
+    @property
+    def has_proxy(self) -> bool:
+        """Check if FutureProof proxy is configured."""
+        return bool(self.futureproof_proxy_key)
+
+    @property
+    def has_openai(self) -> bool:
+        """Check if OpenAI is configured (key must start with sk-)."""
+        return bool(self.openai_api_key and self.openai_api_key.startswith("sk-"))
+
+    @property
+    def has_anthropic(self) -> bool:
+        """Check if Anthropic is configured."""
+        return bool(self.anthropic_api_key)
+
+    @property
+    def has_google(self) -> bool:
+        """Check if Google Gemini is configured."""
+        return bool(self.google_api_key)
+
+    @property
+    def has_azure(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return bool(self.azure_openai_api_key and self.azure_openai_endpoint)
+
+    @property
+    def has_ollama(self) -> bool:
+        """Check if Ollama is configured."""
+        return bool(self.ollama_base_url)
+
+    def is_provider_configured(self, provider_id: str) -> bool:
+        """Check if a provider has its required keys configured."""
+        checks = {
+            "futureproof": self.has_proxy,
+            "openai": self.has_openai,
+            "anthropic": self.has_anthropic,
+            "google": self.has_google,
+            "azure": self.has_azure,
+            "ollama": self.has_ollama,
+        }
+        return checks.get(provider_id, False)
+
+    @property
+    def active_provider(self) -> str:
+        """Determine the active LLM provider.
+
+        Priority: explicit setting > proxy > Azure > OpenAI >
+        Anthropic > Google > Ollama.
+        """
+        if self.llm_provider:
+            return self.llm_provider
+        if self.has_proxy:
+            return "futureproof"
+        if self.has_azure:
+            return "azure"
+        if self.has_openai:
+            return "openai"
+        if self.has_anthropic:
+            return "anthropic"
+        if self.has_google:
+            return "google"
+        if self.has_ollama:
+            return "ollama"
+        return ""
+
+    @property
+    def has_tavily_mcp(self) -> bool:
+        """Check if Tavily Search MCP is configured."""
+        return bool(self.tavily_api_key)
+
+    @property
+    def market_cache_dir(self) -> Path:
+        """Get the market data cache directory."""
+        return self.data_dir / "cache" / "market"
+
+    # Paths (user-level, under ~/.futureproof/)
+    @property
+    def data_dir(self) -> Path:
+        """Get the data directory (~/.futureproof/data/)."""
+        return Path.home() / ".futureproof" / "data"
+
+    @property
+    def raw_dir(self) -> Path:
+        """Get the raw data directory."""
+        return self.data_dir / "raw"
+
+    @property
+    def processed_dir(self) -> Path:
+        """Get the processed data directory."""
+        return self.data_dir / "processed"
+
+    @property
+    def output_dir(self) -> Path:
+        """Get the output directory."""
+        return self.data_dir / "output"
+
+    def ensure_directories(self) -> None:
+        """Create all required directories with restrictive permissions."""
+        from fu7ur3pr00f.utils.security import secure_mkdir
+
+        for dir_path in [self.raw_dir, self.processed_dir, self.output_dir]:
+            secure_mkdir(dir_path)
+
+
+# Global settings instance
+settings = Settings()
+
+
+def get_user_env_path() -> Path:
+    """Path to the user-level .env file (~/.futureproof/.env)."""
+    return _USER_ENV_PATH
+
+
+def _clean_endpoint_value(value: str) -> str:
+    """Strip AI Foundry project path and trailing slash from endpoint URL."""
+    idx = value.find("/api/projects/")
+    if idx != -1:
+        value = value[:idx]
+    return value.rstrip("/")
+
+
+_SETTING_CLEANERS: dict[str, Callable[[str], str]] = {
+    "AZURE_OPENAI_ENDPOINT": _clean_endpoint_value,
+}
+
+
+def write_user_setting(key: str, value: str) -> None:
+    """Write a key=value pair to the user-level .env file.
+
+    Creates the file with 0o600 permissions if it doesn't exist.
+    Uses python-dotenv's set_key() for safe read-modify-write.
+    """
+    cleaner = _SETTING_CLEANERS.get(key)
+    if cleaner:
+        value = cleaner(value)
+    env_path = get_user_env_path()
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    if not env_path.exists():
+        env_path.touch(mode=0o600)
+    set_key(str(env_path), key, value)
+    env_path.chmod(0o600)
+
+
+def reload_settings() -> None:
+    """Reload settings from env files, updating the global singleton in-place.
+
+    All modules that imported ``settings`` by name keep their reference to
+    the same object, so mutating it ensures everyone sees the new values.
+    """
+    new = Settings()
+    for field_name in Settings.model_fields:
+        setattr(settings, field_name, getattr(new, field_name))
