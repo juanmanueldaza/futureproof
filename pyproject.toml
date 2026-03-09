@@ -46,9 +46,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/juanmanueldaza/futureproof"
-Repository = "https://github.com/juanmanueldaza/futureproof"
-"Bug Tracker" = "https://github.com/juanmanueldaza/futureproof/issues"
+Homepage = "https://github.com/juanmanueldaza/fu7ur3pr00f"
+Repository = "https://github.com/juanmanueldaza/fu7ur3pr00f"
+"Bug Tracker" = "https://github.com/juanmanueldaza/fu7ur3pr00f/issues"
 
 [project.scripts]
 futureproof = "futureproof.cli:app"
