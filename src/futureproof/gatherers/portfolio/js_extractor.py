@@ -77,7 +77,7 @@ class JSExtractor:
             if not src:
                 continue
 
-            js_url = urljoin(base_url, src)
+            js_url = urljoin(base_url, str(src))
             try:
                 result = fetcher.fetch(js_url)
                 js_files_processed += 1

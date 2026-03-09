@@ -149,7 +149,7 @@ class PortfolioFetcher:
             raise ValueError(f"DNS resolution failed for {hostname}")
 
         for _family, _type, _proto, _canonname, sockaddr in addrinfo:
-            addr = sockaddr[0]
+            addr = str(sockaddr[0])
             if _is_blocked_ip(addr):
                 raise ValueError(
                     f"Blocked hostname resolving to private/CGNAT IP: "
@@ -160,8 +160,9 @@ class PortfolioFetcher:
 
     def _get_with_pinning(self, url: str, addrinfo: list[tuple] | None) -> httpx.Response:
         """Send GET request with optional DNS pinning."""
+        assert self._client is not None
         if addrinfo:
-            hostname = urlparse(url).hostname
+            hostname = urlparse(url).hostname or ""
             with _pinned_dns(hostname, addrinfo):
                 return self._client.get(url)
         return self._client.get(url)
