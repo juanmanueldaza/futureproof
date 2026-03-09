@@ -189,7 +189,7 @@ class AnalysisSynthesisMiddleware(AgentMiddleware):
                 and msg.name in _ANALYSIS_TOOLS
                 and idx > last_human_idx
             ):
-                analysis_results[msg.name] = msg.content
+                analysis_results[msg.name] = str(msg.content)
                 modified.append(
                     ToolMessage(
                         content=_ANALYSIS_MARKER,

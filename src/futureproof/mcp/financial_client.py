@@ -235,7 +235,7 @@ class FinancialMCPClient(HTTPMCPClient):
                 break
 
         if ppp_ratio is not None:
-            _ppp_cache[code] = (now, ppp_ratio, year)
+            _ppp_cache[code] = (now, ppp_ratio, year or "")
 
         if ppp_ratio is None:
             output = {
