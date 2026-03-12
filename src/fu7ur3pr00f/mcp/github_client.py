@@ -1,6 +1,6 @@
 """GitHub MCP client implementation.
 
-Uses stdio transport with Docker or native binary to communicate
+Uses stdio transport with the native binary to communicate
 with the official GitHub MCP server.
 """
 
@@ -21,15 +21,13 @@ logger = logging.getLogger(__name__)
 class GitHubMCPClient(MCPClient):
     """MCP client for GitHub MCP Server.
 
-    Uses stdio transport with Docker (default) or native binary.
+    Uses stdio transport with the native binary.
 
     Environment:
         GITHUB_PERSONAL_ACCESS_TOKEN: GitHub PAT for authentication
         GITHUB_MCP_TOKEN: Alternative token setting
 
     Configuration:
-        settings.github_mcp_use_docker: Use Docker container (default: True)
-        settings.github_mcp_image: Docker image name
         settings.github_mcp_command: Native binary command
     """
 
@@ -48,45 +46,17 @@ class GitHubMCPClient(MCPClient):
                 "Set GITHUB_PERSONAL_ACCESS_TOKEN or GITHUB_MCP_TOKEN environment variable."
             )
 
-        use_docker = settings.github_mcp_use_docker
-        # Auto-fallback: if Docker preferred but not installed, try native
-        if use_docker and not shutil.which("docker"):
-            native = shutil.which(settings.github_mcp_command)
-            if native:
-                logger.info(
-                    "Docker not found, using native %s",
-                    settings.github_mcp_command,
-                )
-                use_docker = False
-            else:
-                raise MCPConnectionError(
-                    "Neither docker nor github-mcp-server found. "
-                    "Install Docker or the native binary."
-                )
+        if not shutil.which(settings.github_mcp_command):
+            raise MCPConnectionError(
+                "github-mcp-server not found on PATH. "
+                "Install the native binary."
+            )
 
-        if use_docker:
-            return StdioServerParameters(
-                command="docker",
-                args=[
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    settings.github_mcp_image,
-                    "stdio",
-                    "--log-file",
-                    "/dev/null",  # Suppress server logs
-                ],
-                env={"GITHUB_PERSONAL_ACCESS_TOKEN": token},
-            )
-        else:
-            # Native binary
-            return StdioServerParameters(
-                command=settings.github_mcp_command,
-                args=["stdio"],
-                env={"GITHUB_PERSONAL_ACCESS_TOKEN": token},
-            )
+        return StdioServerParameters(
+            command=settings.github_mcp_command,
+            args=["stdio"],
+            env={"GITHUB_PERSONAL_ACCESS_TOKEN": token},
+        )
 
     async def connect(self) -> None:
         """Connect to GitHub MCP server."""

@@ -87,9 +87,7 @@ class Settings(BaseSettings):
     # GitHub MCP Server
     github_personal_access_token: str = Field(default="", repr=False)
     github_mcp_token: str = Field(default="", repr=False)
-    github_mcp_use_docker: bool = True
-    github_mcp_image: str = "ghcr.io/github/github-mcp-server"
-    github_mcp_command: str = "github-mcp-server"  # Native binary if not using Docker
+    github_mcp_command: str = "github-mcp-server"  # Native binary
 
     # Market Intelligence MCP Configuration
     # Tavily Search (1000 free queries/month, no credit card)

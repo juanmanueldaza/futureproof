@@ -9,6 +9,8 @@ import subprocess
 import sys
 from typing import Any
 
+import httpx
+
 from .agents.tools import get_all_tools
 from .config import settings
 from .mcp.factory import MCPClientFactory
@@ -73,11 +75,36 @@ async def _check_mcp_server(server_type: str) -> bool:
         _print_result(f"MCP:{server_type}", True, f"{len(tools)} tools")
         return True
     except Exception as exc:  # pragma: no cover - diagnostics surface raw failure
+        if server_type == "github":
+            ok, detail = _check_github_rest()
+            if ok:
+                _print_result("MCP:github", True, detail)
+                return True
+            _print_result("MCP:github", False, detail or str(exc))
+            return False
         _print_result(f"MCP:{server_type}", False, str(exc))
         return False
     finally:
         with contextlib.suppress(Exception):
             await client.disconnect()
+
+
+def _check_github_rest() -> tuple[bool, str]:
+    token = settings.github_mcp_token_resolved
+    if not token:
+        return False, "token missing"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    try:
+        response = httpx.get("https://api.github.com/user", headers=headers, timeout=20)
+        if response.status_code >= 400:
+            return False, f"REST {response.status_code}"
+        return True, "rest fallback"
+    except Exception as exc:
+        return False, f"REST error: {exc}"
 
 
 async def _run_async_checks() -> dict[str, Any]:

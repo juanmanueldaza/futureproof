@@ -64,6 +64,23 @@ If `fu7ur3pr00f` is not found, run `pipx ensurepath` and restart your shell.
 
 On first launch, the `/setup` wizard prompts you to configure an LLM provider. Supports OpenAI, Anthropic, Google, Azure, Ollama, or the FutureProof proxy. Settings are saved to `~/.fu7ur3pr00f/.env`. Everything happens inside the chat — use `/help` to see all commands.
 
+## Install via apt (Debian/Ubuntu, amd64)
+
+```bash
+curl -fsSL https://juanmanueldaza.github.io/fu7ur3pr00f/fu7ur3pr00f-archive-keyring.gpg | \
+  sudo tee /usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg >/dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
+https://juanmanueldaza.github.io/fu7ur3pr00f stable main" | \
+  sudo tee /etc/apt/sources.list.d/fu7ur3pr00f.list >/dev/null
+
+sudo apt update
+sudo apt install fu7ur3pr00f
+```
+
+The apt package bundles `github-mcp-server` and installs `glab`, `poppler-utils`,
+and WeasyPrint system libraries as dependencies.
+
 > **PDF generation** (CVs) requires system libraries for text rendering. Without them the app works fine — you just get Markdown output instead of PDF.
 >
 > Ubuntu/Debian: `sudo apt-get install libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libfontconfig1 libgdk-pixbuf-2.0-0 poppler-utils`
