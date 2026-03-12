@@ -34,6 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PIP_DEFAULT_TIMEOUT: "120"
           PIP_RETRIES: "5"
+          PIP_NO_BUILD_ISOLATION: "1"
         run: scripts/build_deb.sh
 
       - name: Build apt repository

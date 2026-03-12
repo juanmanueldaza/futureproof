@@ -33,7 +33,13 @@ export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-120}"
 export PIP_RETRIES="${PIP_RETRIES:-5}"
 
 python3 -m pip install --upgrade pip build hatchling getpybs >/dev/null
-python3 -m build --wheel --no-isolation >/dev/null
+
+build_log="${work_dir}/build.log"
+if ! python3 -m build --wheel --no-isolation -v >"${build_log}" 2>&1; then
+  echo "Wheel build failed. Last 200 lines:"
+  tail -n 200 "${build_log}"
+  exit 1
+fi
 
 wheel_path="$(ls -1 "${root_dir}/dist"/fu7ur3pr00f-"${version}"-py3-none-any.whl | head -n1)"
 if [[ ! -f "${wheel_path}" ]]; then
