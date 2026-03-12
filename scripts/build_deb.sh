@@ -102,9 +102,10 @@ case "${pybs_tarball}" in
     ;;
 esac
 
-python_bin="$(find "${python_dir}" -type f -path "*/bin/python3" | head -n1)"
+python_bin="$(find "${python_dir}" -type f -regex ".*/bin/python\\(3\\(\\.[0-9]+\\)?\\)?$" | head -n1)"
 if [[ -z "${python_bin}" ]]; then
   echo "Python binary not found in ${python_dir}"
+  find "${python_dir}" -maxdepth 3 -type f -path "*/bin/*" | head -n 50
   exit 1
 fi
 
