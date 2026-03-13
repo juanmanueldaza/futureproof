@@ -109,9 +109,10 @@ if [[ -z "${python_bin}" ]]; then
   exit 1
 fi
 
-venv_dir="${deb_root}/opt/fu7ur3pr00f/venv"
-"${python_bin}" -m venv "${venv_dir}"
-"${venv_dir}/bin/pip" install --upgrade pip >/dev/null
+python_root="$(cd "$(dirname "$(dirname "${python_bin}")")" && pwd)"
+python_dest="${deb_root}/opt/fu7ur3pr00f/python"
+mkdir -p "${python_dest}"
+cp -a "${python_root}/." "${python_dest}/"
 
 wheel_dir="${deb_root}/opt/fu7ur3pr00f/wheels"
 mkdir -p "${wheel_dir}"
@@ -185,7 +186,17 @@ cat > "${deb_root}/DEBIAN/postinst" <<'EOF'
 set -euo pipefail
 
 venv="/opt/fu7ur3pr00f/venv"
+python="/opt/fu7ur3pr00f/python/bin/python"
 wheel="$(ls /opt/fu7ur3pr00f/wheels/fu7ur3pr00f-*.whl | head -n1)"
+
+if [[ ! -x "${python}" ]]; then
+  echo "Embedded python not found at ${python}" >&2
+  exit 1
+fi
+
+if [[ ! -x "${venv}/bin/python" ]]; then
+  "${python}" -m venv "${venv}"
+fi
 
 if "${venv}/bin/python" - <<'PY'
 import importlib.util
@@ -195,8 +206,12 @@ then
   exit 0
 fi
 
-"${venv}/bin/pip" install --upgrade pip >/dev/null
-"${venv}/bin/pip" install "${wheel}"
+if ! "${venv}/bin/pip" --version >/dev/null 2>&1; then
+  "${venv}/bin/python" -m ensurepip --upgrade >/dev/null 2>&1 || true
+fi
+
+"${venv}/bin/python" -m pip install --upgrade pip >/dev/null
+"${venv}/bin/python" -m pip install "${wheel}"
 EOF
 chmod 755 "${deb_root}/DEBIAN/postinst"
 
