@@ -22,6 +22,35 @@ rm -rf "${repo_dir}"
 mkdir -p "${repo_dir}/pool/${component}/f/fu7ur3pr00f"
 mkdir -p "${repo_dir}/dists/${dist_name}/${component}/binary-${arch}"
 
+cat > "${repo_dir}/index.html" <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>fu7ur3pr00f apt repo</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 2rem; }
+      code { background: #f4f4f4; padding: 0.1rem 0.25rem; border-radius: 4px; }
+      pre { background: #f4f4f4; padding: 0.75rem; border-radius: 6px; overflow-x: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>fu7ur3pr00f apt repo</h1>
+    <p>This GitHub Pages site hosts the apt repository for fu7ur3pr00f.</p>
+    <pre><code>curl -fsSL https://juanmanueldaza.github.io/fu7ur3pr00f/fu7ur3pr00f-archive-keyring.gpg | \
+  sudo tee /usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg >/dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
+https://juanmanueldaza.github.io/fu7ur3pr00f stable main" | \
+  sudo tee /etc/apt/sources.list.d/fu7ur3pr00f.list >/dev/null</code></pre>
+    <p>Repository metadata lives under <code>dists/stable</code>.</p>
+  </body>
+</html>
+EOF
+
+touch "${repo_dir}/.nojekyll"
+
 cp "${deb_path}" "${repo_dir}/pool/${component}/f/fu7ur3pr00f/"
 
 pushd "${repo_dir}" >/dev/null
