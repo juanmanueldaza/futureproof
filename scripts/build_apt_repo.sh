@@ -41,7 +41,7 @@ cat > "${repo_dir}/index.html" <<'EOF'
     <pre><code>curl -fsSL https://juanmanueldaza.github.io/fu7ur3pr00f/fu7ur3pr00f-archive-keyring.gpg | \
   sudo tee /usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg >/dev/null
 
-echo "deb [signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
 https://juanmanueldaza.github.io/fu7ur3pr00f stable main" | \
   sudo tee /etc/apt/sources.list.d/fu7ur3pr00f.list >/dev/null</code></pre>
     <p>Repository metadata lives under <code>dists/stable</code>.</p>

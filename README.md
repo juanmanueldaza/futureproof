@@ -70,7 +70,7 @@ On first launch, the `/setup` wizard prompts you to configure an LLM provider. S
 curl -fsSL https://juanmanueldaza.github.io/fu7ur3pr00f/fu7ur3pr00f-archive-keyring.gpg | \
   sudo tee /usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg >/dev/null
 
-echo "deb [signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
 https://juanmanueldaza.github.io/fu7ur3pr00f stable main" | \
   sudo tee /etc/apt/sources.list.d/fu7ur3pr00f.list >/dev/null
 
