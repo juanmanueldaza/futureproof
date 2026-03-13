@@ -78,6 +78,9 @@ sudo apt update
 sudo apt install fu7ur3pr00f
 ```
 
+During installation, the package bootstraps the Python environment and downloads
+Python dependencies into `/opt/fu7ur3pr00f/venv`, so internet access is required.
+
 The apt package bundles `github-mcp-server` and installs `glab`, `poppler-utils`,
 and WeasyPrint system libraries as dependencies.
 
