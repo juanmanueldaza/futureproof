@@ -104,9 +104,14 @@ def _save_github_username(username: str) -> None:
 def _github(tool_name: str, args: dict) -> str:
     """Call GitHub MCP via pool, return content or error."""
     result = call_mcp("github", tool_name, args)
-    if isinstance(result, str) and result.startswith("Github connection error"):
-        logger.info("GitHub MCP unavailable, falling back to REST API")
-        return _github_http(tool_name, args)
+    if isinstance(result, str):
+        normalized = result.lstrip()
+        if normalized.startswith("Github connection error") or "GitHub MCP server" in result:
+            logger.info("GitHub MCP unavailable, falling back to REST API: %s", result)
+            return _github_http(tool_name, args)
+        if "docker: permission denied" in result:
+            logger.info("GitHub MCP requires Docker; falling back to REST API")
+            return _github_http(tool_name, args)
     return result if isinstance(result, str) else str(result)
 
 
