@@ -112,7 +112,10 @@ fi
 venv_dir="${deb_root}/opt/fu7ur3pr00f/venv"
 "${python_bin}" -m venv "${venv_dir}"
 "${venv_dir}/bin/pip" install --upgrade pip >/dev/null
-"${venv_dir}/bin/pip" install "${wheel_path}" >/dev/null
+
+wheel_dir="${deb_root}/opt/fu7ur3pr00f/wheels"
+mkdir -p "${wheel_dir}"
+cp "${wheel_path}" "${wheel_dir}/"
 
 cat > "${deb_root}/usr/bin/fu7ur3pr00f" <<'EOF'
 #!/usr/bin/env bash
@@ -176,6 +179,26 @@ Description: FutureProof career intelligence agent
  FutureProof is a local-first career intelligence agent that gathers
  professional data, analyzes career trajectories, and generates CVs.
 EOF
+
+cat > "${deb_root}/DEBIAN/postinst" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+venv="/opt/fu7ur3pr00f/venv"
+wheel="$(ls /opt/fu7ur3pr00f/wheels/fu7ur3pr00f-*.whl | head -n1)"
+
+if "${venv}/bin/python" - <<'PY'
+import importlib.util
+raise SystemExit(0 if importlib.util.find_spec("fu7ur3pr00f") else 1)
+PY
+then
+  exit 0
+fi
+
+"${venv}/bin/pip" install --upgrade pip >/dev/null
+"${venv}/bin/pip" install "${wheel}"
+EOF
+chmod 755 "${deb_root}/DEBIAN/postinst"
 
 dpkg-deb --build "${deb_root}" "${dist_dir}/fu7ur3pr00f_${version}_${arch}.deb" >/dev/null
 echo "Built ${dist_dir}/fu7ur3pr00f_${version}_${arch}.deb"
