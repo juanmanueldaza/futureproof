@@ -56,7 +56,14 @@ cp "${deb_path}" "${repo_dir}/pool/${component}/f/fu7ur3pr00f/"
 pushd "${repo_dir}" >/dev/null
 dpkg-scanpackages --arch "${arch}" "pool/${component}" > "dists/${dist_name}/${component}/binary-${arch}/Packages"
 gzip -kf "dists/${dist_name}/${component}/binary-${arch}/Packages"
-apt-ftparchive release "dists/${dist_name}" > "dists/${dist_name}/Release"
+apt-ftparchive \
+  -o "APT::FTPArchive::Release::Origin=fu7ur3pr00f" \
+  -o "APT::FTPArchive::Release::Label=fu7ur3pr00f" \
+  -o "APT::FTPArchive::Release::Suite=${dist_name}" \
+  -o "APT::FTPArchive::Release::Codename=${dist_name}" \
+  -o "APT::FTPArchive::Release::Architectures=${arch}" \
+  -o "APT::FTPArchive::Release::Components=${component}" \
+  release "dists/${dist_name}" > "dists/${dist_name}/Release"
 popd >/dev/null
 
 if [[ -z "${APT_GPG_PRIVATE_KEY:-}" || -z "${APT_GPG_PASSPHRASE:-}" ]]; then
