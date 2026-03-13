@@ -1,0 +1,42 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Fri, 13 Mar 2026 03:39:31 +0000
+Label: fu7ur3pr00f
+Origin: fu7ur3pr00f
+Suite: stable
+MD5Sum:
+ 236c6bd5e81ee18d05b38a5b66f6dc0a              146 Release
+ df6a205b8eba58f469639ab7e73b0c31              720 main/binary-amd64/Packages
+ 4e760ae6185a92e4e5300bd0a55e904d              491 main/binary-amd64/Packages.gz
+SHA1:
+ 7ba54f4840064d1bf0313cb6a16edf324fab8731              146 Release
+ 379119ed54fc893d46a660f842d696f3be419884              720 main/binary-amd64/Packages
+ b54cfff4e642ccf38fb1a56ea7fc18c3292a7243              491 main/binary-amd64/Packages.gz
+SHA256:
+ c7226607675a0a744fd48b0e36ed2129e42c70ef42a08ec9752e3b459b99ae49              146 Release
+ 01fc10f22bdb6580c8897413a2f88eddd5f9095aa0289d563d9fac235e28efb1              720 main/binary-amd64/Packages
+ 4821b00ec2f32aa67081d95d89c1a08002b72c29d3431f734f1458092947588e              491 main/binary-amd64/Packages.gz
+SHA512:
+ 93df01f9f625c44c34d12ee545b4fa1814d8bce2dc669a1c9d2e865a4db1f5f4cbf6e8dd46353ee8af5eff3803e78dae71157ad6acff6031ef3d4481e286530e              146 Release
+ c5ea0d5e5d11668acf6071189b6a00c97e483187a7de30cd8dbdb165b70aee96c7b51643364f942f92959def3dd9ab8806ffb1ab99eba3f327ea2dc30dadf500              720 main/binary-amd64/Packages
+ f05388f2802e4612326b785af61d8fe2a5fbc5fc422d57d809a07dc9eddd9e8cc059808fcef567e755bd2aa46bc0440a91c562cf80f5bbff2a735699cde5c029              491 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEtnfGhslMWcTuFG/hdXxptydJR28FAmmzhvMACgkQdXxptydJ
+R2//MA//QHgZVWpPzi2sbwVEqUN+b7/Mo0q7f5MhK6Q+OYu+CqeKXUJstIkXXP1o
+CxRdHfZ1gi1Od4RXmjeT5IlIdrZbcAj8xeSOO0ANw2AJ7YzkvoDeTaDlJ3wgQEkm
+Z8SbheSMiFiVyXW96kzP+6zYsP8XNVGTMAza+Ej3XqNYxZn/f6kINYq19VE0sBsy
+7JxgueWA9ENZz9A31yjOzC8nt6NlOCaMnxCip1qtbzUk50TvtrGui74LTMEFy4L7
+PbkUO/eyO/0D/k/fT8+2ARfDrVCbYAsZZn4tlQDqCx8NSnzZ4NN3rVDioPkQWZeR
+kmM57ERI6YHaSjIuf59D/uATLyNykfGosbkyoWcB+ra/ZY7rP+eWk5xYVNxl5L5a
+OzwZ5zmBc7kEobJ+YtYRIJ6I2khm9UmugA25Ev04RuMG487tcc6JIf9s/Rd72j5w
+g/MGO1b/o0AtzdEd6dV93us9zVe5aTN8D3ympPXZSjklHKpGD2VUC1NjDRkQ24Y2
+Jt3bIMfsx0TcTANjgDbgIMcJAwAuCF0uLlFT+NzX81jHEPXKisOy+4RGicLBAtN3
+OCAnUyTYYKoUejDcf2XcJ63itLySBUbXolHApbmSKBSs6hE2nu+EJlqRxwW4ckno
+7IUb6qlCy+MsCpAzylt/9tfrMoh6i/jJqdpyzW/d+wq34jgAMrc=
+=/vmP
+-----END PGP SIGNATURE-----

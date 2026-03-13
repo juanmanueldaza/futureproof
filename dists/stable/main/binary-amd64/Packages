@@ -1,0 +1,16 @@
+Package: fu7ur3pr00f
+Version: 0.1.8
+Architecture: amd64
+Maintainer: Juan Manuel Daza <juanmanueldaza@users.noreply.github.com>
+Depends: libc6, libstdc++6, libpango-1.0-0, libpangoft2-1.0-0, libcairo2, libfontconfig1, libgdk-pixbuf-2.0-0, poppler-utils, glab
+Filename: pool/main/f/fu7ur3pr00f/fu7ur3pr00f_0.1.8_amd64.deb
+Size: 33379948
+MD5sum: a3001f99e2b2858d89a0af35df658df4
+SHA1: 19c699d053399c8346c1e257fe3ce131a7b76d6d
+SHA256: 741d693ffbe3c8cb59fe2949bfcefd1a713d9f6a19d997a44a3c103a6ba3198a
+Section: utils
+Priority: optional
+Description: FutureProof career intelligence agent
+ FutureProof is a local-first career intelligence agent that gathers
+ professional data, analyzes career trajectories, and generates CVs.
+
