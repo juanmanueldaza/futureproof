@@ -66,9 +66,9 @@ Vagrant.configure("2") do |config|
     fi
 
     echo "=== Installing project dependencies ==="
-    .venv/bin/pip install --upgrade pip
-    .venv/bin/pip install -e .
-    .venv/bin/pip install pyright pytest ruff
+    .venv/bin/python -m pip install --upgrade pip --quiet
+    .venv/bin/python -m pip install -e . --quiet
+    .venv/bin/python -m pip install pyright pytest ruff --quiet
 
     echo "=== Installing GitHub MCP server ==="
     if ! command -v github-mcp-server &> /dev/null; then
