@@ -6,7 +6,6 @@ import asyncio
 import contextlib
 import shutil
 import subprocess
-import sys
 from typing import Any
 
 import httpx
@@ -127,8 +126,7 @@ def main() -> int:
     failures = 0
     if not results["llm"]:
         failures += 1
-    if not results["gitlab"]:
-        failures += 1
+    # GitLab CLI integration is optional for the core install.
     failures += sum(1 for ok in results["mcp"].values() if not ok)
 
     if failures:

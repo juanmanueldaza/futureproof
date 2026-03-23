@@ -55,12 +55,20 @@ graph LR
 
 ## Quick Start
 
+Tier-1 package support today is Debian/Ubuntu on `amd64`.
+
 ```bash
-pipx install fu7ur3pr00f
+curl -fsSL https://juanmanueldaza.github.io/fu7ur3pr00f/fu7ur3pr00f-archive-keyring.gpg | \
+  sudo tee /usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg >/dev/null
+
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/fu7ur3pr00f-archive-keyring.gpg] \
+https://juanmanueldaza.github.io/fu7ur3pr00f stable main" | \
+  sudo tee /etc/apt/sources.list.d/fu7ur3pr00f.list >/dev/null
+
+sudo apt update
+sudo apt install fu7ur3pr00f
 fu7ur3pr00f
 ```
-
-If `fu7ur3pr00f` is not found, run `pipx ensurepath` and restart your shell.
 
 On first launch, the `/setup` wizard prompts you to configure an LLM provider. Supports OpenAI, Anthropic, Google, Azure, Ollama, or the FutureProof proxy. Settings are saved to `~/.fu7ur3pr00f/.env`. Everything happens inside the chat — use `/help` to see all commands.
 
@@ -78,17 +86,29 @@ sudo apt update
 sudo apt install fu7ur3pr00f
 ```
 
-During installation, the package bootstraps the Python environment and downloads
-Python dependencies into `/opt/fu7ur3pr00f/venv`, so internet access is required.
+The apt package is self-contained: installation places a ready-to-run Python
+runtime and CLI under `/opt/fu7ur3pr00f` with no `pip install` and no network
+bootstrap during `apt install`.
 
-The apt package bundles `github-mcp-server` and installs `glab`, `poppler-utils`,
-and WeasyPrint system libraries as dependencies.
+The package bundles `github-mcp-server`. Some optional integrations rely on
+extra system packages and degrade gracefully if they are not present.
 
-> **PDF generation** (CVs) requires system libraries for text rendering. Without them the app works fine — you just get Markdown output instead of PDF.
+> **Optional extras**
 >
-> Ubuntu/Debian: `sudo apt-get install libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libfontconfig1 libgdk-pixbuf-2.0-0 poppler-utils`
+> GitLab tools: `sudo apt-get install glab`
 >
-> macOS: `brew install pango cairo gdk-pixbuf poppler`
+> CliftonStrengths PDF import: `sudo apt-get install poppler-utils`
+>
+> PDF generation (CV export): `sudo apt-get install libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libfontconfig1 libgdk-pixbuf-2.0-0`
+
+## Other Platforms
+
+`apt` is the first polished native channel. `rpm`, `AUR`, and `Homebrew`
+support are planned from the same packaged runtime model, but they are not yet
+the supported installation path.
+
+For contributor workflows and unsupported platforms, `pipx install fu7ur3pr00f`
+still works as a development/testing fallback.
 
 ## Project Structure
 

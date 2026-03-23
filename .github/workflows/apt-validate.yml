@@ -1,15 +1,14 @@
-name: Apt Release
+name: Apt Validate
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
+  pull_request:
+  push:
+    branches: ["main"]
 
 jobs:
-  build-apt:
+  validate-apt:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -43,20 +42,3 @@ jobs:
         run: |
           deb_path="$(ls -1t dist/deb/*.deb | head -n1)"
           scripts/validate_apt_artifact.sh "${deb_path}"
-
-      - name: Build apt repository
-        env:
-          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
-          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
-          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
-        run: |
-          deb_path="$(ls -1t dist/deb/*.deb | head -n1)"
-          scripts/build_apt_repo.sh "${deb_path}"
-
-      - name: Publish apt repo to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dist/apt
-          publish_branch: gh-pages
-          force_orphan: true

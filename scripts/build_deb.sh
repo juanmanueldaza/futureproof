@@ -22,6 +22,7 @@ PY
 fi
 
 mkdir -p "${dist_dir}"
+rm -f "${dist_dir}"/fu7ur3pr00f_*.deb
 rm -rf "${work_dir}" "${pkg_dir}"
 mkdir -p "${work_dir}" "${pkg_dir}"
 
@@ -114,13 +115,35 @@ python_dest="${deb_root}/opt/fu7ur3pr00f/python"
 mkdir -p "${python_dest}"
 cp -a "${python_root}/." "${python_dest}/"
 
-wheel_dir="${deb_root}/opt/fu7ur3pr00f/wheels"
-mkdir -p "${wheel_dir}"
-cp "${wheel_path}" "${wheel_dir}/"
+runtime_log="${work_dir}/runtime-install.log"
+echo "Installing application into bundled Python"
+if ! "${python_dest}/bin/python" -m pip --version >/dev/null 2>&1; then
+  if ! "${python_dest}/bin/python" -m ensurepip --upgrade >"${runtime_log}" 2>&1; then
+    echo "ensurepip failed. Last 200 lines:"
+    tail -n 200 "${runtime_log}"
+    exit 1
+  fi
+fi
+
+if ! PYTHONNOUSERSITE=1 PIP_PREFER_BINARY=1 "${python_dest}/bin/python" -m pip install \
+  --ignore-installed "${wheel_path}" >>"${runtime_log}" 2>&1; then
+  echo "Bundled Python install failed. Last 200 lines:"
+  tail -n 200 "${runtime_log}"
+  exit 1
+fi
+
+build_python_path="${python_dest}/bin/python"
+runtime_python_path="/opt/fu7ur3pr00f/python/bin/python"
+while IFS= read -r -d '' script_path; do
+  if [[ "$(head -n1 "${script_path}")" == "#!${build_python_path}" ]]; then
+    sed -i "1s|^#!.*$|#!${runtime_python_path}|" "${script_path}"
+  fi
+done < <(find "${python_dest}/bin" -maxdepth 1 -type f -perm -u+x -print0)
 
 cat > "${deb_root}/usr/bin/fu7ur3pr00f" <<'EOF'
 #!/usr/bin/env bash
-exec /opt/fu7ur3pr00f/venv/bin/fu7ur3pr00f "$@"
+export PYTHONNOUSERSITE=1
+exec /opt/fu7ur3pr00f/python/bin/python -m fu7ur3pr00f.cli "$@"
 EOF
 chmod 755 "${deb_root}/usr/bin/fu7ur3pr00f"
 
@@ -175,38 +198,12 @@ Section: utils
 Priority: optional
 Architecture: ${arch}
 Maintainer: Juan Manuel Daza <juanmanueldaza@users.noreply.github.com>
-Depends: libc6, libstdc++6, libpango-1.0-0, libpangoft2-1.0-0, libcairo2, libfontconfig1, libgdk-pixbuf-2.0-0, poppler-utils, glab
+Depends: libc6, libstdc++6, ca-certificates
+Suggests: glab, poppler-utils, libpango-1.0-0, libpangoft2-1.0-0, libcairo2, libfontconfig1, libgdk-pixbuf-2.0-0
 Description: FutureProof career intelligence agent
  FutureProof is a local-first career intelligence agent that gathers
  professional data, analyzes career trajectories, and generates CVs.
 EOF
-
-cat > "${deb_root}/DEBIAN/postinst" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-venv="/opt/fu7ur3pr00f/venv"
-python="/opt/fu7ur3pr00f/python/bin/python"
-wheel="$(ls /opt/fu7ur3pr00f/wheels/fu7ur3pr00f-*.whl | head -n1)"
-
-if [[ ! -x "${python}" ]]; then
-  echo "Embedded python not found at ${python}" >&2
-  exit 1
-fi
-
-if [[ ! -x "${venv}/bin/python" ]]; then
-  "${python}" -m venv "${venv}"
-fi
-
-if ! "${venv}/bin/pip" --version >/dev/null 2>&1; then
-  "${venv}/bin/python" -m ensurepip --upgrade >/dev/null 2>&1 || true
-fi
-
-"${venv}/bin/python" -m pip install --upgrade pip >/dev/null
-# Always install/upgrade from the bundled wheel to keep the venv in sync
-"${venv}/bin/python" -m pip install --upgrade --no-deps "${wheel}"
-EOF
-chmod 755 "${deb_root}/DEBIAN/postinst"
 
 dpkg-deb --build "${deb_root}" "${dist_dir}/fu7ur3pr00f_${version}_${arch}.deb" >/dev/null
 echo "Built ${dist_dir}/fu7ur3pr00f_${version}_${arch}.deb"
