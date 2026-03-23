@@ -9,9 +9,14 @@
 #
 # Or use the helper script:
 #   scripts/vagrant_dev_setup.sh up
+#
+# Environment variables:
+#   VAGRANT_BOX         - Box to use (default: "bento/ubuntu-24.04")
+#   VAGRANT_VM_MEMORY   - RAM in MB (default: 4096)
+#   VAGRANT_VM_CPUS     - CPU cores (default: 2)
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "bento/ubuntu-24.04"
+  config.vm.box = ENV.fetch("VAGRANT_BOX", "bento/ubuntu-24.04")
   config.vm.hostname = "fu7ur3pr00f-dev"
   config.vm.boot_timeout = 600
 
@@ -29,8 +34,8 @@ Vagrant.configure("2") do |config|
   # config.vm.synced_folder "~/my-career-data", "/workspace/data/raw"
 
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = 4096
-    vb.cpus = 2
+    vb.memory = ENV.fetch("VAGRANT_VM_MEMORY", 4096).to_i
+    vb.cpus = ENV.fetch("VAGRANT_VM_CPUS", 2).to_i
   end
 
   # Install development dependencies
