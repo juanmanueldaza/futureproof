@@ -198,11 +198,10 @@ def gather_cv_data(file_path: str) -> str:
 
     Use this when the user wants to import their CV or resume.
     The file is parsed into sections and indexed for semantic search.
-    Existing CV data is NOT automatically cleared — use clear_career_knowledge
-    with source='cv' first if re-importing an updated CV.
     """
     from pathlib import Path
 
+    from fu7ur3pr00f.memory.knowledge import KnowledgeSource
     from fu7ur3pr00f.services import GathererService
     from fu7ur3pr00f.services.exceptions import NoDataError, ServiceError
 
@@ -215,19 +214,45 @@ def gather_cv_data(file_path: str) -> str:
     if suffix not in {".pdf", ".md", ".txt"}:
         return f"Unsupported format '{suffix}'. Only .pdf, .md, and .txt are supported."
 
+    # Check if CV data already exists
+    from fu7ur3pr00f.memory.knowledge import get_knowledge_store
+    store = get_knowledge_store()
+    existing_cv = store.get_by_source(KnowledgeSource.CV) if store else []
+    has_existing_cv = bool(existing_cv)
+
+    # Build interrupt prompt with auto-clear option if CV exists
+    interrupt_details = (
+        "This will parse and index the file into the knowledge base as source 'cv'."
+    )
+    if has_existing_cv:
+        interrupt_details += (
+            f"\n\n⚠️  You have {len(existing_cv)} existing CV section(s). "
+            "Would you like to clear them first to avoid duplicates?"
+        )
+
     approved = interrupt({
         "question": f"Index CV from '{resolved}'?",
-        "details": (
-            "This will parse and index the file into the knowledge base "
-            "as source 'cv'. If you've imported a CV before, run "
-            "clear_career_knowledge(source='cv') first to avoid duplicates."
-        ),
+        "details": interrupt_details,
+        "options": [
+            {"label": "Import (clear existing CV first)", "value": "clear_first"} if has_existing_cv else {"label": "Import", "value": "import"},
+            {"label": "Import (keep existing)", "value": "keep"},
+            {"label": "Cancel", "value": "cancel"},
+        ] if has_existing_cv else None,
     })
-    if not approved:
+    
+    if approved == "cancel" or not approved:
         return "CV import cancelled."
 
     service = GathererService()
     try:
+        # Clear existing CV data if user chose to clear first
+        if approved == "clear_first":
+            from fu7ur3pr00f.memory.knowledge import get_knowledge_store
+            store = get_knowledge_store()
+            if store:
+                store.clear_by_source(KnowledgeSource.CV)
+            logger.info("Cleared existing CV data before re-import")
+        
         sections = service.gather_cv(resolved)
     except FileNotFoundError:
         return f"CV file not found at '{file_path}'. Please check the path."
@@ -235,7 +260,9 @@ def gather_cv_data(file_path: str) -> str:
         return str(e)
     except ServiceError as e:
         return str(e)
-    return f"CV imported: {len(sections)} sections indexed from {resolved.name}"
+    
+    action = "cleared and " if approved == "clear_first" else ""
+    return f"CV {action}imported: {len(sections)} sections indexed from {resolved.name}"
 
 
 @tool

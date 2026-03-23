@@ -133,6 +133,31 @@ scripts/fresh_install_check.sh --source local --config-from .env
 scripts/fresh_install_check.sh --source pypi --config-from .env
 ```
 
+## Optional Dependencies
+
+### CV/Resume PDF Import
+
+To import CV/resume PDFs, install `pdftotext` (from poppler-utils):
+
+```bash
+# Debian/Ubuntu
+sudo apt install poppler-utils
+
+# macOS
+brew install poppler
+
+# RHEL/CentOS
+sudo dnf install poppler-utils
+```
+
+Markdown (`.md`) and plain text (`.txt`) CVs work without additional dependencies.
+
+### GitLab Support
+
+```bash
+sudo apt install glab  # or see https://gitlab.com/gitlab-org/cli
+```
+
 ## Tech Stack
 
 **Python 3.13** · [LangChain](https://python.langchain.com/) + [LangGraph](https://langchain-ai.github.io/langgraph/) · [ChromaDB](https://www.trychroma.com/) · Multi-provider LLM (OpenAI, Anthropic, Google, Azure, Ollama) · [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) · [WeasyPrint](https://weasyprint.org/) · [httpx](https://www.python-httpx.org/)

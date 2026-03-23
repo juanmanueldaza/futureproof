@@ -44,40 +44,50 @@ UNSTRUCTURED_TEXT = "John Doe, software engineer with 5 years experience in Pyth
 
 
 class TestExtractTextPdf:
-    def test_success_returns_stdout(self):
+    def test_success_returns_stdout(self, tmp_path):
         gatherer = CVGatherer()
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = STRUCTURED_PDF_TEXT
 
+        # Create a real temp file for stat() to work with caching
+        pdf_file = tmp_path / "resume.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake pdf content")
+
         with (
             patch("shutil.which", return_value="/usr/bin/pdftotext"),
             patch("subprocess.run", return_value=mock_result),
         ):
-            text = gatherer._extract_text_pdf(Path("resume.pdf"))
+            text = gatherer._extract_text_pdf(pdf_file)
 
         assert text == STRUCTURED_PDF_TEXT
 
-    def test_non_zero_returncode_returns_empty(self):
+    def test_non_zero_returncode_returns_empty(self, tmp_path):
         gatherer = CVGatherer()
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stderr = "some error"
         mock_result.stdout = ""
 
+        pdf_file = tmp_path / "resume.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake")
+
         with (
             patch("shutil.which", return_value="/usr/bin/pdftotext"),
             patch("subprocess.run", return_value=mock_result),
         ):
-            text = gatherer._extract_text_pdf(Path("resume.pdf"))
+            text = gatherer._extract_text_pdf(pdf_file)
 
         assert text == ""
 
-    def test_pdftotext_missing_raises_service_error(self):
+    def test_pdftotext_missing_raises_service_error(self, tmp_path):
+        pdf_file = tmp_path / "resume.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake")
+
         gatherer = CVGatherer()
         with patch("shutil.which", return_value=None):
             with pytest.raises(ServiceError, match="pdftotext"):
-                gatherer._extract_text_pdf(Path("resume.pdf"))
+                gatherer._extract_text_pdf(pdf_file)
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +215,104 @@ class TestGatherErrors:
         with patch("shutil.which", return_value=None):
             with pytest.raises(ServiceError, match="pdftotext"):
                 gatherer.gather(pdf_file)
+
+
+# ---------------------------------------------------------------------------
+# .txt file support
+# ---------------------------------------------------------------------------
+
+
+class TestTxtFileSupport:
+    def test_txt_file_parsed_as_markdown(self, tmp_path):
+        txt_file = tmp_path / "resume.txt"
+        txt_file.write_text(STRUCTURED_MD_TEXT, encoding="utf-8")
+
+        gatherer = CVGatherer()
+        sections = gatherer.gather(txt_file)
+
+        assert len(sections) > 0
+        assert all(isinstance(s, Section) for s in sections)
+
+    def test_empty_txt_raises_nodataerror(self, tmp_path):
+        txt_file = tmp_path / "empty.txt"
+        txt_file.write_text("", encoding="utf-8")
+
+        gatherer = CVGatherer()
+        with pytest.raises(NoDataError):
+            gatherer.gather(txt_file)
+
+    def test_txt_with_headings_parses_sections(self, tmp_path):
+        txt_file = tmp_path / "cv.txt"
+        txt_file.write_text("""
+# John Doe
+## Experience
+Software Engineer at Acme
+## Education
+BS Computer Science
+""", encoding="utf-8")
+
+        gatherer = CVGatherer()
+        sections = gatherer.gather(txt_file)
+
+        assert len(sections) >= 2
+        section_names = [s.name.lower() for s in sections]
+        assert "experience" in section_names
+        assert "education" in section_names
+
+
+# ---------------------------------------------------------------------------
+# gather_cv_data() tool tests
+# ---------------------------------------------------------------------------
+
+
+class TestGatherCvDataTool:
+    """Tests for the gather_cv_data tool.
+    
+    Note: Full integration testing with interrupt() requires LangGraph
+    runtime. These tests verify basic validation and error handling.
+    """
+    
+    def test_gather_cv_data_tool_exists(self):
+        """Verify the tool is properly registered."""
+        from langchain_core.tools import StructuredTool
+        from fu7ur3pr00f.agents.tools.gathering import gather_cv_data
+        
+        assert isinstance(gather_cv_data, StructuredTool)
+        assert gather_cv_data.name == "gather_cv_data"
+        assert "file_path" in gather_cv_data.args
+
+    def test_gather_cv_data_file_not_found(self, tmp_path):
+        from fu7ur3pr00f.agents.tools.gathering import gather_cv_data
+        from pathlib import Path
+
+        # Create a file in tmp_path that looks like a PDF but doesn't exist
+        # We test the actual error message for non-existent files
+        fake_path = str(tmp_path / "subfolder" / "nonexistent.pdf")
+        result = gather_cv_data.invoke({"file_path": fake_path})
+        # The tool checks is_file() which fails for non-existent paths
+        assert "not found" in result.lower() or "access denied" in result.lower()
+
+    def test_gather_cv_data_unsupported_format(self, tmp_path):
+        from fu7ur3pr00f.agents.tools.gathering import gather_cv_data
+        from pathlib import Path
+
+        # Create a test file in home directory to pass the path check
+        import os
+        test_file = Path.home() / ".fu7ur3pr00f" / "test_cv.docx"
+        test_file.parent.mkdir(parents=True, exist_ok=True)
+        test_file.write_bytes(b"fake docx")
+        
+        try:
+            result = gather_cv_data.invoke({"file_path": str(test_file)})
+            assert "unsupported format" in result.lower()
+        finally:
+            test_file.unlink(missing_ok=True)
+
+    def test_gather_cv_data_path_outside_home(self):
+        from fu7ur3pr00f.agents.tools.gathering import gather_cv_data
+
+        result = gather_cv_data.invoke({"file_path": "/etc/passwd"})
+        assert "access denied" in result.lower()
 
 
 # ---------------------------------------------------------------------------

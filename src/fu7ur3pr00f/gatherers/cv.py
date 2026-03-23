@@ -4,10 +4,12 @@ Parses CV and resume files (PDF or Markdown) into labeled sections
 for indexing into the career knowledge base.
 """
 
+import hashlib
 import logging
 import re
 import shutil
 import subprocess  # nosec B404 — required for pdftotext CLI
+from functools import lru_cache
 from pathlib import Path
 
 from ..memory.chunker import Section
@@ -43,6 +45,21 @@ _MD_HEADING_RE = re.compile(r"^#{1,3}\s+(.+)", re.MULTILINE)
 # Regex for all-caps lines that look like PDF section headings
 # e.g. "EXPERIENCE", "WORK EXPERIENCE", "OPEN SOURCE / PROJECTS"
 _PDF_ALLCAPS_RE = re.compile(r"^[A-Z][A-Z\s/&-]{2,}$")
+
+# Short all-caps words to exclude from section heading detection
+_PDF_ALLCAPS_EXCLUDE = frozenset({
+    "NO", "YES", "US", "UK", "IT", "AI", "OK", "ID", "CV",
+    "CEO", "CTO", "CFO", "COO", "VP", "SR", "JR", "MD", "PHD",
+})
+
+
+def _file_cache_key(path: Path) -> tuple[str, float, int]:
+    """Generate cache key from file path, mtime, and size.
+    
+    Cache is automatically invalidated when file is modified.
+    """
+    stat = path.stat()
+    return (str(path), stat.st_mtime, stat.st_size)
 
 
 class CVGatherer:
@@ -91,12 +108,18 @@ class CVGatherer:
 
         return sections
 
-    def _extract_text_pdf(self, path: Path) -> str:
-        """Run pdftotext -layout and return stdout.
-
-        Raises:
-            ServiceError: if pdftotext is not found on PATH.
+    @lru_cache(maxsize=128)
+    def _extract_text_pdf_cached(self, cache_key: tuple[str, float, int]) -> str:
+        """Cached PDF text extraction.
+        
+        Cache is invalidated when file is modified (mtime/size change).
         """
+        # cache_key contains (path_str, mtime, size) - we only need path for extraction
+        path = Path(cache_key[0])
+        return self._extract_text_pdf_uncached(path)
+    
+    def _extract_text_pdf_uncached(self, path: Path) -> str:
+        """Run pdftotext -layout and return stdout (uncached)."""
         pdftotext_path = shutil.which("pdftotext")
         if not pdftotext_path:
             raise ServiceError(
@@ -118,6 +141,15 @@ class CVGatherer:
         except subprocess.TimeoutExpired:
             logger.error("Timeout extracting text from %s", path)
             return ""
+    
+    def _extract_text_pdf(self, path: Path) -> str:
+        """Run pdftotext with caching.
+        
+        Raises:
+            ServiceError: if pdftotext is not found on PATH.
+        """
+        cache_key = _file_cache_key(path)
+        return self._extract_text_pdf_cached(cache_key)
 
     def _extract_text_markdown(self, path: Path) -> str:
         """Read a .md or .txt file as UTF-8.
@@ -205,5 +237,11 @@ class CVGatherer:
             return True
         # All-caps pattern: e.g. "EXPERIENCE", "OPEN SOURCE / PROJECTS"
         if _PDF_ALLCAPS_RE.match(line):
+            # Exclude short all-caps words and common acronyms
+            if line in _PDF_ALLCAPS_EXCLUDE:
+                return False
+            # Require at least 3 words or 8 characters for multi-word headings
+            if " " in line or "/" in line or "-" in line:
+                return len(line) >= 8
             return True
         return False
