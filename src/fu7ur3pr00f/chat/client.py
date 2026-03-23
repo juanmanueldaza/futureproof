@@ -653,8 +653,25 @@ def run_chat(thread_id: str = "main") -> None:
                         agent = create_career_agent()
                         continue
                     else:
+                        # Log full traceback to file only, show user-friendly message
                         logger.exception("Unrecoverable agent error")
-                        display_error(_sanitize_error(f"Agent error: {e}"))
+                        error_msg = _sanitize_error(f"Agent error: {e}")
+                        
+                        # Provide helpful context for common errors
+                        if "Connection error" in str(e) or "ConnectError" in str(type(e).__name__):
+                            error_msg = (
+                                "Cannot connect to LLM provider. "
+                                "Check your internet connection and API credentials. "
+                                "Run '/setup' to reconfigure."
+                            )
+                        elif "APIConnectionError" in str(type(e).__name__):
+                            error_msg = (
+                                "Cannot connect to LLM provider. "
+                                "Check your internet connection and API credentials. "
+                                "Run '/setup' to reconfigure."
+                            )
+                        
+                        display_error(error_msg)
                         break
 
         except KeyboardInterrupt:
