@@ -32,6 +32,12 @@ ENV/
 *.swo
 *~
 
+# AI assistants
+.claude/
+CLAUDE.md
+.qwen/
+!QWEN.md
+
 # Environment and secrets
 .env
 .env.*
@@ -94,3 +100,4 @@ uv.lock
 *.deb
 
 .zed/
+/vagrant/.vagrant/
