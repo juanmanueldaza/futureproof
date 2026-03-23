@@ -37,7 +37,19 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", privileged: false, inline: <<-SHELL
     set -euo pipefail
 
-    echo "=== Installing system dependencies ==="
+    LOG_FILE="/home/vagrant/provision.log"
+    exec > >(tee -a "${LOG_FILE}") 2>&1
+
+    log() {
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    }
+
+    log "=== Starting provision ==="
+    log "LOG_FILE=${LOG_FILE}"
+    log "PWD=$(pwd)"
+    log "USER=${USER:-unknown}"
+
+    log "=== Installing system dependencies ==="
     sudo apt-get update
     sudo apt-get install -y \
       git \
@@ -54,37 +66,76 @@ Vagrant.configure("2") do |config|
       python3-venv \
       python3-dev
 
-    echo "=== Setting up Python virtual environment ==="
+    log "=== Setting up Python virtual environment ==="
     cd /workspace
-    # Remove any broken venv from previous runs
-    if [ -d ".venv" ] && ! .venv/bin/python --version &>/dev/null; then
-      echo "Removing broken venv..."
-      rm -rf .venv
+    log "Workspace contents:"
+    ls -la || true
+    
+    # Always start with a clean venv to avoid corruption issues
+    log "Removing any existing .venv..."
+    rm -rf .venv
+    
+    log "Creating new venv with python3 -m venv .venv"
+    if ! python3 -m venv .venv; then
+      log "ERROR: Failed to create venv"
+      exit 1
     fi
-    if [ ! -d ".venv" ]; then
-      python3 -m venv .venv
+    
+    log "Verifying venv..."
+    if [ ! -f .venv/bin/python ]; then
+      log "ERROR: .venv/bin/python not found"
+      exit 1
     fi
+    
+    log "VenV python version: $(.venv/bin/python --version)"
 
-    echo "=== Installing project dependencies ==="
-    .venv/bin/python -m pip install --upgrade pip --quiet
-    .venv/bin/python -m pip install -e . --quiet
-    .venv/bin/python -m pip install pyright pytest ruff --quiet
+    log "=== Installing project dependencies ==="
+    log "Upgrading pip..."
+    if ! .venv/bin/python -m pip install --upgrade pip --quiet; then
+      log "ERROR: Failed to upgrade pip"
+      exit 1
+    fi
+    
+    log "Installing project in editable mode..."
+    if ! .venv/bin/python -m pip install -e . --quiet; then
+      log "ERROR: Failed to install project"
+      log "Checking pyproject.toml..."
+      cat pyproject.toml || true
+      exit 1
+    fi
+    
+    log "Installing dev tools (pyright, pytest, ruff)..."
+    if ! .venv/bin/python -m pip install pyright pytest ruff --quiet; then
+      log "ERROR: Failed to install dev tools"
+      exit 1
+    fi
+    
+    log "Verifying installation..."
+    .venv/bin/fu7ur3pr00f --version || log "WARNING: fu7ur3pr00f not in PATH yet"
 
-    echo "=== Installing GitHub MCP server ==="
+    log "=== Installing GitHub MCP server ==="
     if ! command -v github-mcp-server &> /dev/null; then
       GITHUB_MCP_VERSION="v0.1.0"
-      curl -fsSL "https://github.com/github/github-mcp-server/releases/download/${GITHUB_MCP_VERSION}/github-mcp-server_Linux_x86_64.tar.gz" | \
-        sudo tar xzf - -C /usr/local/bin github-mcp-server
+      log "Downloading GitHub MCP server ${GITHUB_MCP_VERSION}..."
+      if ! curl -fsSL "https://github.com/github/github-mcp-server/releases/download/${GITHUB_MCP_VERSION}/github-mcp-server_Linux_x86_64.tar.gz" | \
+        sudo tar xzf - -C /usr/local/bin github-mcp-server; then
+        log "ERROR: Failed to install GitHub MCP server"
+        exit 1
+      fi
+      log "GitHub MCP server installed successfully"
+    else
+      log "GitHub MCP server already installed"
     fi
 
-    echo "=== Setup complete ==="
-    echo ""
-    echo "To start the FutureProof chat:"
-    echo "  cd /workspace"
-    echo "  source .venv/bin/activate"
-    echo "  fu7ur3pr00f"
-    echo ""
-    echo "Your data is at: /workspace/data/raw"
-    echo "Your config is at: /home/vagrant/.fu7ur3pr00f/.env"
+    log "=== Provision complete ==="
+    log ""
+    log "To start the FutureProof chat:"
+    log "  cd /workspace"
+    log "  source .venv/bin/activate"
+    log "  fu7ur3pr00f"
+    log ""
+    log "Your data is at: /workspace/data/raw"
+    log "Your config is at: /home/vagrant/.fu7ur3pr00f/.env"
+    log "Provision log saved to: ${LOG_FILE}"
   SHELL
 end
