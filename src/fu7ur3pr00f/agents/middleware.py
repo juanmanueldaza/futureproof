@@ -274,7 +274,14 @@ class AnalysisSynthesisMiddleware(AgentMiddleware):
         # Call synthesis model
         model, config = get_model_with_fallback(purpose="synthesis")
         logger.info("Synthesis model: %s", config.description)
-        result = model.invoke([SystemMessage(content=prompt)])
+        
+        # Google Gemini requires HumanMessage for synthesis (SystemMessage not supported)
+        # Other providers use SystemMessage for proper behavioral context
+        if config.provider == "google":
+            result = model.invoke([HumanMessage(content=prompt)])
+        else:
+            from langchain_core.messages import SystemMessage
+            result = model.invoke([SystemMessage(content=prompt), HumanMessage(content=prompt)])
 
         return ModelResponse(result=[result])
 

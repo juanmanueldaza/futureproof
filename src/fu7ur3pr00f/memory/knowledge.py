@@ -27,6 +27,7 @@ class KnowledgeSource(Enum):
     LINKEDIN = "linkedin"
     PORTFOLIO = "portfolio"
     ASSESSMENT = "assessment"  # CliftonStrengths
+    CV = "cv"
 
 
 class CareerKnowledgeStore(ChromaDBStore):

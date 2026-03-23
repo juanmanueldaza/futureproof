@@ -53,6 +53,10 @@ class GathererService:
             from ..gatherers import CliftonStrengthsGatherer
 
             return CliftonStrengthsGatherer()
+        if name == "cv":
+            from ..gatherers import CVGatherer
+
+            return CVGatherer()
 
         raise ValueError(f"Unknown gatherer: {name}")
 
@@ -81,6 +85,7 @@ class GathererService:
                 "portfolio": KnowledgeSource.PORTFOLIO,
                 "linkedin": KnowledgeSource.LINKEDIN,
                 "assessment": KnowledgeSource.ASSESSMENT,
+                "cv": KnowledgeSource.CV,
             }
 
             source = source_map.get(source_name)
@@ -192,4 +197,11 @@ class GathererService:
         gatherer = self._get_gatherer("assessment")
         sections = gatherer.gather(input_dir)
         self._index_sections("assessment", sections, verbose=verbose)
+        return sections
+
+    def gather_cv(self, file_path: Path, verbose: bool = False) -> list[Section]:
+        """Gather and index a CV or resume file."""
+        gatherer = self._get_gatherer("cv")
+        sections = gatherer.gather(file_path)
+        self._index_sections("cv", sections, verbose=verbose)
         return sections

@@ -396,9 +396,12 @@ def get_model_for_purpose(
         "synthesis": settings.azure_synthesis_deployment,
     }
 
-    model_name = purpose_map.get(purpose, "") or azure_map.get(purpose, "")
+    provider = settings.active_provider or "azure"
+    model_name = purpose_map.get(purpose, "")
+    # Azure legacy fallback only applies when the active provider is Azure
+    if not model_name and provider == "azure":
+        model_name = azure_map.get(purpose, "")
     if model_name:
-        provider = settings.active_provider or "azure"
         desc = f"{provider} {model_name}"
         chain = _build_purpose_chain(model_name, provider, desc)
     else:

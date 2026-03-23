@@ -168,6 +168,31 @@ ruff check .                  # Lint
 
 Use `scripts/clean_dev_artifacts.sh` to remove stale wheels, `dist/`, and Python cache directories when you need a lean working tree or before running `git status`. The script also purges the temporary `data/cache/` folder so market gatherers start with fresh data.
 
+## Optional Dependencies
+
+### CV/Resume PDF Import
+
+To import CV/resume PDFs, install `pdftotext` (from poppler-utils):
+
+```bash
+# Debian/Ubuntu
+sudo apt install poppler-utils
+
+# macOS
+brew install poppler
+
+# RHEL/CentOS
+sudo dnf install poppler-utils
+```
+
+Markdown (`.md`) and plain text (`.txt`) CVs work without additional dependencies.
+
+### GitLab Support
+
+```bash
+sudo apt install glab  # or see https://gitlab.com/gitlab-org/cli
+```
+
 ## Fresh Install Connectivity Check
 
 Use this to validate a clean pipx install plus MCP/LLM connectivity from a temporary HOME.
