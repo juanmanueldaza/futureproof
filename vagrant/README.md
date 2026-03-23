@@ -36,6 +36,8 @@ data/raw/
 
 ### 3. Start the VM
 
+**Recommended: Use the helper script**
+
 ```bash
 scripts/vagrant_dev_setup.sh setup
 ```
@@ -46,6 +48,14 @@ This will:
 - Set up the virtual environment
 - Install the project
 - Mount your `~/.fu7ur3pr00f` config directory
+
+**Alternative: Use Vagrant directly**
+
+```bash
+cd vagrant
+vagrant up --provision
+vagrant ssh
+```
 
 ### 4. SSH and Run
 

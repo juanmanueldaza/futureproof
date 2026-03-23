@@ -62,37 +62,37 @@ cd "${vagrant_dir}"
 case "${command}" in
   up)
     echo "Starting Vagrant VM (${box})..."
-    vagrant up --provision -f "${vagrant_file}"
+    VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant up --provision
     echo ""
     echo "✓ VM is running. SSH with: scripts/vagrant_dev_setup.sh ssh"
     ;;
 
   ssh)
-    if ! vagrant status -f "${vagrant_file}" | grep -q "running"; then
+    if ! VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant status | grep -q "running"; then
       echo "VM is not running. Start it with: scripts/vagrant_dev_setup.sh up" >&2
       exit 1
     fi
     echo "SSHing into VM..."
-    vagrant ssh -f "${vagrant_file}"
+    VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant ssh
     ;;
 
   halt)
     echo "Stopping VM..."
-    vagrant halt -f "${vagrant_file}"
+    VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant halt
     ;;
 
   destroy)
     echo "Destroying VM..."
-    vagrant destroy -f "${vagrant_file}"
+    VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant destroy -f
     echo "✓ VM destroyed"
     ;;
 
   status)
-    vagrant status -f "${vagrant_file}"
+    VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant status
     ;;
 
   logs)
-    vagrant ssh -f "${vagrant_file}" -c "cat /home/vagrant/fu7ur3pr00f-apt-smoke.log 2>/dev/null || echo 'No logs found'"
+    VAGRANT_VAGRANTFILE="${vagrant_file}" vagrant ssh -c "cat /home/vagrant/fu7ur3pr00f-apt-smoke.log 2>/dev/null || echo 'No logs found'"
     ;;
 
   setup)

@@ -3,9 +3,12 @@
 
 # Development Vagrantfile for FutureProof
 # Usage:
-#   vagrant up --provision -f Vagrantfile.dev
-#   vagrant ssh -f Fagrantfile.dev
-#   vagrant destroy -f Fagrantfile.dev
+#   cd vagrant
+#   VAGRANT_VAGRANTFILE=Vagrantfile.dev vagrant up --provision
+#   VAGRANT_VAGRANTFILE=Vagrantfile.dev vagrant ssh
+#
+# Or use the helper script:
+#   scripts/vagrant_dev_setup.sh up
 
 Vagrant.configure("2") do |config|
   config.vm.box = "bento/ubuntu-24.04"
