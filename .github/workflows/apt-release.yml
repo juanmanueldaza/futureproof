@@ -8,17 +8,27 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
 jobs:
   build-apt:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
 
       - name: Install system dependencies
         run: |
@@ -56,10 +66,21 @@ jobs:
           deb_path="$(ls -1t dist/deb/*.deb | head -n1)"
           scripts/build_apt_repo.sh "${deb_path}"
 
-      - name: Publish apt repo to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dist/apt
-          publish_branch: gh-pages
-          force_orphan: true
+          path: dist/apt
+
+  deploy-pages:
+    needs: build-apt
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

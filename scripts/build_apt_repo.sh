@@ -17,6 +17,12 @@ repo_dir="${REPO_DIR:-${root_dir}/dist/apt}"
 dist_name="${APT_DIST:-stable}"
 component="${APT_COMPONENT:-main}"
 arch="amd64"
+gpg_home="$(mktemp -d)"
+
+cleanup() {
+  rm -rf "${gpg_home}"
+}
+trap cleanup EXIT
 
 rm -rf "${repo_dir}"
 mkdir -p "${repo_dir}/pool/${component}/f/fu7ur3pr00f"
@@ -66,7 +72,6 @@ apt-ftparchive \
   release "dists/${dist_name}" > "dists/${dist_name}/Release"
 popd >/dev/null
 
-gpg_home="${repo_dir}/.gnupg"
 mkdir -p "${gpg_home}"
 chmod 700 "${gpg_home}"
 export GNUPGHOME="${gpg_home}"
@@ -78,7 +83,7 @@ if [[ -n "${APT_GPG_PRIVATE_KEY:-}" ]]; then
   fi
   echo "${APT_GPG_PRIVATE_KEY}" | gpg --batch --import >/dev/null
 elif [[ "${APT_GPG_ALLOW_EPHEMERAL:-0}" == "1" ]]; then
-  batch_file="${repo_dir}/.ephemeral-gpg-batch"
+  batch_file="${gpg_home}/ephemeral-gpg-batch"
   cat > "${batch_file}" <<'EOF'
 %no-protection
 Key-Type: RSA
