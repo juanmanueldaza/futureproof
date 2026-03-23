@@ -76,8 +76,7 @@ Vagrant.configure("2") do |config|
       glab \
       python3.13 \
       python3.13-venv \
-      python3.13-dev \
-      python3.13-distutils
+      python3.13-dev
 
     log "=== Setting up Python virtual environment ==="
     cd /workspace
