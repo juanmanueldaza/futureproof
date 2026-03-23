@@ -90,14 +90,18 @@ Vagrant.configure("2") do |config|
     log "VenV python version: $(.venv/bin/python --version)"
 
     log "=== Installing project dependencies ==="
-    log "Upgrading pip..."
-    if ! .venv/bin/python -m pip install --upgrade pip --quiet; then
-      log "ERROR: Failed to upgrade pip"
+    # Skip pip upgrade - it can corrupt itself in Vagrant synced folders
+    # Use the bundled pip which is sufficient
+    log "Using bundled pip (skipping upgrade to avoid corruption)..."
+    
+    log "Installing build tools first (hatchling for editable install)..."
+    if ! .venv/bin/python -m pip install hatchling --quiet 2>&1 | tee -a "${LOG_FILE}"; then
+      log "ERROR: Failed to install hatchling"
       exit 1
     fi
     
     log "Installing project in editable mode..."
-    if ! .venv/bin/python -m pip install -e . --quiet; then
+    if ! .venv/bin/python -m pip install -e . 2>&1 | tee -a "${LOG_FILE}"; then
       log "ERROR: Failed to install project"
       log "Checking pyproject.toml..."
       cat pyproject.toml || true
@@ -105,7 +109,7 @@ Vagrant.configure("2") do |config|
     fi
     
     log "Installing dev tools (pyright, pytest, ruff)..."
-    if ! .venv/bin/python -m pip install pyright pytest ruff --quiet; then
+    if ! .venv/bin/python -m pip install pyright pytest ruff 2>&1 | tee -a "${LOG_FILE}"; then
       log "ERROR: Failed to install dev tools"
       exit 1
     fi
