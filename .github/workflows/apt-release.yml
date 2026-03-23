@@ -19,7 +19,20 @@ concurrency:
 
 jobs:
   build-apt:
+    uses: ./.github/workflows/build-apt.yml
+    with:
+      validate: true
+      validation_images: "ubuntu:24.04 debian:12"
+
+  sign-and-publish:
+    needs: build-apt
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
 
@@ -27,13 +40,8 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
       - name: Install system dependencies
         run: |
-          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \
-            \( -name '*microsoft*' -o -name '*azure*' \) -delete
           sudo apt-get update
           sudo apt-get install -y \
             dpkg-dev \
@@ -44,20 +52,12 @@ jobs:
             zstd \
             unzip
 
-      - name: Build deb package
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PIP_DEFAULT_TIMEOUT: "120"
-          PIP_RETRIES: "5"
-          PIP_NO_BUILD_ISOLATION: "1"
-        run: scripts/build_deb.sh
-
-      - name: Validate apt install flow
-        env:
-          APT_VALIDATION_IMAGES: "ubuntu:24.04 debian:12"
-        run: |
-          deb_path="$(ls -1t dist/deb/*.deb | head -n1)"
-          scripts/validate_apt_artifact.sh "${deb_path}"
+      - name: Download built package
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/deb
+          pattern: deb-package-*
+          merge-multiple: true
 
       - name: Build apt repository
         env:
@@ -73,16 +73,6 @@ jobs:
         with:
           path: dist/apt
 
-  deploy-pages:
-    needs: build-apt
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

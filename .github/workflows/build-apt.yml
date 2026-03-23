@@ -1,0 +1,69 @@
+name: Build Apt Package
+
+on:
+  workflow_call:
+    inputs:
+      validate:
+        description: "Run validation tests after building"
+        required: false
+        type: boolean
+        default: true
+      validation_images:
+        description: "Container images for validation (space-separated)"
+        required: false
+        type: string
+        default: "ubuntu:24.04 debian:12"
+    outputs:
+      deb_path:
+        description: "Path to the built .deb package"
+        value: ${{ jobs.build-apt.outputs.deb_path }}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build-apt:
+    runs-on: ubuntu-latest
+    outputs:
+      deb_path: ${{ steps.find-deb.outputs.deb_path }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install system dependencies
+        run: |
+          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \
+            \( -name '*microsoft*' -o -name '*azure*' \) -delete
+          sudo apt-get update
+          sudo apt-get install -y \
+            dpkg-dev \
+            gnupg \
+            jq \
+            curl \
+            xz-utils \
+            zstd \
+            unzip
+
+      - name: Build deb package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PIP_DEFAULT_TIMEOUT: "120"
+          PIP_RETRIES: "5"
+          PIP_NO_BUILD_ISOLATION: "1"
+        run: scripts/build_deb.sh
+
+      - name: Find built package
+        id: find-deb
+        run: |
+          deb_path="$(ls -1t dist/deb/*.deb | head -n1)"
+          echo "deb_path=${deb_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate apt install flow
+        if: inputs.validate
+        env:
+          APT_VALIDATION_IMAGES: ${{ inputs.validation_images }}
+        run: |
+          scripts/validate_apt_artifact.sh "${{ steps.find-deb.outputs.deb_path }}"
