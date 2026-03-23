@@ -1,0 +1,83 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Development Vagrantfile for FutureProof
+# Usage:
+#   vagrant up --provision -f Vagrantfile.dev
+#   vagrant ssh -f Fagrantfile.dev
+#   vagrant destroy -f Fagrantfile.dev
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-24.04"
+  config.vm.hostname = "fu7ur3pr00f-dev"
+  config.vm.boot_timeout = 600
+
+  # Sync the entire project directory
+  config.vm.synced_folder "..", "/workspace"
+
+  # Sync your local .env file (contains secrets)
+  config.vm.synced_folder "#{Dir.home}/.fu7ur3pr00f", "/home/vagrant/.fu7ur3pr00f",
+    create: true,
+    owner: "vagrant",
+    group: "vagrant",
+    mount_options: ["dmode=755,fmode=644"]
+
+  # Optional: Sync specific data directories if not in project
+  # config.vm.synced_folder "~/my-career-data", "/workspace/data/raw"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = 4096
+    vb.cpus = 2
+  end
+
+  # Install development dependencies
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    set -euo pipefail
+
+    echo "=== Installing system dependencies ==="
+    sudo apt-get update
+    sudo apt-get install -y \
+      git \
+      curl \
+      wget \
+      build-essential \
+      libpango-1.0-0 \
+      libpangoft2-1.0-0 \
+      libcairo2 \
+      libfontconfig1 \
+      libgdk-pixbuf-2.0-0 \
+      poppler-utils \
+      glab \
+      python3-venv \
+      python3-dev
+
+    echo "=== Setting up Python virtual environment ==="
+    cd /workspace
+    if [ ! -d ".venv" ]; then
+      python3 -m venv .venv
+    fi
+
+    echo "=== Installing project dependencies ==="
+    source .venv/bin/activate
+    pip install --upgrade pip
+    pip install -e .
+    pip install pyright pytest ruff
+
+    echo "=== Installing GitHub MCP server ==="
+    if ! command -v github-mcp-server &> /dev/null; then
+      GITHUB_MCP_VERSION="v0.1.0"
+      curl -fsSL "https://github.com/github/github-mcp-server/releases/download/${GITHUB_MCP_VERSION}/github-mcp-server_Linux_x86_64.tar.gz" | \
+        sudo tar xzf - -C /usr/local/bin github-mcp-server
+    fi
+
+    echo "=== Setup complete ==="
+    echo ""
+    echo "To start the FutureProof chat:"
+    echo "  cd /workspace"
+    echo "  source .venv/bin/activate"
+    echo "  fu7ur3pr00f"
+    echo ""
+    echo "Your data is at: /workspace/data/raw"
+    echo "Your config is at: /home/vagrant/.fu7ur3pr00f/.env"
+  SHELL
+end
