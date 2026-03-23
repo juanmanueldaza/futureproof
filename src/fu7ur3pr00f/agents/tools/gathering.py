@@ -189,6 +189,56 @@ def gather_linkedin_data(zip_path: str) -> str:
 
 
 @tool
+def gather_cv_data(file_path: str) -> str:
+    """Import a CV or resume file (PDF or Markdown) into the knowledge base.
+
+    Args:
+        file_path: Path to the CV file (.pdf, .md, or .txt).
+            Example: "~/Documents/resume.pdf"
+
+    Use this when the user wants to import their CV or resume.
+    The file is parsed into sections and indexed for semantic search.
+    Existing CV data is NOT automatically cleared — use clear_career_knowledge
+    with source='cv' first if re-importing an updated CV.
+    """
+    from pathlib import Path
+
+    from fu7ur3pr00f.services import GathererService
+    from fu7ur3pr00f.services.exceptions import NoDataError, ServiceError
+
+    resolved = Path(file_path).expanduser().resolve()
+    if not resolved.is_relative_to(Path.home()):
+        return "Access denied: path must be within your home directory."
+    if not resolved.is_file():
+        return f"CV file not found at '{file_path}'. Please check the path."
+    suffix = resolved.suffix.lower()
+    if suffix not in {".pdf", ".md", ".txt"}:
+        return f"Unsupported format '{suffix}'. Only .pdf, .md, and .txt are supported."
+
+    approved = interrupt({
+        "question": f"Index CV from '{resolved}'?",
+        "details": (
+            "This will parse and index the file into the knowledge base "
+            "as source 'cv'. If you've imported a CV before, run "
+            "clear_career_knowledge(source='cv') first to avoid duplicates."
+        ),
+    })
+    if not approved:
+        return "CV import cancelled."
+
+    service = GathererService()
+    try:
+        sections = service.gather_cv(resolved)
+    except FileNotFoundError:
+        return f"CV file not found at '{file_path}'. Please check the path."
+    except NoDataError as e:
+        return str(e)
+    except ServiceError as e:
+        return str(e)
+    return f"CV imported: {len(sections)} sections indexed from {resolved.name}"
+
+
+@tool
 def gather_assessment_data(input_dir: str = "") -> str:
     """Process CliftonStrengths assessment PDFs from Gallup.
 

@@ -16,6 +16,7 @@ from .financial import compare_salary_ppp, convert_currency
 from .gathering import (
     gather_all_career_data,
     gather_assessment_data,
+    gather_cv_data,
     gather_linkedin_data,
     gather_portfolio_data,
 )
@@ -68,6 +69,7 @@ _ALL_TOOLS = [
     gather_portfolio_data,
     gather_linkedin_data,
     gather_assessment_data,
+    gather_cv_data,
     gather_all_career_data,
     # GitHub
     search_github_repos,
