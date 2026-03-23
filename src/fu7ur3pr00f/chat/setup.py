@@ -45,9 +45,9 @@ _PROVIDERS: dict[str, dict] = {
     },
     "google": {
         "name": "Google Gemini",
-        "description": "Gemini 2.5 Flash, Gemini 2.5 Pro (coming soon)",
+        "description": "Gemini 2.5 Flash, Gemini 2.5 Pro",
         "keys": [
-            ("GOOGLE_API_KEY", "API key", True),
+            ("GOOGLE_API_KEY", "API key (from aistudio.google.com)", True),
         ],
     },
     "azure": {
@@ -90,7 +90,7 @@ _PROVIDER_ORDER = ["azure", "fu7ur3pr00f", "openai", "anthropic", "google", "oll
 _INTEGRATION_ORDER = ["github", "tavily"]
 
 # Providers not yet available for selection
-_LOCKED_PROVIDERS = {"fu7ur3pr00f", "openai", "anthropic", "google", "ollama"}
+_LOCKED_PROVIDERS = {"fu7ur3pr00f", "openai", "anthropic", "ollama"}
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
