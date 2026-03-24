@@ -310,6 +310,8 @@ def display_help() -> None:
 | `/thread [name]` | Show or switch conversation thread |
 | `/threads` | List all conversation threads |
 | `/memory` | Show memory and profile stats |
+| `/debug` | Toggle debug mode (verbose logging) |
+| `/verbose` | Show system information |
 | `/multi` | Multi-agent system commands |
 | `/multi agents` | List specialist agents |
 | `/multi test` | Test multi-agent system |

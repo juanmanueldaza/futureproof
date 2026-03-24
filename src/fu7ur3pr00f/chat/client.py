@@ -283,16 +283,23 @@ def handle_command(command: str, *, chat_state: dict) -> bool:
     if cmd == "/gather":
         # Gather career data from all sources
         console.print("[bold #5bc0be]Gathering career data...[/bold #5bc0be]\n")
+        
+        # Enable verbose logging during gather
+        logging.getLogger("fu7ur3pr00f.gatherers").setLevel(logging.INFO)
+        
         try:
             from fu7ur3pr00f.services.gatherer_service import GathererService
             
+            console.print("[dim]Using GathererService...[/dim]\n")
             service = GathererService()
             sections = service.gather_all()
             
-            console.print(f"[#10b981]✓ Gathered {len(sections)} sections from all sources[/#10b981]")
+            console.print(f"\n[#10b981]✓ Gathered {len(sections)} sections from all sources[/#10b981]")
             console.print("[#10b981]✓ Data indexed to knowledge base[/#10b981]\n")
-        except ImportError:
+        except ImportError as e:
             # Fallback: run gatherers directly
+            console.print(f"[dim]Fallback mode (ImportError: {e})[/dim]\n")
+            
             from fu7ur3pr00f.gatherers.linkedin import LinkedInGatherer
             from fu7ur3pr00f.gatherers.cliftonstrengths import CliftonStrengthsGatherer
             from fu7ur3pr00f.gatherers.cv import CVGatherer
@@ -303,53 +310,87 @@ def handle_command(command: str, *, chat_state: dict) -> bool:
             data_dir = settings.data_dir / "raw"
             total = 0
             
+            console.print(f"[dim]Scanning {data_dir} for data files...[/dim]\n")
+            
             # LinkedIn
             zip_files = list(data_dir.glob("*.zip"))
             if zip_files:
+                console.print("[bold]LinkedIn:[/bold]")
                 gatherer = LinkedInGatherer()
                 for zip_file in zip_files:
+                    console.print(f"  [dim]Processing {zip_file.name}...[/dim]")
+                    start = time.time()
                     sections = gatherer.gather(zip_file)
+                    elapsed = time.time() - start
                     total += len(sections)
-                    console.print(f"  [✓] LinkedIn: {len(sections)} sections from {zip_file.name}")
+                    console.print(f"  [#10b981]✓ {len(sections)} sections in {elapsed:.1f}s[/#10b981]")
+            else:
+                console.print("  [#ff6b6b]No LinkedIn ZIP found[/#ff6b6b]")
+            console.print()
             
             # CliftonStrengths
             pdf_files = [f for f in data_dir.glob("*.pdf") if 'strength' in f.name.lower()]
             if pdf_files:
+                console.print("[bold]CliftonStrengths:[/bold]")
                 gatherer = CliftonStrengthsGatherer()
+                console.print(f"  [dim]Processing {len(pdf_files)} PDF files...[/dim]")
+                start = time.time()
                 sections = gatherer.gather(data_dir)
+                elapsed = time.time() - start
                 total += len(sections)
-                console.print(f"  [✓] CliftonStrengths: {len(sections)} sections")
+                console.print(f"  [#10b981]✓ {len(sections)} sections in {elapsed:.1f}s[/#10b981]")
+            else:
+                console.print("  [#ff6b6b]No CliftonStrengths PDFs found[/#ff6b6b]")
+            console.print()
             
             # CV
             cv_files = list(data_dir.glob("*.md")) + list(data_dir.glob("*.pdf")) + list(data_dir.glob("*.txt"))
             if cv_files:
+                console.print("[bold]CV/Resume:[/bold]")
                 gatherer = CVGatherer()
                 for cv_file in cv_files:
                     try:
+                        console.print(f"  [dim]Processing {cv_file.name}...[/dim]")
+                        start = time.time()
                         sections = gatherer.gather(cv_file)
+                        elapsed = time.time() - start
                         total += len(sections)
-                        console.print(f"  [✓] CV: {len(sections)} sections from {cv_file.name}")
+                        console.print(f"  [#10b981]✓ {len(sections)} sections in {elapsed:.1f}s[/#10b981]")
                     except Exception as e:
-                        console.print(f"  [!] CV skip: {cv_file.name} ({e})")
+                        console.print(f"  [#ff6b6b]✗ Skip: {cv_file.name} ({e})[/#ff6b6b]")
+            else:
+                console.print("  [#ff6b6b]No CV files found[/#ff6b6b]")
+            console.print()
             
             # Portfolio
             if settings.portfolio_url:
+                console.print(f"[bold]Portfolio:[/bold]")
+                console.print(f"  [dim]Fetching {settings.portfolio_url}...[/dim]")
                 gatherer = PortfolioGatherer()
+                start = time.time()
                 sections = gatherer.gather(settings.portfolio_url)
+                elapsed = time.time() - start
                 total += len(sections)
-                console.print(f"  [✓] Portfolio: {len(sections)} sections from {settings.portfolio_url}")
+                console.print(f"  [#10b981]✓ {len(sections)} sections in {elapsed:.1f}s[/#10b981]")
+            else:
+                console.print("[bold]Portfolio:[/bold] [#ff6b6b]No PORTFOLIO_URL configured[/#ff6b6b]")
+            console.print()
             
             if total > 0:
-                console.print(f"\n[#10b981]✓ Total: {total} sections indexed to knowledge base[/#10b981]\n")
+                console.print(f"\n[bold #10b981]═══════════════════════════════════════[/bold #10b981]")
+                console.print(f"[bold #10b981]  Total: {total} sections indexed[/bold #10b981]")
+                console.print(f"[bold #10b981]═══════════════════════════════════════[/bold #10b981]\n")
             else:
-                console.print("[#ff6b6b]No data files found. Add files to data/raw/[/#ff6b6b]\n")
+                console.print("\n[#ff6b6b]No data files found. Add files to data/raw/[/#ff6b6b]\n")
                 console.print("Expected files:")
                 console.print("  - LinkedIn: linkedin.zip (from LinkedIn export)")
                 console.print("  - CliftonStrengths: *.pdf (Gallup PDF reports)")
                 console.print("  - CV: *.md, *.pdf, or *.txt")
                 console.print(f"  - Portfolio: configured in .env (PORTFOLIO_URL)\n")
         except Exception as e:
-            display_error(f"Gather failed: {e}")
+            import traceback
+            console.print(f"\n[#ff6b6b]Gather failed:[/#ff6b6b] {e}")
+            console.print(f"[dim]{traceback.format_exc()}[/dim]\n")
         return False
 
     if cmd == "/multi":
@@ -389,6 +430,37 @@ def handle_command(command: str, *, chat_state: dict) -> bool:
             console.print("  - Job search (Jobs)")
             console.print("  - Code projects (Code)")
             console.print("  - Startups (Founder)\n")
+        return False
+
+    if cmd == "/debug":
+        # Toggle debug/verbose mode
+        current_level = logging.getLogger().level
+        if current_level <= logging.DEBUG:
+            logging.getLogger().setLevel(logging.WARNING)
+            console.print("[#ff6b6b]Debug mode OFF[/#ff6b6b]\n")
+        else:
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.getLogger("fu7ur3pr00f").setLevel(logging.DEBUG)
+            console.print("[#10b981]Debug mode ON[/#10b981]\n")
+            console.print("[dim]You will now see:[/dim]")
+            console.print("  - LLM API calls and responses")
+            console.print("  - Tool execution details")
+            console.print("  - Agent routing decisions")
+            console.print("  - ChromaDB operations\n")
+        return False
+
+    if cmd == "/verbose":
+        # Show detailed system info
+        from fu7ur3pr00f.memory.checkpointer import get_data_dir
+        
+        console.print("[bold #5bc0be]System Information[/bold #5bc0be]\n")
+        console.print(f"Data directory: {get_data_dir()}")
+        console.print(f"LLM Provider: {settings.llm_provider or 'auto-detect'}")
+        console.print(f"Model: {get_agent_model_name()}")
+        console.print(f"Portfolio URL: {settings.portfolio_url or 'Not configured'}")
+        console.print(f"GitHub MCP: {'Enabled' if settings.has_github_mcp else 'Disabled'}")
+        console.print(f"Tavily MCP: {'Enabled' if settings.has_tavily_mcp else 'Disabled'}")
+        console.print(f"Debug level: {logging.getLevelName(logging.getLogger().level)}\n")
         return False
 
     if cmd == "/reset":
