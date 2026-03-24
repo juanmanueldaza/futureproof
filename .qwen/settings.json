@@ -1,0 +1,103 @@
+{
+  "instructions": {
+    "project": "FutureProof - Career intelligence agent",
+    "stack": "Python 3.13, LangChain, LangGraph, ChromaDB, MCP",
+    "style": {
+      "line_length": 100,
+      "imports": "prefer collections.abc over typing",
+      "errors": "raise exceptions, never return error dicts",
+      "types": "required type hints, Python 3.13 syntax"
+    },
+    "testing": {
+      "framework": "pytest",
+      "fixtures": "tests/conftest.py",
+      "mocking": "mock external services (LLMs, HTTP, ChromaDB)",
+      "command": "pytest tests/ -q"
+    },
+    "quality": {
+      "lint": "ruff check . --fix",
+      "typecheck": "pyright src/fu7ur3pr00f"
+    }
+  },
+  "architecture": {
+    "pattern": "single agent with 40+ tools",
+    "data_pipeline": "database-first (direct to ChromaDB)",
+    "synthesis": "two-pass via AnalysisSynthesisMiddleware",
+    "hitl": "LangGraph interrupt() for destructive/expensive ops"
+  },
+  "key_files": {
+    "agent": "src/fu7ur3pr00f/agents/career_agent.py",
+    "middleware": "src/fu7ur3pr00f/agents/middleware.py",
+    "orchestrator": "src/fu7ur3pr00f/agents/orchestrator.py",
+    "memory": "src/fu7ur3pr00f/memory/chroma/",
+    "llm": "src/fu7ur3pr00f/llm/fallback.py",
+    "fixtures": "tests/conftest.py"
+  },
+  "security": {
+    "pii": "anonymized via utils/security.py",
+    "ssrf": "enforced in portfolio fetchers",
+    "secrets": "~/.fu7ur3pr00f/.env with 0o600 permissions"
+  },
+  "forbidden": [
+    "AI attribution in commit messages (no Co-authored-by lines)",
+    "AI attribution comments in code",
+    "intermediate files for data pipeline",
+    "bypassing utils/security.py",
+    "mocking in production code",
+    "adding dependencies without checking pyproject.toml"
+  ],
+  "commit_rules": {
+    "no_ai_attribution": true,
+    "description": "NEVER add 'Co-authored-by' or any AI attribution to commit messages"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(pip install *)",
+      "Bash(source *)",
+      "Bash(pyright *)",
+      "Bash(chmod *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(lsb_release *)",
+      "Bash(az *)",
+      "Bash(curl *)",
+      "Bash(cp *)",
+      "Bash(gh *)",
+      "Bash(git checkout *)",
+      "Bash(true)",
+      "Bash(git reset *)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(git config *)",
+      "Bash(jq *)",
+      "WebSearch",
+      "Bash(rm *)",
+      "Bash(mkdir *)",
+      "Bash(ls *)",
+      "Bash(bash *)",
+      "Bash(scripts/clean_dev_artifacts.sh)",
+      "Bash(scripts/fresh_install_check.sh *)",
+      "Bash(scripts/run_vagrant_apt_smoke.sh *)",
+      "Bash(scripts/vagrant_dev_setup.sh *)",
+      "Bash(scripts/build_deb.sh)",
+      "Bash(scripts/build_apt_repo.sh *)",
+      "Bash(docker *)",
+      "Bash(scripts/setup.sh)",
+      "Bash(scripts/validate_apt_artifact.sh *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(find *)",
+      "Bash(git push *)",
+      "Bash(git *)",
+      "Bash(xargs *)",
+      "Bash(git reflog *)",
+      "Bash(git gc *)"
+    ]
+  },
+  "$version": 3
+}
