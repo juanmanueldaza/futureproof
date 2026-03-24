@@ -63,6 +63,8 @@ See [.env.example](.env.example) for all options.
 
 ## Architecture
 
+### Single-Agent (Current)
+
 ```mermaid
 graph LR
     User <-->|Rich UI, HITL| Chat[Chat Client]
@@ -70,6 +72,20 @@ graph LR
     Agent --> ChromaDB[(ChromaDB<br/>RAG + Memory)]
     Agent --> LLM[Multi-Provider<br/>LLM Fallback]
     Agent --> MCP[12 MCP Clients<br/>GitHub, Jobs, Search]
+```
+
+### Multi-Agent (New — `/multi` command)
+
+```mermaid
+graph TB
+    User --> Chat[Chat Client]
+    Chat --> Orchestrator[Orchestrator Agent]
+    Orchestrator --> Coach[Coach Agent]
+    Orchestrator --> Learning[Learning Agent]
+    Orchestrator --> Jobs[Jobs Agent]
+    Orchestrator --> Code[Code Agent]
+    Orchestrator --> Founder[Founder Agent]
+    Coach & Learning & Jobs & Code & Founder --> ChromaDB[(Shared ChromaDB)]
 ```
 
 **Design decisions:**
@@ -80,6 +96,7 @@ graph LR
 | Database-first | Gatherers index directly to ChromaDB — no intermediate files |
 | Two-pass synthesis | `AnalysisSynthesisMiddleware` replaces generic LLM output with focused reasoning |
 | HITL confirmation | Destructive/expensive operations require user approval via `interrupt()` |
+| Multi-agent | Specialized agents for different career paths (growth, learning, jobs, code, startups) |
 
 ## Development
 
@@ -92,11 +109,37 @@ pytest tests/ -q
 pyright src/fu7ur3pr00f
 ruff check .
 ruff check . --fix
+```
 
-# Fresh install check (pipx + MCP/LLM)
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `setup.sh` | One-time Azure/config setup |
+| `fresh_install_check.sh` | Validate pipx install |
+| `clean_dev_artifacts.sh` | Clean build artifacts |
+| `build_deb.sh` | Build .deb package |
+| `build_apt_repo.sh` | Build apt repository |
+| `validate_apt_artifact.sh` | Test .deb in Docker |
+| `run_vagrant_apt_smoke.sh` | Test in Vagrant VMs |
+| `vagrant_dev_setup.sh` | Dev VM manager |
+| `vagrant_apt_smoke.sh` | Vagrant provision script |
+
+See [docs/scripts.md](docs/scripts.md) for detailed usage.
+
+### Testing
+
+```bash
+# Unit tests
+pytest tests/ -q
+
+# Benchmarks
+pytest tests/benchmarks/ -v
+
+# Fresh install check
 scripts/fresh_install_check.sh --source local --config-from .env
 
-# Vagrant apt testing (isolated VM)
+# Vagrant apt testing
 scripts/run_vagrant_apt_smoke.sh ubuntu2404
 scripts/run_vagrant_apt_smoke.sh debian12
 ```

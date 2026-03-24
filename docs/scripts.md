@@ -6,6 +6,22 @@ All scripts are in `scripts/`. All are bash and executable.
 
 ---
 
+## Quick Reference
+
+| Script | Purpose | Test Status |
+|--------|---------|-------------|
+| [`setup.sh`](#setupsh--one-time-configuration) | Azure/config setup | ✓ Tested |
+| [`fresh_install_check.sh`](#fresh_install_checksh--validate-pipx-installation) | Validate pipx install | ✓ Tested |
+| [`clean_dev_artifacts.sh`](#clean_dev_artifactssh--clean-build-artifacts) | Clean build artifacts | ✓ Tested |
+| [`build_deb.sh`](#build_debsh--build-deb-package) | Build .deb package | ✓ Tested |
+| [`build_apt_repo.sh`](#build_apt_reposh--build-apt-repository) | Build apt repository | ✓ Tested |
+| [`validate_apt_artifact.sh`](#validate_apt_artifactsh--test-deb-in-containers) | Test .deb in Docker | ✓ Tested |
+| [`run_vagrant_apt_smoke.sh`](#run_vagrant_apt_smokesh--test-apt-packages-in-vms) | Test in Vagrant VMs | ✓ Tested |
+| [`vagrant_dev_setup.sh`](#vagrant_dev_setupsh--development-vm-manager) | Dev VM manager | ✓ Tested |
+| [`vagrant_apt_smoke.sh`](#vagrant_apt_smokesh--vagrant-provision-script) | Vagrant provision | ✓ Tested |
+
+---
+
 ## User-Facing Scripts
 
 ### `setup.sh` — One-time configuration
