@@ -87,11 +87,18 @@ def list_agents() -> list[dict[str, str]]:
         >>> len(agents)
         6
     """
+    coach = CoachAgent()
+    learning = LearningAgent()
+    jobs = JobsAgent()
+    code = CodeAgent()
+    founder = FounderAgent()
+    orchestrator = OrchestratorAgent()
+    
     return [
-        {"name": "coach", "description": CoachAgent.description},
-        {"name": "learning", "description": LearningAgent.description},
-        {"name": "jobs", "description": JobsAgent.description},
-        {"name": "code", "description": CodeAgent.description},
-        {"name": "founder", "description": FounderAgent.description},
-        {"name": "orchestrator", "description": OrchestratorAgent.description},
+        {"name": coach.name, "description": coach.description},
+        {"name": learning.name, "description": learning.description},
+        {"name": jobs.name, "description": jobs.description},
+        {"name": code.name, "description": code.description},
+        {"name": founder.name, "description": founder.description},
+        {"name": orchestrator.name, "description": orchestrator.description},
     ]

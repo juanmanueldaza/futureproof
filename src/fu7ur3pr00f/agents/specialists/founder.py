@@ -30,8 +30,15 @@ class FounderAgent(BaseAgent):
         'founder'
     """
     
-    name = "founder"
-    description = "Entrepreneurial opportunities and startup guidance"
+    @property
+    def name(self) -> str:
+        """Agent identifier."""
+        return "founder"
+    
+    @property
+    def description(self) -> str:
+        """Agent description."""
+        return "Entrepreneurial opportunities and startup guidance"
     
     # Tools available to this agent
     tools: list[Callable] = []
@@ -154,7 +161,7 @@ class FounderAgent(BaseAgent):
                         "has_users": has_users,
                         "growing": has_growth,
                     },
-                    "recommendation": "Consider launching" if has_users else "Validate problem first",
+                    "recommendation": "Consider launching" if has_users else "Validate first",
                 })
         
         # If no projects, suggest idea validation

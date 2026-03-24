@@ -33,8 +33,15 @@ class JobsAgent(BaseAgent):
         'jobs'
     """
     
-    name = "jobs"
-    description = "Employment opportunities and job search"
+    @property
+    def name(self) -> str:
+        """Agent identifier."""
+        return "jobs"
+    
+    @property
+    def description(self) -> str:
+        """Agent description."""
+        return "Employment opportunities and job search"
     
     # Tools available to this agent
     tools: list[Callable] = []

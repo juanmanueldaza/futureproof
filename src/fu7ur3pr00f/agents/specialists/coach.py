@@ -40,11 +40,18 @@ class CoachAgent(BaseAgent):
         True
     """
     
-    name = "coach"
-    description = "Career growth and leadership coach"
-    
     # Tools available to this agent
     tools: list[Callable] = []  # Populated from existing tools
+    
+    @property
+    def name(self) -> str:
+        """Agent identifier."""
+        return "coach"
+    
+    @property
+    def description(self) -> str:
+        """Agent description."""
+        return "Career growth and leadership coach"
     
     # Keywords for intent matching
     KEYWORDS = {
@@ -430,7 +437,8 @@ class CoachAgent(BaseAgent):
         # Strengths summary
         if strengths:
             lines.append("### Your Strengths")
-            lines.append(f"Based on your CliftonStrengths, you have {len(strengths)} identified themes.\n")
+            count = len(strengths)
+            lines.append(f"Based on your CliftonStrengths, you have {count} themes.\n")
             
             leadership = self._identify_leadership_themes(strengths)
             if leadership:
@@ -469,14 +477,15 @@ class CoachAgent(BaseAgent):
         
         lines.append("**Actions:**")
         for action in plan["actions"]:
-            lines.append(f"- {action['action']} ({action['timeline']}, {action['priority']} priority)")
+            action_text = f"- {action['action']} ({action['timeline']}"
+            lines.append(f"{action_text}, {action['priority']} priority)")
         
         # Closing encouragement
         lines.append("\n### Next Steps")
         lines.append("1. Review this plan with your manager")
         lines.append("2. Pick 1-2 high-priority actions to start")
         lines.append("3. Track your progress and celebrate wins")
-        lines.append("\nRemember: Leadership is service, not power. Use your strengths to help others succeed.")
+        lines.append("\nRemember: Leadership is service. Use strengths to help others succeed.")
         
         return "\n".join(lines)
 

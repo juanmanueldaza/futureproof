@@ -99,10 +99,6 @@ class BaseAgent(ABC):
     """
     
     # Class-level attributes (override in subclasses)
-    name: str = ""
-    description: str = ""
-    
-    # Shared tool registry (populated by subclasses)
     tools: list[Callable] = []
     
     # Class-level ChromaDB client and lock for thread-safe lazy loading

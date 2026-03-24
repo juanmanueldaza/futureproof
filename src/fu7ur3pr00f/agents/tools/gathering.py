@@ -234,7 +234,11 @@ def gather_cv_data(file_path: str) -> str:
         "question": f"Index CV from '{resolved}'?",
         "details": interrupt_details,
         "options": [
-            {"label": "Import (clear existing CV first)", "value": "clear_first"} if has_existing_cv else {"label": "Import", "value": "import"},
+            (
+                {"label": "Import (clear existing CV first)", "value": "clear_first"}
+                if has_existing_cv
+                else {"label": "Import", "value": "import"}
+            ),
             {"label": "Import (keep existing)", "value": "keep"},
             {"label": "Cancel", "value": "cancel"},
         ] if has_existing_cv else None,

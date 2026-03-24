@@ -316,7 +316,10 @@ def apply_values_filter(
     filtered = template.format(
         red_flags="\n".join(red_flags) if red_flags else "None identified",
         green_flags="\n".join(green_flags) if green_flags else "None identified",
-        alternatives="- Consider companies with strong OSS contributions\n- Look for remote-first, values-aligned startups",
+        alternatives=(
+            "- Look for OSS-contributing companies\n"
+            "- Seek remote-first, values-aligned startups"
+        ),
     )
     
     # Append original response if it adds value

@@ -36,8 +36,15 @@ class OrchestratorAgent(BaseAgent):
         >>> response = await orchestrator.handle("Should I start a company?")
     """
     
-    name = "orchestrator"
-    description = "Routes requests and synthesizes multi-agent responses"
+    @property
+    def name(self) -> str:
+        """Agent identifier."""
+        return "orchestrator"
+    
+    @property
+    def description(self) -> str:
+        """Agent description."""
+        return "Routes requests and synthesizes multi-agent responses"
     
     # All specialist agents
     specialists: dict[str, BaseAgent] = {}

@@ -30,8 +30,15 @@ class LearningAgent(BaseAgent):
         'learning'
     """
     
-    name = "learning"
-    description = "Technical skill development and expertise building"
+    @property
+    def name(self) -> str:
+        """Agent identifier."""
+        return "learning"
+    
+    @property
+    def description(self) -> str:
+        """Agent description."""
+        return "Technical skill development and expertise building"
     
     # Tools available to this agent
     tools: list[Callable] = []
@@ -204,7 +211,7 @@ class LearningAgent(BaseAgent):
         # Immediate: Pick 1-2 high-impact technical gaps
         if gaps["technical"]:
             roadmap["immediate"] = [
-                {"skill": gaps["technical"][0], "action": "Build a project using this", "months": 2},
+                {"skill": gaps["technical"][0], "action": "Build project", "months": 2},
             ]
             if len(gaps["technical"]) > 1:
                 roadmap["short_term"].append(

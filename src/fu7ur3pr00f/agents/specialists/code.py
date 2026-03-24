@@ -30,8 +30,15 @@ class CodeAgent(BaseAgent):
         'code'
     """
     
-    name = "code"
-    description = "GitHub, GitLab, and open source contributions"
+    @property
+    def name(self) -> str:
+        """Agent identifier."""
+        return "code"
+    
+    @property
+    def description(self) -> str:
+        """Agent description."""
+        return "GitHub, GitLab, and open source contributions"
     
     # Tools available to this agent
     tools: list[Callable] = []
@@ -143,9 +150,11 @@ class CodeAgent(BaseAgent):
             readme_score = (analysis["has_readme"] / analysis["total_repos"]) * 25
             test_score = (analysis["has_tests"] / analysis["total_repos"]) * 25
             doc_score = (analysis["has_documentation"] / analysis["total_repos"]) * 25
-            activity_score = min((analysis["active_contributions"] / analysis["total_repos"]) * 25, 25)
+            activity = analysis["active_contributions"] / analysis["total_repos"]
+            activity_score = min(activity * 25, 25)
             
-            analysis["quality_score"] = round(readme_score + test_score + doc_score + activity_score)
+            total = readme_score + test_score + doc_score + activity_score
+            analysis["quality_score"] = round(total)
         
         analysis["languages"] = list(analysis["languages"])
         
@@ -217,15 +226,20 @@ class CodeAgent(BaseAgent):
         lines.append(f"**Total projects:** {analysis['total_repos']}")
         lines.append(f"- GitHub: {analysis['github_repos']}")
         lines.append(f"- GitLab: {analysis['gitlab_repos']}")
-        lines.append(f"**Languages:** {', '.join(analysis['languages']) if analysis['languages'] else 'Not detected'}")
+        langs = analysis['languages']
+        lang_str = ', '.join(langs) if langs else 'Not detected'
+        lines.append(f"**Languages:** {lang_str}")
         lines.append(f"**Quality score:** {analysis['quality_score']}/100\n")
         
         # Quality breakdown
         lines.append("### Quality Breakdown")
         if analysis['total_repos'] > 0:
-            lines.append(f"- Projects with README: {analysis['has_readme']}/{analysis['total_repos']}")
-            lines.append(f"- Projects with tests: {analysis['has_tests']}/{analysis['total_repos']}")
-            lines.append(f"- Projects with documentation: {analysis['has_documentation']}/{analysis['total_repos']}")
+            readme = f"{analysis['has_readme']}/{analysis['total_repos']}"
+            tests = f"{analysis['has_tests']}/{analysis['total_repos']}"
+            docs = f"{analysis['has_documentation']}/{analysis['total_repos']}"
+            lines.append(f"- Projects with README: {readme}")
+            lines.append(f"- Projects with tests: {tests}")
+            lines.append(f"- Projects with docs: {docs}")
             lines.append(f"- Active contributions: {analysis['active_contributions']}")
         else:
             lines.append("No projects found. Time to start building!\n")
