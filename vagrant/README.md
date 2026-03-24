@@ -2,6 +2,8 @@
 
 Quick guide to run FutureProof in a disposable Vagrant VM with your data and secrets.
 
+**NEW:** Multi-agent system is now available! Test it with `/multi` command.
+
 ## Prerequisites
 
 - [Vagrant](https://www.vagrantup.com/download)
@@ -30,7 +32,7 @@ Place your data files in `data/raw/`:
 ```
 data/raw/
 ├── linkedin_export.csv      # LinkedIn profile export
-├── cliffordstrengths.pdf    # CliftonStrengths assessment (optional)
+├── cliftonstrengths.pdf     # CliftonStrengths assessment (optional)
 └── ...
 ```
 
@@ -53,7 +55,7 @@ This will:
 
 ```bash
 cd vagrant
-vagrant up --provision
+VAGRANT_VAGRANTFILE=Vagrantfile.dev vagrant up --provision
 vagrant ssh
 ```
 
@@ -69,6 +71,21 @@ Inside the VM:
 cd /workspace
 source .venv/bin/activate
 fu7ur3pr00f
+```
+
+### 5. Test Multi-Agent System
+
+Once inside the chat:
+
+```bash
+# List available specialist agents
+/multi agents
+
+# Test the multi-agent system
+/multi test
+
+# Try a query
+How can I get promoted to Staff Engineer?
 ```
 
 ## Commands
