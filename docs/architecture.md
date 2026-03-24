@@ -125,8 +125,11 @@ Agent → Tool execution → Generic response → Middleware → Reasoning model
 | `src/fu7ur3pr00f/agents/orchestrator.py` | LangGraph workflows |
 | `src/fu7ur3pr00f/llm/fallback.py` | Multi-provider fallback routing |
 | `src/fu7ur3pr00f/memory/chroma/` | ChromaDB RAG + episodic memory |
+| `src/fu7ur3pr00f/agents/tools/` | **40 tools** organized by domain |
 | `src/fu7ur3pr00f/gatherers/` | Data gathering tools |
 | `src/fu7ur3pr00f/generators/` | CV generation (Markdown + PDF) |
+
+See [Tools Reference](tools.md) for the complete list of all 40 tools.
 
 ## See Also
 

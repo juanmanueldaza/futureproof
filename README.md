@@ -124,6 +124,7 @@ Python 3.13 · LangChain + LangGraph · ChromaDB · Typer + Rich · WeasyPrint �
 - [Configuration](docs/configuration.md)
 - [Development](docs/development.md)
 - [Scripts](docs/scripts.md)
+- [Tools](docs/tools.md) — All 40 tools
 
 ---
 
