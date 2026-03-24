@@ -109,7 +109,7 @@ class MultiAgentSystem:
         query: str,
         context: dict[str, Any] | None = None,
     ):
-        """Stream a response (placeholder for future streaming support).
+        """Stream a response token-by-token.
         
         Currently yields the full response as a single chunk.
         Future: Stream token-by-token from specialist agents.
@@ -123,6 +123,54 @@ class MultiAgentSystem:
         """
         response = await self.handle(query, context)
         yield {"content": response}
+    
+    async def stream_parallel(
+        self,
+        query: str,
+        agent_names: list[str] | None = None,
+        context: dict[str, Any] | None = None,
+    ):
+        """Stream responses from multiple agents in parallel.
+        
+        Yields responses as they become available from each agent.
+        
+        Args:
+            query: User's question
+            agent_names: List of agents to query (default: all)
+            context: Optional context dict
+        
+        Yields:
+            Dict with agent name and response
+        
+        Example:
+            >>> async for response in system.stream_parallel(
+            ...     "Career advice",
+            ...     ["coach", "learning"]
+            ... ):
+            ...     print(f"{response['agent']}: {response['content'][:100]}")
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        if context is None:
+            context = {}
+        context["query"] = query
+        
+        if agent_names is None:
+            agent_names = list(self.orchestrator.specialists.keys())
+        
+        async def stream_agent(name):
+            agent = self.orchestrator.specialists.get(name)
+            if agent:
+                response = await agent.process(context)
+                return {"agent": name, "content": response}
+            return {"agent": name, "content": ""}
+        
+        # Run agents in parallel and yield as they complete
+        tasks = [asyncio.create_task(stream_agent(name)) for name in agent_names]
+        for task in asyncio.as_completed(tasks):
+            result = await task
+            yield result
     
     def get_available_agents(self) -> list[dict[str, str]]:
         """Get list of available specialist agents.

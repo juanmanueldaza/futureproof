@@ -114,6 +114,44 @@ class OrchestratorAgent(BaseAgent):
         
         return synthesized
     
+    async def process_parallel(
+        self,
+        context: dict,
+        agent_names: list[str] | None = None,
+    ) -> dict[str, str]:
+        """Process request with multiple agents in parallel.
+        
+        Args:
+            context: Request context
+            agent_names: List of agent names to query (default: all)
+        
+        Returns:
+            Dict mapping agent names to their responses
+        
+        Example:
+            >>> results = await orchestrator.process_parallel(
+            ...     {"query": "Career advice"},
+            ...     ["coach", "learning"]
+            ... )
+            >>> print(results["coach"])
+        """
+        if agent_names is None:
+            agent_names = list(self.specialists.keys())
+        
+        async def process_agent(name):
+            agent = self.specialists.get(name)
+            if agent:
+                response = await agent.process(context)
+                return name, response
+            return name, ""
+        
+        # Run agents in parallel
+        results = await asyncio.gather(*[
+            process_agent(name) for name in agent_names
+        ])
+        
+        return dict(results)
+    
     async def initialize(self) -> None:
         """Initialize all specialist agents.
         

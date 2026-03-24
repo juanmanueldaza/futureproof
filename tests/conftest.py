@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from fu7ur3pr00f.agents.multi_agent import MultiAgentSystem
+
 
 @pytest.fixture
 def tmp_project(tmp_path: Path) -> Path:
@@ -40,3 +42,14 @@ def mock_llm_with_structured_format() -> MagicMock:
     mock = MagicMock()
     mock.invoke.return_value.content = [{"type": "text", "text": "Mocked structured response"}]
     return mock
+
+
+# Multi-agent benchmarks fixtures
+from pytest_asyncio import fixture as async_fixture
+
+@async_fixture
+async def multi_agent_system():
+    """Initialize multi-agent system for tests."""
+    system = MultiAgentSystem()
+    await system.initialize()
+    yield system
