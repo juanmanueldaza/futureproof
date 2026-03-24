@@ -10,6 +10,7 @@ Example:
     'Based on your CliftonStrengths...'
 """
 
+import asyncio
 
 from fu7ur3pr00f.agents.specialists.base import BaseAgent
 from fu7ur3pr00f.agents.specialists.coach import CoachAgent
@@ -194,10 +195,18 @@ class OrchestratorAgent(BaseAgent):
             scores[specialist] = score
         
         # Return highest scoring specialist
-        if max(scores.values()) == 0:
+        max_score = max(scores.values())
+        if max_score == 0:
             return "coach"  # Default to coach for ambiguous queries
-        
-        return max(scores, key=scores.get)
+
+        # Find specialist with highest score
+        best_score = 0
+        best_specialist = "coach"
+        for specialist, score in scores.items():
+            if score > best_score:
+                best_score = score
+                best_specialist = specialist
+        return best_specialist
     
     def _handle_no_specialist(self, query: str) -> str:
         """Handle query when no specialist is available.
