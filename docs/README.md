@@ -6,6 +6,7 @@
 - [Configuration](configuration.md) — LLM providers, MCP, settings
 - [Architecture](architecture.md) — Design decisions and data flow
 - [Tools](tools.md) — All 40 tools organized by domain
+- [MCP Clients](mcp_clients.md) — All 12 MCP clients
 
 ## Development
 

@@ -72,9 +72,11 @@ return {"error": "..."}                   # Bad
 | `src/fu7ur3pr00f/memory/chroma/` | ChromaDB RAG + episodic memory |
 | `src/fu7ur3pr00f/llm/fallback.py` | Multi-provider fallback routing |
 | `src/fu7ur3pr00f/agents/tools/` | **40 tools** organized by domain |
+| `src/fu7ur3pr00f/mcp/` | **12 MCP clients** for real-time data |
 | `tests/conftest.py` | Shared pytest fixtures |
 
-See [docs/tools.md](docs/tools.md) for the complete list of all 40 tools.
+See [docs/tools.md](docs/tools.md) for the complete list of all 40 tools.  
+See [docs/mcp_clients.md](docs/mcp_clients.md) for the complete list of all 12 MCP clients.
 
 ### 7. What Qwen Should NOT Do
 

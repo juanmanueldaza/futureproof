@@ -125,6 +125,7 @@ Python 3.13 · LangChain + LangGraph · ChromaDB · Typer + Rich · WeasyPrint �
 - [Development](docs/development.md)
 - [Scripts](docs/scripts.md)
 - [Tools](docs/tools.md) — All 40 tools
+- [MCP Clients](docs/mcp_clients.md) — All 12 MCP clients
 
 ---
 
