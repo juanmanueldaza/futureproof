@@ -117,15 +117,28 @@ Python 3.13 · LangChain + LangGraph · ChromaDB · Typer + Rich · WeasyPrint �
 
 ## Documentation
 
-- [Contributing](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Security](SECURITY.md)
-- [Architecture](docs/architecture.md)
-- [Configuration](docs/configuration.md)
-- [Development](docs/development.md)
-- [Scripts](docs/scripts.md)
+### Getting Started
+- [Quick Start](#quick-start) — Install and run
+- [Configuration](docs/configuration.md) — LLM providers, settings
+- [Chat Commands](docs/chat_commands.md) — All commands reference
+
+### User Guides
+- [Data Gathering](docs/gatherers.md) — Import LinkedIn, GitHub, CV
+- [CV Generation](docs/cv_generation.md) — Generate ATS-optimized CVs
+- [Troubleshooting](docs/troubleshooting.md) — Common issues
+
+### Reference
+- [Architecture](docs/architecture.md) — System design
 - [Tools](docs/tools.md) — All 40 tools
 - [MCP Clients](docs/mcp_clients.md) — All 12 MCP clients
+- [Memory System](docs/memory_system.md) — ChromaDB, RAG
+- [Prompts](docs/prompts.md) — Prompt templates
+- [Scripts](docs/scripts.md) — Build and test scripts
+
+### Contributing
+- [Contributing](CONTRIBUTING.md) — How to contribute
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security](SECURITY.md)
 
 ---
 
