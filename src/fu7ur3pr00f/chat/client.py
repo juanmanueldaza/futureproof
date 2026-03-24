@@ -284,15 +284,18 @@ def handle_command(command: str, *, chat_state: dict) -> bool:
         # Multi-agent system command
         if arg == "agents":
             # List available specialist agents
-            agents = list_multi_agents()
-            console.print("[bold #5bc0be]Specialist Agents[/bold #5bc0be]\n")
-            for agent in agents:
-                agent_line = (
-                    f"  [bold #ffd700]{agent['name']}[/bold #ffd700]: "
-                    f"{agent['description']}"
-                )
-                console.print(agent_line)
-            console.print()
+            try:
+                agents = asyncio.run(list_multi_agents())
+                console.print("[bold #5bc0be]Specialist Agents[/bold #5bc0be]\n")
+                for agent in agents:
+                    agent_line = (
+                        f"  [bold #ffd700]{agent['name']}[/bold #ffd700]: "
+                        f"{agent['description']}"
+                    )
+                    console.print(agent_line)
+                console.print()
+            except Exception as e:
+                display_error(f"Failed to list agents: {e}")
         elif arg == "test":
             # Test multi-agent system
             console.print("[bold #5bc0be]Testing multi-agent system...[/bold #5bc0be]")
