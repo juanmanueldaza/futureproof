@@ -20,9 +20,9 @@ Complete documentation for FutureProof career intelligence agent.
 
 | Document | Description |
 |----------|-------------|
-| [Tools](tools.md) | All 40 tools organized by domain |
+| [Tools](tools.md) | All 41 tools organized by domain |
 | [MCP Clients](mcp_clients.md) | All 12 MCP clients for real-time data |
-| [Memory System](memory_system.md) | ChromaDB, chunking, RAG, embeddings |
+| [Memory System](memory_system.md) | ChromaDB episodic memory, SQLite checkpointing, RAG |
 | [Prompts](prompts.md) | Prompt templates and customization |
 
 ### User Guides
@@ -31,7 +31,7 @@ Complete documentation for FutureProof career intelligence agent.
 |----------|-------------|
 | [Data Gathering](gatherers.md) | How to import career data |
 | [CV Generation](cv_generation.md) | CV templates and customization |
-| [Chat Commands](chat_commands.md) | All chat commands reference |
+| [Chat Commands](chat_commands.md) | Slash commands and conversational usage |
 | [Scripts](scripts.md) | All scripts and what they do |
 
 ### Development
@@ -39,7 +39,6 @@ Complete documentation for FutureProof career intelligence agent.
 | Document | Description |
 |----------|-------------|
 | [Development Guide](development.md) | Setup, testing, Vagrant, debugging |
-| [Contributing](../CONTRIBUTING.md) | How to contribute |
 | [QWEN.md](../QWEN.md) | Qwen Code assistant instructions |
 
 ### Support
@@ -65,7 +64,6 @@ Complete documentation for FutureProof career intelligence agent.
 | See all tools | [Tools](tools.md) |
 | See MCP clients | [MCP Clients](mcp_clients.md) |
 | Fix problems | [Troubleshooting](troubleshooting.md) |
-| Contribute code | [Contributing](../CONTRIBUTING.md) |
 
 ---
 
@@ -80,19 +78,18 @@ Complete documentation for FutureProof career intelligence agent.
 
 **Architecture & Design:**
 - [Architecture](architecture.md) — System design, diagrams
-- [Tools](tools.md) — 40 tools reference
+- [Tools](tools.md) — 41 tools reference
 - [MCP Clients](mcp_clients.md) — 12 MCP clients
-- [Memory System](memory_system.md) — ChromaDB, RAG
+- [Memory System](memory_system.md) — ChromaDB, SQLite, RAG
 - [Prompts](prompts.md) — Prompt system
 
 **User Guides:**
 - [Data Gathering](gatherers.md) — LinkedIn, GitHub, CV import
 - [CV Generation](cv_generation.md) — Generate ATS-optimized CVs
-- [Chat Commands](chat_commands.md) — All chat commands
+- [Chat Commands](chat_commands.md) — Slash commands and conversational model
 
 **Development:**
 - [Development Guide](development.md) — Setup, testing, contributing
-- [Contributing](../CONTRIBUTING.md) — Contribution guidelines
 - [QWEN.md](../QWEN.md) — AI assistant instructions
 
 **Support:**
@@ -104,13 +101,12 @@ Complete documentation for FutureProof career intelligence agent.
 
 - [GitHub Repository](https://github.com/juanmanueldaza/fu7ur3pr00f)
 - [Issues](https://github.com/juanmanueldaza/fu7ur3pr00f/issues)
-- [Discussions](https://github.com/juanmanueldaza/fu7ur3pr00f/discussions)
 
 ---
 
 ## Documentation Version
 
-**Version:** 0.1.8+  
+**Version:** 0.1.8  
 **Last updated:** March 2025
 
 ---
@@ -118,5 +114,4 @@ Complete documentation for FutureProof career intelligence agent.
 ## See Also
 
 - [README](../README.md) — Project overview
-- [CONTRIBUTING.md](../CONTRIBUTING.md) — Contribution guide
 - [QWEN.md](../QWEN.md) — Qwen Code configuration

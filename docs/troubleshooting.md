@@ -12,7 +12,6 @@ Common issues and solutions for FutureProof.
 
 **Solution:**
 ```bash
-# Install pipx
 python -m pip install --user pipx
 python -m pipx ensurepath
 
@@ -41,19 +40,25 @@ pip install -e .
 
 **Solution:**
 ```bash
-# Check for conflicts
 pip check
 
-# If NumPy conflict (JobSpy pins numpy==1.26.3)
-# Use separate venv for other tools
-python -m venv .venv-other
-source .venv-other/bin/activate
-pip install other-tools
+# NumPy conflict (python-jobspy pins numpy)
+# Use a dedicated virtual environment
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
 ---
 
 ## LLM Connection Issues
+
+### No provider configured
+
+**Error:** Setup wizard launches on first start
+
+**Solution:**
+Run `/setup` and enter your API key for one provider. See [Configuration](configuration.md).
 
 ### Azure OpenAI authentication fails
 
@@ -65,22 +70,22 @@ pip install other-tools
    AZURE_OPENAI_API_KEY=your-key-here
    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
    ```
-2. Check key hasn't expired
-3. Verify deployment names match:
+2. Check that the endpoint does NOT include `/api/projects/...` (it's stripped automatically, but verify)
+3. Verify deployment names match your Azure resource:
    ```bash
    az cognitiveservices account deployment list \
      --resource-group YOUR_RG \
      --name YOUR_RESOURCE
    ```
 
-### OpenAI API errors
+### OpenAI rate limit
 
 **Error:** `Rate limit exceeded` or `429 Too Many Requests`
 
 **Solution:**
-- Wait and retry (rate limits reset)
-- Use `--debug` to see retry behavior
-- Consider upgrading OpenAI tier
+- The agent has automatic fallback — it will try the next model in the chain
+- Run `/verbose` to see which model is active
+- Use `--debug` to observe the fallback chain
 
 ### Ollama connection refused
 
@@ -94,7 +99,7 @@ ollama serve
 # Pull a model if none installed
 ollama pull qwen3
 
-# Verify connection
+# Verify
 curl http://localhost:11434/api/tags
 ```
 
@@ -104,9 +109,9 @@ curl http://localhost:11434/api/tags
 
 **Solution:**
 1. Check internet connection
-2. Verify at least one provider configured in `.env`
-3. Run with debug: `fu7ur3pr00f --debug`
-4. Check logs at `~/.fu7ur3pr00f/logs/`
+2. Verify at least one provider configured in `~/.fu7ur3pr00f/.env`
+3. Run: `fu7ur3pr00f --debug`
+4. Check logs: `tail -f ~/.fu7ur3pr00f/data/fu7ur3pr00f.log`
 
 ---
 
@@ -117,17 +122,15 @@ curl http://localhost:11434/api/tags
 **Error:** `GitHub MCP client failed` or `401 Unauthorized`
 
 **Solution:**
-1. Verify token in `.env`:
+1. Verify token in `~/.fu7ur3pr00f/.env`:
    ```bash
    GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
    ```
-2. Check token scopes:
-   - Go to https://github.com/settings/tokens
-   - Token must have: `repo`, `read:user`, `user:email`
-3. Test connection:
+2. Check token scopes at https://github.com/settings/tokens:
+   - `repo`, `read:user`, `user:email`
+3. Test manually:
    ```bash
-   curl -H "Authorization: token YOUR_TOKEN" \
-     https://api.github.com/user
+   curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
    ```
 
 ### Tavily search fails
@@ -135,8 +138,8 @@ curl http://localhost:11434/api/tags
 **Error:** `Tavily API error` or `401 Unauthorized`
 
 **Solution:**
-1. Get API key at https://tavily.com/
-2. Add to `.env`:
+1. Get free API key at https://tavily.com/
+2. Add to `~/.fu7ur3pr00f/.env`:
    ```bash
    TAVILY_API_KEY=your-key-here
    ```
@@ -147,15 +150,12 @@ curl http://localhost:11434/api/tags
 **Issue:** No job results
 
 **Solution:**
-1. Check JobSpy is enabled:
+1. Check JobSpy is enabled (default: true):
    ```bash
    JOBSPY_ENABLED=true
    ```
-2. Verify `python-jobspy` installed:
-   ```bash
-   pip show python-jobspy
-   ```
-3. Some job boards may be temporarily unavailable
+2. Verify installation: `pip show python-jobspy`
+3. Some job boards may be temporarily unavailable — try again later
 
 ---
 
@@ -163,27 +163,27 @@ curl http://localhost:11434/api/tags
 
 ### LinkedIn ZIP not found
 
-**Error:** `FileNotFoundError: LinkedIn export not found`
+**Error:** `No LinkedIn ZIP found`
 
 **Solution:**
-1. Export from LinkedIn:
-   - Settings → Data privacy → Get a copy of your data
-   - Wait for email (10-30 min)
-2. Place ZIP in correct location:
+1. Export from LinkedIn: Settings → Data privacy → Get a copy of your data
+2. Wait for email (10–30 min)
+3. Place ZIP in `~/.fu7ur3pr00f/data/raw/`:
    ```bash
-   mv ~/Downloads/LinkedIn*.zip ~/.fu7ur3pr00f/data/raw/linkedin.zip
+   mv ~/Downloads/LinkedIn*.zip ~/.fu7ur3pr00f/data/raw/linux.zip
    ```
+4. Run `/gather`
 
 ### CliftonStrengths PDF not detected
 
-**Error:** `No Gallup CliftonStrengths PDFs found`
+**Error:** `No CliftonStrengths PDFs found`
 
 **Solution:**
 1. Rename PDF to include keywords:
    ```bash
    mv your-report.pdf Top_5_CliftonStrengths.pdf
    ```
-2. Valid keywords: `top_5`, `top_10`, `all_34`, `cliftonstrengths`, `gallup`
+2. Valid keywords (case-insensitive): `strength`, `top_5`, `top_10`, `all_34`, `cliftonstrengths`, `gallup`
 
 ### pdftotext not installed
 
@@ -197,7 +197,7 @@ sudo apt install poppler-utils
 # macOS
 brew install poppler
 
-# Verify installation
+# Verify
 pdftotext -v
 ```
 
@@ -206,68 +206,69 @@ pdftotext -v
 **Error:** `SSRF protection` or `Connection refused`
 
 **Solution:**
-1. Portfolio must be publicly accessible
-2. Cannot scrape:
-   - `localhost` or `127.0.0.1`
-   - Private IPs (`192.168.x.x`, `10.x.x.x`)
-   - Sites requiring authentication
-3. Check `robots.txt` allows scraping
+1. Portfolio must be publicly accessible (no auth required)
+2. Cannot scrape: localhost, private IPs, or robots.txt-blocked paths
+3. Verify `PORTFOLIO_URL` in `~/.fu7ur3pr00f/.env` is correct
 
 ### CV import returns empty
 
-**Error:** `NoDataError: No text could be extracted`
+**Error:** `No text could be extracted`
 
 **Solution:**
 1. PDF may be scanned/image-based
-2. Convert to text-based PDF or use Markdown
-3. Verify file has content:
+2. Convert to text-based PDF, or use Markdown format instead:
    ```bash
-   pdftotext your-cv.pdf -
+   pdftotext your-cv.pdf -  # Verify it has text
    ```
 
 ---
 
-## ChromaDB Issues
+## Knowledge Base Issues
 
-### Database locked
+### Database locked (SQLite)
 
 **Error:** `Database is locked` or `OperationalError`
 
 **Solution:**
 1. Close other instances of fu7ur3pr00f
-2. Remove lock file:
+2. Remove any lock files:
    ```bash
-   rm ~/.fu7ur3pr00f/chroma/*.lock
+   rm -f ~/.fu7ur3pr00f/*.lock
    ```
 3. Restart the application
 
-### Indexing fails
+### ChromaDB errors
 
-**Error:** `Failed to index to ChromaDB`
+**Error:** ChromaDB-related failures
 
 **Solution:**
-1. Check disk space:
+1. Check disk space: `df -h ~/.fu7ur3pr00f`
+2. If corrupted, remove and rebuild:
    ```bash
-   df -h ~/.fu7ur3pr00f
+   rm -rf ~/.fu7ur3pr00f/episodic/
    ```
-2. Clear and rebuild:
-   ```bash
-   fu7ur3pr00f
-   /knowledge clear
-   /gather
-   ```
+   Then run `/gather` to re-index. Conversation history (`memory.db`) is unaffected.
+
+### Agent says it has no data
+
+**Issue:** "No career data indexed yet"
+
+**Solution:**
+1. Run `/gather` or tell the agent: *"gather all my career data"*
+2. Verify files exist in `~/.fu7ur3pr00f/data/raw/`
+3. Ask: *"show me knowledge base statistics"*
 
 ### Embedding errors
 
 **Error:** `Embedding failed` or dimension mismatch
 
 **Solution:**
-1. Verify embedding model configured:
+1. Verify embedding model in `~/.fu7ur3pr00f/.env`:
    ```bash
    EMBEDDING_MODEL=text-embedding-3-small
    ```
-2. Check model is available in your LLM provider
-3. Restart to reload embeddings
+2. Check LLM provider connectivity
+3. Restart the application
 
 ---
 
@@ -287,30 +288,21 @@ sudo apt install libpango-1.0-0 libpangoft2-1.0-0 \
 python -c "import weasyprint; print(weasyprint.__version__)"
 ```
 
-### CV content incomplete
+### CV content thin or incomplete
 
-**Issue:** Missing sections or data
+**Issue:** Missing sections or generic content
 
 **Solution:**
-1. Gather all data first:
-   ```bash
-   /gather
-   ```
-2. Check knowledge base:
-   ```bash
-   /knowledge stats
-   ```
-3. Update profile with missing info
+1. Gather all data first: `/gather`
+2. Tell the agent more about yourself: *"I have 8 years of Python experience, led teams of 5+, worked at X and Y"*
+3. Ask: *"show me knowledge base statistics"* to confirm data is indexed
 
 ### Formatting broken in PDF
 
-**Issue:** Weird layout or spacing
-
 **Solution:**
-1. Edit Markdown file to fix content
-2. Remove custom formatting
-3. Ensure proper Markdown syntax
-4. Regenerate PDF
+1. Edit `~/.fu7ur3pr00f/data/output/cv_en_ats.md` to fix content
+2. Remove any non-standard Markdown
+3. Ask the agent to regenerate the PDF
 
 ---
 
@@ -318,47 +310,32 @@ python -c "import weasyprint; print(weasyprint.__version__)"
 
 ### VM fails to start
 
-**Error:** `VT-x/AMD-V not available` or similar
+**Error:** `VT-x/AMD-V not available`
 
 **Solution:**
 1. Enable virtualization in BIOS
-2. Check VirtualBox installed:
-   ```bash
-   vboxmanage --version
-   ```
-3. Close other VMs or hypervisors
+2. Check VirtualBox is installed: `vboxmanage --version`
+3. Close other hypervisors (Hyper-V, VMware)
 
 ### Vagrant provisioning fails
 
-**Error:** `Provisioning failed`
-
 **Solution:**
-1. Check logs:
-   ```bash
-   vagrant ssh
-   cat /home/vagrant/provision.log
-   ```
-2. Destroy and recreate:
-   ```bash
-   vagrant destroy -f
-   vagrant up --provision
-   ```
+```bash
+vagrant ssh
+cat /home/vagrant/provision.log
+# Fix issues, then:
+vagrant destroy -f
+vagrant up --provision
+```
 
 ### Shared folders not working
 
-**Issue:** `/workspace` empty or not accessible
-
 **Solution:**
-1. Install VirtualBox Guest Additions
-2. Restart VM:
-   ```bash
-   vagrant reload
-   ```
-3. Check permissions:
-   ```bash
-   vagrant ssh
-   ls -la /workspace
-   ```
+```bash
+vagrant reload  # Restart with Guest Additions
+vagrant ssh
+ls -la /workspace
+```
 
 ---
 
@@ -370,25 +347,15 @@ Enable verbose logging:
 fu7ur3pr00f --debug
 ```
 
-This shows:
-- LLM API calls and responses
-- Tool execution details
-- MCP client connections
-- ChromaDB operations
-- Full error tracebacks
+Or toggle inside chat with `/debug`.
 
-### Log Files
+Full logs are always written to `~/.fu7ur3pr00f/data/fu7ur3pr00f.log`:
 
-```
-~/.fu7ur3pr00f/logs/
-├── fu7ur3pr00f.log      # Main application log
-└── chroma.log           # ChromaDB logs
-```
-
-View recent logs:
 ```bash
-tail -f ~/.fu7ur3pr00f/logs/fu7ur3pr00f.log
+tail -f ~/.fu7ur3pr00f/data/fu7ur3pr00f.log
 ```
+
+Use `/verbose` in chat for a quick system status summary.
 
 ---
 
@@ -398,8 +365,8 @@ tail -f ~/.fu7ur3pr00f/logs/fu7ur3pr00f.log
 
 - [Architecture](architecture.md) — System design
 - [Configuration](configuration.md) — Settings reference
-- [Tools](tools.md) — Tool documentation
-- [Scripts](scripts.md) — Utility scripts
+- [Chat Commands](chat_commands.md) — Commands reference
+- [Data Gathering](gatherers.md) — Import guide
 
 ### Search Existing Issues
 
@@ -409,14 +376,13 @@ https://github.com/juanmanueldaza/fu7ur3pr00f/issues
 
 Include:
 1. **What happened** — Clear description
-2. **Expected behavior** — What you expected
-3. **Reproduction steps** — How to reproduce
+2. **Expected behavior**
+3. **Reproduction steps**
 4. **Environment** — OS, Python version, fu7ur3pr00f version
-5. **Logs** — Debug output from `fu7ur3pr00f --debug`
+5. **Logs** — From `~/.fu7ur3pr00f/data/fu7ur3pr00f.log` or `fu7ur3pr00f --debug`
 
 ### System Information
 
-Run this and include in bug report:
 ```bash
 fu7ur3pr00f --version
 python --version
@@ -431,11 +397,12 @@ uname -a
 |---------|-----------|
 | Command not found | `pipx ensurepath` then restart terminal |
 | Module not found | `pip install -e .` |
-| API key invalid | Check `.env` and regenerate if needed |
-| PDF not generated | Install poppler-utils and pango libs |
-| Data not found | Run `/gather` first |
+| API key invalid | Check `~/.fu7ur3pr00f/.env` and regenerate key |
+| PDF not generated | Install poppler-utils + pango libs |
+| No career data | Run `/gather` or tell the agent to gather data |
 | Database locked | Close other instances, remove `.lock` files |
 | VM won't start | Enable virtualization in BIOS |
+| Agent gives generic answers | Run `/gather` first — agent needs indexed data |
 
 ---
 
@@ -444,3 +411,4 @@ uname -a
 - [Configuration](configuration.md) — Settings reference
 - [Data Gathering](gatherers.md) — Import guide
 - [CV Generation](cv_generation.md) — CV guide
+- [Memory System](memory_system.md) — Storage details

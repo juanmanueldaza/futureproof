@@ -1,10 +1,10 @@
 # Tools Reference
 
-The career agent has **40 tools** organized by domain. All tools are defined in `src/fu7ur3pr00f/agents/tools/`.
+The career agent has **41 tools** organized by domain. All tools are defined in `src/fu7ur3pr00f/agents/tools/`.
 
 ## Tool Categories
 
-| Category | Tools | Description |
+| Category | Count | Description |
 |----------|-------|-------------|
 | Profile | 7 | User profile, goals, salary info |
 | Gathering | 5 | LinkedIn, portfolio, assessments, CV |
@@ -40,7 +40,7 @@ Manage user profile, career goals, and personal information.
 
 ## Gathering Tools (5)
 
-Collect career data from various sources.
+Collect career data from various sources and index to ChromaDB.
 
 | Tool | Description |
 |------|-------------|
@@ -48,7 +48,7 @@ Collect career data from various sources.
 | `gather_linkedin_data` | Import LinkedIn CSV export |
 | `gather_assessment_data` | Import CliftonStrengths PDF |
 | `gather_cv_data` | Import existing CV (PDF/MD/TXT) |
-| `gather_all_career_data` | Run all gatherers at once |
+| `gather_all_career_data` | Run all gatherers at once (HITL confirmation) |
 
 **File:** `tools/gathering.py`
 
@@ -86,14 +86,14 @@ Access GitLab data via `glab` CLI.
 
 ## Knowledge Tools (4)
 
-RAG search and indexing over career data.
+RAG search and indexing over career data (ChromaDB at `~/.fu7ur3pr00f/episodic/`).
 
 | Tool | Description |
 |------|-------------|
 | `search_career_knowledge` | Search indexed career data |
 | `get_knowledge_stats` | Get knowledge base statistics |
 | `index_career_knowledge` | Index new data to ChromaDB |
-| `clear_career_knowledge` | Clear all knowledge base data |
+| `clear_career_knowledge` | Clear all knowledge base data (HITL confirmation) |
 
 **File:** `tools/knowledge.py`
 
@@ -101,13 +101,13 @@ RAG search and indexing over career data.
 
 ## Analysis Tools (3)
 
-Career analysis and guidance.
+Career analysis and guidance. Results are displayed directly to the user in Rich panels. The agent's final text response is replaced by `AnalysisSynthesisMiddleware` with focused reasoning-model synthesis.
 
 | Tool | Description |
 |------|-------------|
 | `analyze_skill_gaps` | Analyze gaps between current and target role |
 | `analyze_career_alignment` | Analyze career alignment with goals |
-| `get_career_advice` | Get personalized career advice |
+| `get_career_advice` | Get personalized strategic career advice |
 
 **File:** `tools/analysis.py`
 
@@ -115,13 +115,13 @@ Career analysis and guidance.
 
 ## Market Tools (6)
 
-Job market intelligence.
+Job market intelligence via MCP clients.
 
 | Tool | Description |
 |------|-------------|
 | `search_jobs` | Search 7 job boards + Hacker News |
-| `get_tech_trends` | Get technology trends |
-| `get_salary_insights` | Get salary data for roles/locations |
+| `get_tech_trends` | Get technology trends (HN, Stack Overflow, Dev.to) |
+| `get_salary_insights` | Get salary data for roles/locations (Tavily) |
 | `analyze_market_fit` | Analyze market fit for target roles |
 | `analyze_market_skills` | Analyze in-demand skills for market |
 | `gather_market_data` | Gather market data from multiple sources |
@@ -132,7 +132,7 @@ Job market intelligence.
 
 ## Financial Tools (2)
 
-Real-time financial data.
+Real-time financial data via the Financial MCP client.
 
 | Tool | Description |
 |------|-------------|
@@ -149,16 +149,17 @@ CV and document generation.
 
 | Tool | Description |
 |------|-------------|
-| `generate_cv` | Generate ATS-optimized CV (Markdown + PDF) |
+| `generate_cv` | Generate ATS-optimized CV (Markdown + PDF, HITL confirmation) |
 | `generate_cv_draft` | Generate CV draft for review |
 
-**File:** `tools/generation.py`
+**File:** `tools/generation.py`  
+**Output:** `~/.fu7ur3pr00f/data/output/cv_en_ats.md` and `.pdf`
 
 ---
 
 ## Memory Tools (4)
 
-Episodic memory for decisions and applications.
+Episodic memory stored in ChromaDB (`~/.fu7ur3pr00f/episodic/`).
 
 | Tool | Description |
 |------|-------------|
@@ -211,6 +212,6 @@ def my_new_tool(param: str) -> str:
 
 ## See Also
 
-- [Architecture](architecture.md) — Single agent design
+- [Architecture](architecture.md) — Single agent design and middleware
 - [Development](development.md) — Adding tools guide
 - [QWEN.md](../QWEN.md) — Qwen Code instructions

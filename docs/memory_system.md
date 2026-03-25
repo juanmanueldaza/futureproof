@@ -1,21 +1,54 @@
 # Memory System
 
-How FutureProof stores and retrieves your career data using ChromaDB.
+How FutureProof stores and retrieves data across two separate backends.
 
 ---
 
 ## Overview
 
-FutureProof uses ChromaDB for two types of memory:
+FutureProof uses two distinct storage backends:
 
-| Type | Purpose | Content |
-|------|---------|---------|
-| **Knowledge Base** | RAG search | Career data, skills, experience |
-| **Episodic Memory** | Conversation history | Decisions, applications, chat context |
+| Backend | File | Purpose |
+|---------|------|---------|
+| **SQLite** (`SqliteSaver`) | `~/.fu7ur3pr00f/memory.db` | Conversation checkpoints — per-thread message history, agent state, time-travel |
+| **ChromaDB** | `~/.fu7ur3pr00f/episodic/` | Career knowledge base (RAG) and episodic memory (decisions, applications) |
+
+These are completely separate. `/clear` clears SQLite conversation history. The knowledge base (ChromaDB) is cleared by telling the agent to clear it, which triggers a HITL confirmation.
 
 ---
 
-## Architecture
+## Conversation Checkpointing (SQLite)
+
+Implemented via LangGraph's `SqliteSaver`:
+
+- Stored at `~/.fu7ur3pr00f/memory.db`
+- Persists message history across sessions (restart the app, conversation resumes)
+- One row set per thread — use `/thread <name>` to isolate conversations
+- Supports LangGraph time-travel and state inspection
+
+### Thread Management
+
+```bash
+/thread            # Show current thread ID
+/thread jobsearch  # Switch to a named thread
+/threads           # List all threads with history
+/clear             # Delete history for the current thread
+```
+
+---
+
+## Career Knowledge Base (ChromaDB RAG)
+
+When you run `/gather`, data is:
+
+1. Parsed into sections (LinkedIn CSV, PDF text, HTML scrape, etc.)
+2. Chunked into 50–500 token pieces with 50-token overlap
+3. Embedded (vector representation)
+4. Stored in ChromaDB at `~/.fu7ur3pr00f/episodic/`
+
+The agent searches this knowledge base automatically before answering career questions.
+
+### Architecture
 
 ```
 ┌─────────────────┐
@@ -25,14 +58,12 @@ FutureProof uses ChromaDB for two types of memory:
          ▼
 ┌─────────────────┐
 │  Embedding Model│  ← Converts query to vector
-│  (text-embedding)│
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│   ChromaDB      │  ← Vector similarity search
-│  - Knowledge    │
-│  - Episodic     │
+│   ChromaDB      │  ← Vector similarity search (cosine)
+│  (episodic/)    │
 └────────┬────────┘
          │
          ▼
@@ -42,104 +73,77 @@ FutureProof uses ChromaDB for two types of memory:
          │
          ▼
 ┌─────────────────┐
-│     LLM +       │  ← Generates response with context
-│   Retrieved     │
-│    Context      │
+│   LLM +         │  ← Generates response with context
+│  Retrieved      │
+│   Context       │
 └─────────────────┘
 ```
-
----
-
-## Data Directory
-
-```
-~/.fu7ur3pr00f/
-├── chroma/                  # ChromaDB database
-│   ├── chroma.sqlite3       # Metadata store
-│   └── *.bin                # Vector index files
-└── data/
-    └── raw/                 # Source data files
-```
-
----
-
-## Knowledge Base
-
-### What Gets Indexed
-
-When you run `/gather`, data is:
-1. Parsed into sections
-2. Chunked (50-500 tokens)
-3. Embedded (vector representation)
-4. Stored in ChromaDB
 
 ### Indexed Sources
 
 | Source | Sections |
 |--------|----------|
-| LinkedIn | Profile, Experience, Education, Skills, etc. |
+| LinkedIn | Profile, Experience, Education, Skills, Certifications, Languages, Projects, Recommendations |
 | GitHub | Repos, Contributions, Languages |
 | GitLab | Projects, Merge Requests |
-| CliftonStrengths | Top 5/10/34 strengths, insights |
+| CliftonStrengths | Top 5/10/34 strengths, insights, action items |
 | CV/Resume | All detected sections |
 | Portfolio | About, Projects, Blog posts |
 
 ### Chunking Strategy
-
-Text is split into chunks for efficient retrieval:
 
 - **Min tokens:** 50
 - **Max tokens:** 500
 - **Overlap:** 50 tokens
 - **Boundary:** Paragraph/section breaks
 
-### Search
-
-```bash
-/memory search Python        # Semantic search
-/knowledge search AWS        # Same as above
-```
-
-Search finds chunks by **meaning**, not just keywords.
-
-**Example:**
-- Query: "backend development"
-- Matches: "API development", "server-side programming", "database design"
-
 ---
 
 ## Episodic Memory
 
-### What Gets Stored
+The agent can store and recall discrete memories: career decisions, job applications, and other events.
 
-| Event | Stored Data |
-|-------|-------------|
-| Career decisions | Decision, reasoning, date |
-| Job applications | Company, role, status, date |
-| Chat context | Important conversation turns |
+Tell the agent in natural language:
 
-### Commands
+```
+> remember that I accepted an offer at Company X for $180k
+> remember I applied to Google for Senior SWE on March 15
+> what job applications have I saved?
+> recall decisions I've made in the last year
+```
 
-```bash
-# Remember a decision
-/memory remember decision "Accepted offer at Company X"
+Episodic memories are stored in the same ChromaDB instance (`episodic/`) alongside career knowledge.
 
-# Remember job application
-/memory remember application "Senior Dev at Google - Applied 2024-01-15"
+---
 
-# Recall memories
-/memory recall "job applications"
-/memory recall "decisions"
+## Data Directory Structure
 
-# Get stats
-/memory stats
+```
+~/.fu7ur3pr00f/
+├── .env                     # Configuration and secrets (0600)
+├── memory.db                # SQLite — conversation checkpoints
+├── profile.yaml             # User profile (name, role, skills, goals)
+├── episodic/                # ChromaDB — career knowledge + episodic memory
+│   ├── chroma.sqlite3       # ChromaDB metadata
+│   └── *.bin                # Vector index files
+└── data/
+    ├── raw/                 # Place source data files here
+    │   ├── linkedin.zip
+    │   ├── *.pdf
+    │   └── resume.md
+    ├── processed/           # Intermediate processed data
+    ├── output/              # Generated CVs
+    │   ├── cv_en_ats.md
+    │   └── cv_en_ats.pdf
+    ├── cache/               # Market data cache
+    └── fu7ur3pr00f.log      # Application log
 ```
 
 ---
 
 ## Embeddings
 
-### Model Configuration
+### Configuration
 
 ```bash
 # In ~/.fu7ur3pr00f/.env
@@ -151,7 +155,7 @@ EMBEDDING_MODEL=text-embedding-3-small  # OpenAI (default)
 | Provider | Model |
 |----------|-------|
 | OpenAI | `text-embedding-3-small`, `text-embedding-3-large` |
-| Azure | `text-embedding-3-small` |
+| Azure | `text-embedding-3-small` (via `AZURE_EMBEDDING_DEPLOYMENT`) |
 | Ollama | `nomic-embed-text`, `mxbai-embed-large` |
 
 ### Vector Dimensions
@@ -164,127 +168,61 @@ EMBEDDING_MODEL=text-embedding-3-small  # OpenAI (default)
 
 ---
 
-## Commands Reference
+## Knowledge Base Commands
 
-### Search Knowledge
+Interact with the knowledge base via natural language or the agent tools directly:
 
-```bash
-/memory search <query>     # Search knowledge base
-/knowledge search <query>  # Alias
+```
+> search my knowledge base for Python projects
+> show me statistics about my indexed career data
+> clear all career knowledge and start fresh
+> what AWS experience do I have?
 ```
 
-**Examples:**
-```bash
-/memory search Python Django
-/memory search "machine learning"
-/memory search AWS certification
-```
-
-### Knowledge Stats
-
-```bash
-/memory stats              # Show knowledge base stats
-/knowledge stats           # Alias
-```
-
-**Output:**
-```
-Knowledge Base Statistics:
-- Total documents: 156
-- Total chunks: 423
-- Collections: 1
-- Embedding model: text-embedding-3-small
-```
-
-### Clear Knowledge
-
-```bash
-/memory clear              # Clear all knowledge
-/knowledge clear           # Alias
-```
-
-**Requires confirmation** before deleting all data.
-
-### Remember Events
-
-```bash
-/memory remember decision "Description of decision"
-/memory remember application "Company - Role - Status"
-```
-
-### Recall Memories
-
-```bash
-/memory recall <query>     # Search episodic memories
-```
-
----
-
-## Advanced Usage
-
-### Manual Indexing
-
-```bash
-/index file resume.md      # Index specific file
-/index directory ./docs    # Index directory
-```
-
-### Export/Import
-
-```bash
-/export knowledge          # Export knowledge base
-/import knowledge backup/  # Import previously exported
-```
+The `/memory` slash command only shows a brief overview (data directory, thread count, profile status). It does not support subcommands for search or clear.
 
 ---
 
 ## Troubleshooting
 
-### Search returns no results
+### No results from knowledge base
 
-**Issue:** Query doesn't match any chunks
+**Issue:** Agent says it has no data
 
 **Solution:**
-1. Try different keywords
-2. Check if data is indexed: `/memory stats`
-3. Re-run `/gather` if needed
+1. Run `/gather` to index data
+2. Ask agent: *"show me knowledge base statistics"*
+3. Verify files exist in `~/.fu7ur3pr00f/data/raw/`
 
-### Database locked
+### Database locked (SQLite)
 
-**Error:** `Database is locked`
+**Error:** `Database is locked` or `OperationalError`
 
 **Solution:**
 ```bash
-# Close other instances
-# Remove lock files
-rm ~/.fu7ur3pr00f/chroma/*.lock
-
-# Restart application
+# Close other instances of fu7ur3pr00f
+# Remove lock files if present
+rm -f ~/.fu7ur3pr00f/*.lock
 ```
 
-### Indexing fails
+### ChromaDB store reset
 
-**Error:** `Failed to index to ChromaDB`
+To fully wipe and rebuild the knowledge base:
 
-**Solution:**
-1. Check disk space:
-   ```bash
-   df -h ~/.fu7ur3pr00f
-   ```
-2. Clear and rebuild:
-   ```bash
-   /knowledge clear
-   /gather
-   ```
+```bash
+rm -rf ~/.fu7ur3pr00f/episodic/
+```
+
+Then run `/gather` to re-index. The SQLite conversation history (`memory.db`) is unaffected.
 
 ### Embedding errors
 
 **Error:** `Embedding failed`
 
 **Solution:**
-1. Verify embedding model configured
+1. Verify embedding model is set in `.env`
 2. Check LLM provider connectivity
-3. Restart to reload embeddings
+3. Restart the application to reload embeddings
 
 ---
 
@@ -292,81 +230,52 @@ rm ~/.fu7ur3pr00f/chroma/*.lock
 
 ### Chunk Size
 
-Adjust in `.env`:
-
 ```bash
+# In ~/.fu7ur3pr00f/.env
 KNOWLEDGE_CHUNK_MAX_TOKENS=500
 KNOWLEDGE_CHUNK_MIN_TOKENS=50
 ```
 
-**Smaller chunks:**
-- More precise retrieval
-- More chunks to search
+- Smaller chunks: more precise retrieval, more items to search
+- Larger chunks: more context per result, may include noise
 
-**Larger chunks:**
-- More context per chunk
-- May include irrelevant content
+### Auto-Indexing
 
-### Search Results
-
-Default returns top 5 chunks. Adjust:
-
-```python
-# In code or via settings
-top_k = 10  # Return more results
+```bash
+# Auto-index after every gather (default: true)
+KNOWLEDGE_AUTO_INDEX=true
 ```
 
 ---
 
 ## Data Privacy
 
-### Where Data is Stored
+- All data stored **locally** under `~/.fu7ur3pr00f/`
+- No cloud sync
+- Only the top 5–10 most relevant chunks are sent to the LLM per query
+- API keys stored with `0600` permissions
 
-- **Local:** `~/.fu7ur3pr00f/chroma/`
-- **No cloud sync** unless you configure it
-- **Full control** over your data
-
-### What Gets Sent to LLM
-
-- Only **relevant chunks** (top 5-10)
-- **Anonymized** if configured
-- **Not stored** by LLM provider
-
-### Backup Your Data
+### Backup
 
 ```bash
-# Backup ChromaDB
-cp -r ~/.fu7ur3pr00f/chroma/ ~/backup/chroma-backup/
+# Backup everything
+cp -r ~/.fu7ur3pr00f/ ~/backup/fu7ur3pr00f-backup/
 
-# Backup source data
-cp -r ~/.fu7ur3pr00f/data/ ~/backup/data-backup/
+# Backup only the knowledge base
+cp -r ~/.fu7ur3pr00f/episodic/ ~/backup/episodic-backup/
 ```
 
 ---
 
 ## Technical Details
 
-### ChromaDB Configuration
-
-```python
-# Collection settings
-collection_name = "career_knowledge"
-metadata = {"hnsw:space": "cosine"}  # Cosine similarity
-```
-
 ### Similarity Search
 
-Uses **cosine similarity** for vector comparison:
-- Range: -1 to 1
-- Higher = more similar
-- Threshold: ~0.7 for good matches
+Uses **cosine similarity** for vector comparison. ChromaDB's HNSW index provides O(log n) approximate nearest-neighbor search.
 
-### Index Type
+### SQLite Checkpointer
 
-Uses **HNSW** (Hierarchical Navigable Small World):
-- Fast approximate nearest neighbors
-- O(log n) search time
-- Configurable accuracy
+The `SqliteSaver` from `langgraph-checkpoint-sqlite` stores checkpoints in `memory.db` with `check_same_thread=False` for multi-threaded safety.
 
 ---
 

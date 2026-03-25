@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     content_cache_hours: int = 12  # Dev.to/SO content trends
     forex_cache_hours: int = 4  # Exchange rates (updated daily)
 
+    # Values filter (ethical opportunity scoring in multi-agent responses)
+    values_filter_enabled: bool = False
+
     # Knowledge Base Configuration (RAG)
     knowledge_auto_index: bool = True  # Auto-index after gather
     knowledge_chunk_max_tokens: int = 500  # Max tokens per chunk

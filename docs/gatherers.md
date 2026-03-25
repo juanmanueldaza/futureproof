@@ -5,13 +5,23 @@ How to import your career data into FutureProof. All data is indexed to ChromaDB
 ## Quick Start
 
 ```bash
-# Place your data files in ~/.fu7ur3pr00f/data/raw/
-mkdir -p ~/.fu7ur3pr00f/data/raw
+# 1. Place your data files in ~/.fu7ur3pr00f/data/raw/
+mkdir -p ~/.fu7ur3pr00f/data/raw/
+cp ~/Downloads/LinkedIn_*.zip ~/.fu7ur3pr00f/data/raw/linkedin.zip
+cp ~/Downloads/Top_5_CliftonStrengths.pdf ~/.fu7ur3pr00f/data/raw/
+cp ~/Documents/resume.md ~/.fu7ur3pr00f/data/raw/
 
-# Then run
+# 2. Run FutureProof and gather
 fu7ur3pr00f
+```
+
+Then in chat:
+
+```
 /gather
 ```
+
+Or tell the agent: *"gather all my career data"*
 
 ---
 
@@ -36,7 +46,7 @@ fu7ur3pr00f
    - Messages (optional)
    - Job applications (optional)
 4. Click **Request archive**
-5. Wait for email (usually 10-30 minutes)
+5. Wait for email (usually 10–30 minutes)
 6. Download ZIP and place in `~/.fu7ur3pr00f/data/raw/`
 
 ### What Gets Imported
@@ -57,9 +67,8 @@ fu7ur3pr00f
 | | Connections | Full network with companies |
 | | Messages | Message history (optional) |
 
-### File Format
+### CSV Files Parsed
 
-The ZIP contains multiple CSV files. FutureProof parses:
 - `Profile.csv`
 - `Positions.csv`
 - `Education.csv`
@@ -94,6 +103,8 @@ The ZIP contains multiple CSV files. FutureProof parses:
 4. Download PDF (choose "Top 10" or "All 34" for best results)
 5. Place in `~/.fu7ur3pr00f/data/raw/`
 
+**Filename must contain one of:** `strength`, `top_5`, `top_10`, `all_34`, `cliftonstrengths`, or `gallup` (case-insensitive) to be detected.
+
 ### What Gets Imported
 
 | Data | Description |
@@ -108,7 +119,7 @@ The ZIP contains multiple CSV files. FutureProof parses:
 
 ### Requirements
 
-**System:** `poppler-utils` for PDF text extraction
+`poppler-utils` must be installed for PDF text extraction:
 
 ```bash
 # Debian/Ubuntu
@@ -128,7 +139,7 @@ brew install poppler
 
 | Format | Extension | Notes |
 |--------|-----------|-------|
-| PDF | `.pdf` | Requires poppler-utils |
+| PDF | `.pdf` | Requires `poppler-utils` |
 | Markdown | `.md` | ATS-optimized format |
 | Plain text | `.txt` | Simple format |
 
@@ -172,12 +183,6 @@ Experienced software engineer with...
 - Built X using Y
 - Improved Z by 40%
 
-### Previous Company
-**Junior Developer**
-*2018 – 2020*
-
-- Developed features...
-
 ## Education
 
 ### University Name
@@ -202,7 +207,7 @@ Description of project...
 
 ## Portfolio Website
 
-**URL:** Configured in `.env` as `PORTFOLIO_URL`
+**URL:** Configured in `~/.fu7ur3pr00f/.env` as `PORTFOLIO_URL`
 
 ### How to Configure
 
@@ -210,7 +215,7 @@ Description of project...
    ```bash
    PORTFOLIO_URL=https://your-portfolio.com
    ```
-2. Restart the chat client
+2. Restart the chat client (or run `/setup`)
 
 ### What Gets Scraped
 
@@ -220,27 +225,26 @@ Description of project...
 | Projects | Project descriptions, tech stack |
 | Blog posts | Articles and tutorials |
 | Contact | Contact information |
-| Resume | Downloadable resume |
 
 ### Supported Portfolio Sites
 
-- Personal websites (any domain)
+- Personal websites (any public domain)
 - GitHub Pages
 - Vercel / Netlify deployments
 - WordPress sites
 - Webflow sites
 
-### Requirements
+### Security
 
-- Portfolio must be publicly accessible (no auth)
-- SSRF protection blocks private IP addresses
+- Portfolio must be **publicly accessible** (no authentication)
+- SSRF protection blocks private IP addresses (`127.x.x.x`, `192.168.x.x`, `10.x.x.x`)
 - Respects `robots.txt`
 
 ---
 
 ## GitHub Integration
 
-**Auth:** `GITHUB_PERSONAL_ACCESS_TOKEN` in `.env`
+**Auth:** `GITHUB_PERSONAL_ACCESS_TOKEN` in `~/.fu7ur3pr00f/.env`
 
 ### How to Configure
 
@@ -249,7 +253,7 @@ Description of project...
    - `repo` (full repo access)
    - `read:user` (read user profile)
    - `user:email` (read email addresses)
-3. Add to `.env`:
+3. Add to `~/.fu7ur3pr00f/.env`:
    ```bash
    GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
    ```
@@ -259,10 +263,19 @@ Description of project...
 | Data | Description |
 |------|-------------|
 | Profile | Bio, location, company |
-| Repositories | All public and private repos |
+| Repositories | Public and private repos |
 | Contributions | Commit history |
 | Languages | Top languages used |
-| README files | Project documentation |
+| READMEs | Project documentation |
+
+### Usage
+
+Tell the agent in natural language:
+```
+> gather my GitHub profile
+> search my GitHub repos for Python projects
+> show me my GitHub contributions
+```
 
 ---
 
@@ -276,7 +289,7 @@ Description of project...
    ```bash
    # Debian/Ubuntu
    sudo apt install glab
-   
+
    # macOS
    brew install glab
    ```
@@ -290,7 +303,6 @@ Description of project...
 | Data | Description |
 |------|-------------|
 | Projects | All accessible projects |
-| Repositories | Git repositories |
 | Files | Source code files |
 | Merge requests | MR history |
 
@@ -312,21 +324,28 @@ Description of project...
 
 ## Gathering Commands
 
-In the chat client:
+### Via slash command
 
 ```bash
-# Gather all data sources
-/gather
+/gather      # Scan ~/.fu7ur3pr00f/data/raw/ and index everything found
+```
 
-# Gather specific sources
-/gather linkedin
-/gather github
-/gather portfolio
-/gather cliftonstrengths
-/gather cv
+### Via natural language
 
-# Check what data is indexed
-/knowledge stats
+```
+> gather all my career data
+> import my LinkedIn data
+> gather my GitHub profile
+> scrape my portfolio website
+```
+
+The `/gather` slash command uses `GathererService` to process all sources at once. Per-source control is available via the agent tools through natural language.
+
+### Check what's indexed
+
+```
+> show me knowledge base statistics
+> how much career data is indexed?
 ```
 
 ---
@@ -335,18 +354,18 @@ In the chat client:
 
 ### LinkedIn ZIP not found
 
-**Error:** `FileNotFoundError: LinkedIn export not found`
+**Error:** `No LinkedIn ZIP found`
 
 **Solution:**
 1. Ensure ZIP is in `~/.fu7ur3pr00f/data/raw/`
-2. File must be named `linkedin.zip` or specify full path
+2. File should be named `linkedin.zip` (or any `.zip` file — all ZIPs in `raw/` are treated as LinkedIn exports)
 
 ### CliftonStrengths PDF not detected
 
-**Error:** `No Gallup CliftonStrengths PDFs found`
+**Error:** `No CliftonStrengths PDFs found`
 
 **Solution:**
-1. PDF filename must contain: `top_5`, `top_10`, `all_34`, `cliftonstrengths`, or `gallup`
+1. PDF filename must contain: `strength`, `top_5`, `top_10`, `all_34`, `cliftonstrengths`, or `gallup`
 2. Rename if needed: `mv your-report.pdf Top_5_CliftonStrengths.pdf`
 
 ### pdftotext not installed
@@ -369,7 +388,7 @@ brew install poppler
 **Solution:**
 1. Regenerate token at https://github.com/settings/tokens
 2. Ensure scopes: `repo`, `read:user`, `user:email`
-3. Update `.env` and restart
+3. Update `~/.fu7ur3pr00f/.env` and restart
 
 ### Portfolio scraping fails
 
@@ -378,7 +397,7 @@ brew install poppler
 **Solution:**
 1. Portfolio must be publicly accessible
 2. Cannot scrape localhost or private IPs
-3. Check firewall settings
+3. Check for `robots.txt` restrictions
 
 ---
 

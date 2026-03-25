@@ -243,6 +243,8 @@ def apply_values_filter(  # noqa: C901 TODO: refactor
 ) -> str:
     """Apply values-based filtering to agent response.
 
+    Disabled by default. Enable via VALUES_FILTER_ENABLED=true in .env.
+
     Analyzes the context and modifies response to highlight ethical concerns
     or praise value-aligned opportunities.
 
@@ -253,20 +255,13 @@ def apply_values_filter(  # noqa: C901 TODO: refactor
 
     Returns:
         Filtered response with values-aware messaging
-
-    Example:
-        >>> response = "The job pays $200k and has great benefits."
-        >>> context = ValuesContext(
-        ...     company_uses_proprietary=True,
-        ...     crunch_expected=True,
-        ...     fair_compensation=True
-        ... )
-        >>> filtered = apply_values_filter(response, context)
-        >>> print(filtered)
-        'The salary is excellent ($200k), but consider:
-        ⚠️ This company uses proprietary software
-        ⚠️ Crunch culture is expected...'
     """
+    # Opt-in: return unchanged unless explicitly enabled
+    from fu7ur3pr00f.config import settings
+
+    if not settings.values_filter_enabled:
+        return response
+
     # Convert dict to ValuesContext if needed
     if isinstance(context, dict):
         ctx = ValuesContext(**context)

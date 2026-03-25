@@ -1,301 +1,225 @@
 # Chat Commands Reference
 
-All commands available in the FutureProof chat client.
+FutureProof has two interaction modes:
 
-## Usage
+1. **Natural language** — just type. The agent understands requests like "analyze my skill gaps for Staff Engineer" or "search for remote Python jobs" or "generate my CV targeting senior roles". This is how most features are accessed.
+2. **Slash commands** — a small set of utility commands for navigation, setup, and data management.
 
-Type `/` followed by command name. Most commands accept arguments.
+---
+
+## Natural Language Interaction
+
+Most features are accessed by typing naturally. Examples:
+
+```
+> analyze my skill gaps for a Staff Engineer role
+> search for remote Python jobs paying above $150k
+> generate an ATS-optimized CV for senior backend roles
+> what are the trending technologies in my field?
+> remember that I prefer remote work
+> what job applications have I saved?
+> convert 180000 USD to ARS with PPP comparison
+> what salary can I expect for a senior ML engineer in Berlin?
+```
+
+The agent uses its 41 tools behind the scenes — RAG search over your indexed career data, job board queries, market analysis, CV generation, and more.
+
+---
+
+## Slash Commands
+
+Type `/` followed by the command. Commands are case-insensitive.
+
+---
+
+### `/help` or `/h` — Show help
+
+Display the help panel with all available commands.
 
 ```bash
-/command [arguments]
+/help
+/h
 ```
 
 ---
 
-## Core Commands
+### `/setup` — Configure LLM and API keys
 
-### `/help` — Show help
-
-Show all available commands or help for specific command.
-
-```bash
-/help                    # Show all commands
-/help gather             # Help for specific command
-```
-
----
-
-### `/gather` — Import career data
-
-Gather data from various sources and index to ChromaDB.
-
-```bash
-/gather                  # Gather all sources
-/gather linkedin         # LinkedIn export only
-/gather github           # GitHub profile only
-/gather portfolio        # Portfolio website only
-/gather cliftonstrengths # CliftonStrengths PDF only
-/gather cv               # CV/resume file only
-```
-
-**Sources:**
-- LinkedIn ZIP export
-- GitHub (via MCP)
-- Portfolio website
-- CliftonStrengths PDF
-- CV/resume files
-
-**See:** [Data Gathering Guide](gatherers.md)
-
----
-
-### `/analyze` — Career analysis
-
-Analyze your career data and provide insights.
-
-```bash
-/analyze                 # General career analysis
-/analyze skills          # Skill gap analysis
-/analyze market          # Market fit analysis
-/analyze for Staff Engineer  # Analysis for specific role
-```
-
-**Outputs:**
-- Skill gaps
-- Market fit assessment
-- Career trajectory recommendations
-- Salary insights
-
----
-
-### `/search` — Job search
-
-Search job boards and hiring threads.
-
-```bash
-/search                  # Search all job boards
-/search python remote    # Search with keywords
-/search --board linkedin # Search specific board
-```
-
-**Boards searched:**
-- LinkedIn
-- Indeed
-- Glassdoor
-- RemoteOK
-- Himalayas
-- Hacker News "Who's Hiring"
-- And more...
-
----
-
-### `/generate` — Generate CV
-
-Create ATS-optimized CV in Markdown and PDF.
-
-```bash
-/generate cv             # Generate CV
-/generate cv draft       # Generate draft for review
-/generate cv for Senior Developer  # Targeted CV
-```
-
-**Outputs:**
-- `data/output/cv_en_ats.md` (Markdown)
-- `data/output/cv_en_ats.pdf` (PDF)
-
-**See:** [CV Generation Guide](cv_generation.md)
-
----
-
-### `/memory` — Knowledge base
-
-Query and manage your career knowledge base.
-
-```bash
-/memory search Python    # Search knowledge base
-/memory stats            # Show knowledge base stats
-/memory clear            # Clear all knowledge (requires confirmation)
-```
-
-**See:** [Memory System](memory_system.md)
-
----
-
-## Profile Commands
-
-### `/get` — View profile
-
-View your current profile and settings.
-
-```bash
-/get profile             # Full profile
-/get goals               # Career goals
-/get config              # Current configuration
-```
-
----
-
-### `/update` — Update profile
-
-Update your profile information.
-
-```bash
-/update name John Doe              # Update name
-/update current_role Senior Dev    # Update current role
-/update skills Python, AWS, Docker # Update skills
-/update salary 150000 USD          # Update salary
-```
-
----
-
-### `/set` — Set preferences
-
-Set career preferences and targets.
-
-```bash
-/set target_role Staff Engineer    # Set target role
-/set goal Lead engineering team    # Set career goal
-/set location Remote               # Set location preference
-```
-
----
-
-### `/clear` — Clear profile data
-
-Clear specific profile data (requires confirmation).
-
-```bash
-/clear profile           # Clear entire profile
-/clear goals             # Clear career goals
-```
-
----
-
-## Settings Commands
-
-### `/config` — Configuration
-
-View and modify application settings.
-
-```bash
-/config                  # Show current config
-/config set MODEL gpt-4  # Update setting
-```
-
----
-
-### `/model` — Switch LLM model
-
-Switch the LLM model being used.
-
-```bash
-/model                   # Show current model
-/model gpt-4             # Switch to GPT-4
-/model claude-3          # Switch to Claude 3
-/model list              # List available models
-```
-
----
-
-### `/setup` — Initial setup
-
-Run the setup wizard for first-time configuration.
+Run the interactive setup wizard. Prompts for LLM provider and API keys, writes `~/.fu7ur3pr00f/.env` with secure permissions (`0600`).
 
 ```bash
 /setup
 ```
 
-**Configures:**
-- LLM provider
-- API keys
-- Data directories
-- MCP clients
+**Triggered automatically** on first run if no provider is configured.
 
 ---
 
-## Knowledge Commands
+### `/gather` — Import career data
 
-### `/index` — Index data
-
-Manually index data to the knowledge base.
+Scan `~/.fu7ur3pr00f/data/raw/` for data files and index them to ChromaDB.
 
 ```bash
-/index file resume.md    # Index specific file
-/index directory ./docs  # Index directory
+/gather
+```
+
+**Sources scanned:**
+- `*.zip` → LinkedIn export
+- `*.pdf` containing "strength" → CliftonStrengths
+- `*.md`, `*.pdf`, `*.txt` → CV/resume
+- `PORTFOLIO_URL` in `.env` → portfolio website
+
+**See:** [Data Gathering Guide](gatherers.md)
+
+> **Note:** For granular per-source control (LinkedIn only, GitHub only, etc.), tell the agent in natural language: *"gather only my LinkedIn data"* or *"gather my GitHub profile"*.
+
+---
+
+### `/profile` — View your profile
+
+Display a summary of your stored career profile (name, role, skills, targets).
+
+```bash
+/profile
 ```
 
 ---
 
-### `/knowledge` — Knowledge management
+### `/goals` — View your career goals
 
-Alias for `/memory` commands.
+Display your stored career goals.
 
 ```bash
-/knowledge search Python
-/knowledge stats
-/knowledge clear
+/goals
 ```
 
 ---
 
-## Utility Commands
+### `/thread [name]` — Show or switch conversation thread
 
-### `/export` — Export data
-
-Export your data in various formats.
+Without an argument, shows the current thread ID. With an argument, switches to that thread (creating it if it doesn't exist).
 
 ```bash
-/export cv               # Export CV (same as /generate)
-/export profile          # Export profile as JSON
-/export knowledge        # Export knowledge base
+/thread           # Show current thread
+/thread work      # Switch to "work" thread
+/thread interview # Switch to "interview" thread
+```
+
+Threads let you maintain separate conversations (e.g., one for job search, one for CV work).
+
+---
+
+### `/threads` — List all conversation threads
+
+Show all threads that have stored conversation history.
+
+```bash
+/threads
+```
+
+Active thread is marked.
+
+---
+
+### `/memory` — Show memory and profile stats
+
+Display a summary: data directory, number of threads, profile status, and goal count.
+
+```bash
+/memory
+```
+
+> **Note:** `/memory` does not have subcommands for search or clear. Use natural language to interact with the knowledge base: *"search my knowledge base for Python projects"* or *"clear my career knowledge base"*.
+
+---
+
+### `/multi` — Multi-agent system
+
+Access the multi-agent system (Orchestrator + Specialist Agents).
+
+```bash
+/multi             # Show usage and agent list
+/multi agents      # List all specialist agents
+/multi test        # Test multi-agent connectivity
+```
+
+**Specialist agents:**
+- `Coach` — Career growth, leadership, promotions
+- `Learning` — Skill development, expertise building
+- `Jobs` — Job search, market fit, salary insights
+- `Code` — GitHub, GitLab, open source strategy
+- `Founder` — Startups, entrepreneurship, launch planning
+
+> The multi-agent system is an alternative to the default single-agent mode. Queries via `/multi` are routed by an orchestrator to the appropriate specialist.
+
+---
+
+### `/debug` — Toggle debug mode
+
+Toggle verbose logging to the terminal. When ON, shows LLM calls, tool execution, agent routing, and ChromaDB operations.
+
+```bash
+/debug
+```
+
+Full debug logs are always written to `~/.fu7ur3pr00f/data/fu7ur3pr00f.log` regardless of this setting.
+
+---
+
+### `/verbose` — Show system information
+
+Display current system state: data directory, LLM provider, active model, portfolio URL, MCP status, log level.
+
+```bash
+/verbose
 ```
 
 ---
 
-### `/import` — Import data
+### `/clear` — Clear conversation history
 
-Import data from external sources.
+Delete all stored messages for the current thread. Does not affect the knowledge base or profile.
 
 ```bash
-/import cv resume.pdf    # Import CV file
-/import linkedin export.zip  # Import LinkedIn export
+/clear
 ```
 
 ---
 
-### `/debug` — Debug mode
+### `/reset` — Factory reset
 
-Toggle debug logging.
+Delete all generated data (conversation history, profile, episodic memory, CV output, market cache). Preserves raw data files (`data/raw/`).
 
 ```bash
-/debug                   # Toggle debug mode
-/debug on                # Enable debug
-/debug off               # Disable debug
+/reset
 ```
 
+**Requires confirmation** (`y`/`yes`). After reset, the application exits — restart to start fresh.
+
+**Deleted:**
+- `~/.fu7ur3pr00f/memory.db` — conversation history
+- `~/.fu7ur3pr00f/profile.yaml` — user profile
+- `~/.fu7ur3pr00f/episodic/` — knowledge base and episodic memory
+- `~/.fu7ur3pr00f/data/fu7ur3pr00f.log` — log file
+- `~/.fu7ur3pr00f/data/output/` — generated CVs
+- `~/.fu7ur3pr00f/data/processed/` — processed data
+- `~/.fu7ur3pr00f/data/cache/` — market data cache
+
+**Preserved:** `~/.fu7ur3pr00f/data/raw/` (LinkedIn ZIPs, PDFs, CV files)
+
 ---
 
-## Keyboard Shortcuts
+### `/quit` or `/q` or `/exit` — Exit
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+C` | Cancel current operation |
-| `Ctrl+D` | Exit application |
-| `↑/↓` | Command history |
-| `Tab` | Autocomplete |
-| `Ctrl+R` | Search history |
-
----
-
-## Exit Commands
-
-### `/quit` — Exit application
+Exit the chat application. Conversation is saved automatically.
 
 ```bash
 /quit
+/q
 /exit
-Ctrl+D
 ```
+
+`Ctrl+D` (EOF) also exits cleanly.
 
 ---
 
@@ -304,94 +228,89 @@ Ctrl+D
 | Alias | Full Command |
 |-------|--------------|
 | `/h` | `/help` |
-| `/g` | `/gather` |
-| `/a` | `/analyze` |
-| `/s` | `/search` |
-| `/gen` | `/generate` |
-| `/m` | `/memory` |
 | `/q` | `/quit` |
 
 ---
 
-## Examples
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+C` | Cancel current input (keeps app running) |
+| `Ctrl+D` | Exit application (same as `/quit`) |
+| `↑` / `↓` | Navigate command history |
+
+Command history is persisted to `~/.fu7ur3pr00f/data/chat_history`.
+
+---
+
+## Workflows
 
 ### First-time setup
 
-```bash
-/setup                     # Configure LLM and settings
-/gather                    # Import all career data
-/analyze                   # Get initial analysis
+```
+/setup          → configure LLM provider
+/gather         → import career data from ~/.fu7ur3pr00f/data/raw/
+analyze my career profile and skill gaps
 ```
 
-### Job search workflow
+### Job search
 
-```bash
-/search python remote      # Find remote Python jobs
-/analyze market            # Check market fit
-/generate cv               # Generate targeted CV
+```
+search for remote senior Python backend jobs
+what is the market salary for a Staff Engineer in the US?
+generate my CV targeting senior backend roles
 ```
 
 ### Career planning
 
-```bash
-/get profile               # Review current profile
-/set target_role Staff Engineer  # Set goal
-/analyze skills            # Identify gaps
-/gather                    # Update data
-/analyze                   # Get recommendations
+```
+/profile                           → review current profile
+analyze my skill gaps for ML Engineer
+what steps should I take to become a Staff Engineer?
+/memory                            → check data availability
 ```
 
-### Knowledge management
+### Thread management
 
-```bash
-/knowledge stats           # Check indexed data
-/knowledge search AWS      # Find AWS-related info
-/knowledge search "system design"  # Multi-word search
 ```
-
----
-
-## Tips
-
-1. **Use Tab for autocomplete** — Type `/` and press Tab to see commands
-2. **Command history** — Use ↑/↓ to navigate previous commands
-3. **Partial matching** — `/mem` works for `/memory`
-4. **Quotes for multi-word** — `/search "machine learning"`
-5. **Combine commands** — Chain related commands in sequence
+/threads                           → see existing conversations
+/thread jobsearch                  → switch to job search thread
+search for remote Python jobs
+/thread cvwork                     → switch to CV thread
+generate my CV targeting fintech companies
+```
 
 ---
 
 ## Troubleshooting
 
-### Command not found
+### Command not recognized
 
-**Issue:** Unknown command
-
-**Solution:**
-- Check spelling
-- Use `/help` to see available commands
-- Ensure you're using `/` prefix
-
-### Command requires confirmation
-
-Some commands require `Y/n` confirmation:
-- `/knowledge clear`
-- `/clear profile`
-- CV generation (HITL)
-
-### Command timeout
-
-**Issue:** Command takes too long
+**Issue:** `Unknown command`
 
 **Solution:**
-- Check internet connection
-- Verify API keys are valid
-- Run with `--debug` for details
+- Use `/help` to see all available slash commands
+- Most features work via natural language — no slash command required
+
+### HITL confirmation prompt
+
+Some agent operations pause for human approval (`[Y/n]:`):
+- Full data gathering
+- CV generation
+- Clearing the knowledge base
+
+Press `Enter` or type `y` to approve, `n` to cancel.
+
+### Command takes too long
+
+Check internet and API key validity. Run `/debug` to see detailed logs. View logs at `~/.fu7ur3pr00f/data/fu7ur3pr00f.log`.
 
 ---
 
 ## See Also
 
-- [Configuration](configuration.md) — Settings reference
+- [Configuration](configuration.md) — Provider and key setup
+- [Data Gathering](gatherers.md) — What `/gather` imports
+- [CV Generation](cv_generation.md) — How CV generation works
 - [Troubleshooting](troubleshooting.md) — Common issues
-- [Architecture](architecture.md) — System design

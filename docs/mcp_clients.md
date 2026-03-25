@@ -19,6 +19,8 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 | Remotive | `remotive` | Job Search | ❌ |
 | Financial | `financial` | Financial Data | ❌ |
 
+**Availability defaults:** All clients without auth are enabled by default. GitHub and Tavily require tokens. JobSpy and HN can be disabled via env vars.
+
 ---
 
 ## Career Data Clients (1)
@@ -27,7 +29,9 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/github_client.py`  
 **Server Type:** `github`  
-**Auth:** `GITHUB_PERSONAL_ACCESS_TOKEN` in `.env`
+**Auth:** `GITHUB_PERSONAL_ACCESS_TOKEN` in `~/.fu7ur3pr00f/.env`
+
+Connects to the native `github-mcp-server` binary (bundled in the .deb package).
 
 | Tool | Description |
 |------|-------------|
@@ -47,7 +51,8 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/hn_client.py`  
 **Server Type:** `hn`  
-**Auth:** None (public API)
+**Auth:** None (Algolia public API)  
+**Config:** `HN_MCP_ENABLED=true` (default: enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -63,14 +68,14 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/tavily_client.py`  
 **Server Type:** `tavily`  
-**Auth:** `TAVILY_API_KEY` in `.env`
+**Auth:** `TAVILY_API_KEY` in `~/.fu7ur3pr00f/.env`
 
 | Tool | Description |
 |------|-------------|
 | `web_search` | General web search |
 | `search_salary` | Search salary data |
 
-**Free tier:** 1,000 queries/month
+**Free tier:** 1,000 queries/month, no credit card required
 
 ---
 
@@ -80,7 +85,8 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/jobspy_client.py`  
 **Server Type:** `jobspy`  
-**Auth:** None
+**Auth:** None  
+**Config:** `JOBSPY_ENABLED=true` (default: enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -93,7 +99,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/remoteok_client.py`  
 **Server Type:** `remoteok`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -103,7 +109,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/himalayas_client.py`  
 **Server Type:** `himalayas`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -114,7 +120,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/jobicy_client.py`  
 **Server Type:** `jobicy`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -124,7 +130,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/weworkremotely_client.py`  
 **Server Type:** `weworkremotely`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -134,7 +140,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/remotive_client.py`  
 **Server Type:** `remotive`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -148,7 +154,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/devto_client.py`  
 **Server Type:** `devto`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -160,7 +166,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/stackoverflow_client.py`  
 **Server Type:** `stackoverflow`  
-**Auth:** None (300 requests/day without key)
+**Auth:** None (300 requests/day without key; always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -177,7 +183,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/financial_client.py`  
 **Server Type:** `financial`  
-**Auth:** None
+**Auth:** None (always enabled)
 
 | Tool | Description |
 |------|-------------|
@@ -194,7 +200,7 @@ The career agent uses **12 MCP (Model Context Protocol) clients** to access real
 
 **File:** `mcp/factory.py`
 
-The `MCPClientFactory` creates and manages MCP clients:
+`MCPClientFactory` creates and manages MCP clients using a registry pattern (OCP-compliant — add new clients by updating the dict, not the factory logic):
 
 ```python
 from fu7ur3pr00f.mcp.factory import MCPClientFactory
@@ -212,7 +218,12 @@ if MCPClientFactory.is_available("github"):
 
 **File:** `mcp/pool.py`
 
-Manages persistent connections to avoid reconnect overhead:
+Manages persistent connections via a single background daemon thread running a persistent asyncio event loop:
+
+- Connected clients are cached by server type
+- Per-server `asyncio.Lock` serializes concurrent calls (required for stdio/session-based protocols like GitHub MCP)
+- Automatic reconnection on failure
+- `atexit` cleanup disconnects all clients on process exit
 
 ```python
 from fu7ur3pr00f.mcp.pool import call_mcp
@@ -225,10 +236,10 @@ result = await call_mcp("github", "get_profile", {})
 
 **File:** `mcp/base.py`
 
-- `MCPClient` - Abstract base class for all clients
-- `HTTPMCPClient` - Base for HTTP API clients
-- `MCPToolResult` - Standardized result type
-- `MCPConnectionError`, `MCPToolError` - Error types
+- `MCPClient` — Abstract base class for all clients
+- `HTTPMCPClient` (`mcp/http_client.py`) — Base for HTTP API clients
+- `MCPToolResult` — Standardized result type
+- `MCPConnectionError`, `MCPToolError` — Error types
 
 ---
 
@@ -256,16 +267,14 @@ class MyNewMCPClient(HTTPMCPClient):
 3. Add availability checker in `MCPClientFactory.AVAILABILITY_CHECKERS`:
 
 ```python
-"mynew": lambda: settings.has_mynew_mcp,
+"mynew": lambda: True,  # or lambda: settings.has_mynew_key
 ```
 
-4. Add server type to `MCPServerType` Literal
+4. Add `"mynew"` to the `MCPServerType` Literal in `factory.py`
 
 ---
 
 ## Configuration
-
-Enable/disable MCP clients in `~/.fu7ur3pr00f/.env`:
 
 ```bash
 # GitHub MCP (requires token)
@@ -274,12 +283,23 @@ GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 # Tavily MCP (requires token)
 TAVILY_API_KEY=...
 
-# HN MCP (no auth required)
-HN_MCP_ENABLED=true
+# Disable HN (enabled by default)
+HN_MCP_ENABLED=false
 
-# JobSpy (no auth required)
-JOBSPY_ENABLED=true
+# Disable JobSpy (enabled by default)
+JOBSPY_ENABLED=false
 ```
+
+Market data is cached to avoid redundant API calls:
+
+```bash
+MARKET_CACHE_HOURS=24      # Tech trends
+JOB_CACHE_HOURS=12         # Job postings
+CONTENT_CACHE_HOURS=12     # Dev.to / Stack Overflow
+FOREX_CACHE_HOURS=4        # Exchange rates
+```
+
+Cache is stored in `~/.fu7ur3pr00f/data/cache/market/`.
 
 ---
 

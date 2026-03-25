@@ -4,16 +4,15 @@ Generate ATS-optimized CVs in Markdown and PDF formats.
 
 ## Quick Start
 
-```bash
-fu7ur3pr00f
-/generate cv
+Tell the agent in natural language:
+
+```
+> generate my CV
+> generate a CV targeting Senior Python Developer roles
+> create an ATS-optimized CV for Staff Engineer at a tech company
 ```
 
-Or target a specific role:
-
-```bash
-/generate cv for Senior Python Developer position at tech company
-```
+The agent will ask for confirmation before generating (HITL). Press Enter or `y` to proceed.
 
 ---
 
@@ -30,7 +29,7 @@ FutureProof generates two formats:
 
 Generated files are saved to:
 ```
-data/output/
+~/.fu7ur3pr00f/data/output/
 ├── cv_en_ats.md      # Markdown version
 └── cv_en_ats.pdf     # PDF version
 ```
@@ -109,80 +108,82 @@ Results-driven software engineer with 5+ years of experience...
 
 ---
 
-## Generation Commands
+## Generation Requests
 
 ### Basic CV
 
-```bash
-/generate cv
+```
+> generate my CV
+> create my resume
 ```
 
-Generates CV using your current profile and target role.
+Generates CV using your current profile and indexed career data.
 
 ### Targeted CV
 
-```bash
-/generate cv for Staff Engineer position
-/generate cv targeting remote Python developer roles
-/generate cv for Google Senior Software Engineer position
+```
+> generate my CV for a Staff Engineer position
+> generate a CV targeting remote Python developer roles
+> create my CV for Google Senior Software Engineer
 ```
 
-Customizes CV for specific role or company.
+Customizes CV content for a specific role or company.
 
 ### Draft Mode
 
-```bash
-/generate cv draft
+```
+> generate a draft CV for me to review
 ```
 
-Generates a draft for review before finalizing.
+Generates a draft without final formatting.
 
 ---
 
-## Customization
+## Before Generating: Prepare Your Data
 
-### Before Generation
-
-Update your profile for better results:
+Better data → better CV. Run these before generating:
 
 ```bash
-# Set target role
-/set target_role Staff Software Engineer
+# 1. Index your career data
+/gather
 
-# Update skills
-/update skills Python, Kubernetes, AWS, Machine Learning
-
-# Update current role
-/update current_role Senior Software Engineer at Tech Corp
-
-# Set career goal
-/set goal Lead engineering team building distributed systems
+# 2. Tell the agent your targets (natural language)
+> my target role is Staff Software Engineer
+> I specialize in Python, Kubernetes, and distributed systems
+> my goal is to lead an engineering team building ML infrastructure
 ```
 
-### After Generation
+Or use the profile tools directly:
+
+```
+> update my target role to Staff Software Engineer
+> update my skills to Python, Kubernetes, AWS, PostgreSQL, Go
+> set my career goal to lead a backend infrastructure team
+```
+
+---
+
+## After Generating: Edit and Re-export
 
 Edit the Markdown file directly:
 
 ```bash
-# Edit generated CV
-nano data/output/cv_en_ats.md
-
-# Or with your editor
-$EDITOR data/output/cv_en_ats.md
+nano ~/.fu7ur3pr00f/data/output/cv_en_ats.md
+# or
+$EDITOR ~/.fu7ur3pr00f/data/output/cv_en_ats.md
 ```
 
-Then regenerate PDF:
+Then ask the agent to regenerate the PDF:
 
-```bash
-# Regenerate PDF from edited Markdown
-/generate cv from-file data/output/cv_en_ats.md
+```
+> regenerate the PDF from my edited CV file
 ```
 
 ---
 
 ## PDF Styling
 
-The PDF uses professional styling:
+The PDF uses professional styling via WeasyPrint:
 
 - **Font:** Georgia (serif, ATS-friendly)
 - **Size:** 11pt body, 24pt name
@@ -190,13 +191,9 @@ The PDF uses professional styling:
 - **Page:** A4 standard
 - **Colors:** Dark gray text, subtle accent colors
 
-### Requirements
-
-PDF generation requires:
-- `weasyprint` (Python package, included)
-- System dependencies (see below)
-
 ### System Dependencies
+
+PDF generation requires WeasyPrint system libraries:
 
 ```bash
 # Debian/Ubuntu
@@ -228,9 +225,9 @@ Applicant Tracking Systems scan and parse CVs before humans see them.
 ### Best Practices
 
 1. **Use standard job titles** — Avoid internal titles
-2. **Include keywords** — Match job description
+2. **Include keywords** — Match job description language
 3. **Quantify achievements** — Use numbers and percentages
-4. **Keep it concise** — 1-2 pages maximum
+4. **Keep it concise** — 1–2 pages maximum
 5. **Use full words** — "Bachelor" not "Bach."
 
 ---
@@ -239,7 +236,7 @@ Applicant Tracking Systems scan and parse CVs before humans see them.
 
 ### PDF generation fails
 
-**Error:** `WeasyPrint not available` or PDF missing
+**Error:** `WeasyPrint not available` or PDF not created
 
 **Solution:**
 ```bash
@@ -247,79 +244,51 @@ Applicant Tracking Systems scan and parse CVs before humans see them.
 sudo apt install libpango-1.0-0 libpangoft2-1.0-0 \
   libcairo2 libfontconfig1 libgdk-pixbuf-2.0-0
 
-# Reinstall weasyprint
-pip install weasyprint
+# Verify weasyprint
+python -c "import weasyprint; print(weasyprint.__version__)"
 ```
 
 ### CV content incomplete
 
-**Issue:** Missing sections or data
+**Issue:** Missing sections or thin content
 
 **Solution:**
-1. Ensure data is gathered: `/gather`
-2. Check knowledge base: `/knowledge stats`
-3. Update profile: `/get profile`
-
-### Formatting issues in PDF
-
-**Issue:** Weird spacing or broken layout
-
-**Solution:**
-1. Edit Markdown file to fix content
-2. Remove any custom formatting
-3. Regenerate PDF
+1. Gather all data first: `/gather`
+2. Ask agent: *"show me knowledge base statistics"*
+3. Tell the agent what's missing: *"I have 8 years of Python experience at X, Y, Z companies"*
 
 ### CV too long
 
-**Solution:**
-```bash
-# Generate with length constraint
-/generate cv keeping it to 2 pages maximum
+```
+> generate my CV keeping it to 2 pages maximum
+> create a concise 1-page CV for startup applications
 ```
 
-Or edit manually:
-- Remove older positions (10+ years)
-- Consolidate similar roles
-- Trim project descriptions
+Or edit `~/.fu7ur3pr00f/data/output/cv_en_ats.md` manually and remove older positions.
 
 ---
 
-## Examples
+## Examples by Seniority
 
 ### Entry-Level CV
 
 ```
-/generate cv for entry-level software engineer position
-
-# Emphasizes:
-- Education
-- Projects
-- Internships
-- Relevant coursework
+> generate a CV for an entry-level software engineer role
+> emphasize my projects, education, and internships
 ```
 
-### Senior CV
+### Senior/Staff CV
 
 ```
-/generate cv for Staff Engineer role
-
-# Emphasizes:
-- Leadership experience
-- Architecture decisions
-- Team mentoring
-- Technical impact
+> generate a CV for a Staff Engineer role at a large tech company
+> highlight leadership, architecture decisions, and team impact
 ```
 
 ### Career Change CV
 
 ```
-/generate cv transitioning from finance to software engineering
-
-# Emphasizes:
-- Transferable skills
-- Projects and bootcamps
-- Domain expertise
-- Technical skills
+> generate a CV for transitioning from finance to software engineering
+> emphasize my Python projects, bootcamp, and transferable analytical skills
 ```
 
 ---
@@ -329,14 +298,11 @@ Or edit manually:
 Track CV changes with Git:
 
 ```bash
-cd ~/Projects/fu7ur3pr00f/data/output
+cd ~/.fu7ur3pr00f/data/output
 
-# Initialize git (if not already)
 git init
-
-# Track CV
 git add cv_en_ats.md
-git commit -m "Update CV for Staff Engineer applications"
+git commit -m "CV for Staff Engineer applications — March 2025"
 ```
 
 ---

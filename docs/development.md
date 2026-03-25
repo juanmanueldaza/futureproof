@@ -19,48 +19,81 @@ ruff check . --fix  # Auto-fix
 # Type check
 pyright src/fu7ur3pr00f
 
-# Test
+# Tests
 pytest tests/ -q
 pytest tests/ -k test_name  # Specific test
+pytest tests/ --cov=src     # With coverage
+
+# Or use the test runner script
+python scripts/run_tests.py
 ```
 
 ## Project Structure
 
 ```
 src/fu7ur3pr00f/
-├── agents/           # Single agent, middleware, orchestrator, tools
+├── agents/           # Single agent, middleware, orchestrator, tools, specialists
+│   ├── career_agent.py       # Main agent (singleton, middleware stack)
+│   ├── middleware.py         # Dynamic prompt, synthesis, tool repair
+│   ├── orchestrator.py       # LangGraph Functional API (analyze/advise tasks)
+│   ├── multi_agent.py        # Multi-agent system (/multi command)
+│   ├── specialists/          # Specialist agents (Coach, Learning, Jobs, Code, Founder)
+│   ├── helpers/              # Pipeline, LLM invoker, result mapper
+│   └── tools/                # 41 tools by domain
 ├── chat/             # CLI client, HITL loop, Rich UI
-├── gatherers/        # LinkedIn, GitHub, GitLab, portfolio, CliftonStrengths
-├── generators/       # CV generation (Markdown + PDF)
+│   ├── client.py             # Chat loop, slash commands, streaming
+│   ├── ui.py                 # Rich panels, tool display, help
+│   └── setup.py              # First-run setup wizard
+├── gatherers/        # LinkedIn, CV, portfolio, CliftonStrengths, market
+│   ├── market/               # Market data gatherers (tech trends, jobs, content)
+│   └── portfolio/            # Portfolio scraper (fetcher, HTML/JS extractors)
+├── generators/       # CV generation (Markdown + PDF via WeasyPrint)
 ├── llm/              # Multi-provider fallback routing
-├── memory/           # ChromaDB RAG + episodic memory
-├── mcp/              # MCP clients (GitHub, Tavily, job boards)
-├── prompts/          # System + analysis + CV prompts
-├── services/         # Business logic layer
-└── utils/            # Security, logging, data loading
+├── memory/           # ChromaDB (episodic/) + SQLite (memory.db) checkpointer
+├── mcp/              # 12 MCP clients (GitHub, Tavily, job boards, financial)
+├── prompts/          # System + analysis + CV prompts (md/*.md)
+├── services/         # Business logic (gatherer, analysis, knowledge services)
+└── utils/            # Security, logging, console, data loading
 ```
 
 ## Adding a Tool
 
 1. Create tool function in `src/fu7ur3pr00f/agents/tools/<domain>.py`
-2. Register in `career_agent.py`
+2. Register in `tools/__init__.py` — both the import and the `_ALL_TOOLS` list
 3. Add tests in `tests/agents/tools/`
 
 ```python
 # Example tool
-def analyze_skill_gap(profile: str, target: str) -> str:
-    """Analyze skill gaps between profile and target role."""
-    ...
+from langchain.tools import tool
 
-# Register in career_agent.py
-tools.append(analyze_skill_gap)
+@tool
+def my_new_tool(param: str) -> str:
+    """Tool description for the LLM.
+    
+    Args:
+        param: Parameter description
+        
+    Returns:
+        Result description
+    """
+    ...
+```
+
+```python
+# In tools/__init__.py
+from .mymodule import my_new_tool
+
+_ALL_TOOLS = [
+    ...
+    my_new_tool,   # Add here
+]
 ```
 
 ## Adding a Gatherer
 
 1. Create gatherer in `src/fu7ur3pr00f/gatherers/`
-2. Return `Section` NamedTuple
-3. Index to ChromaDB
+2. Return `Section` NamedTuple(s)
+3. Index to ChromaDB via `KnowledgeService`
 4. Add tests
 
 ```python
@@ -68,9 +101,9 @@ from collections import namedtuple
 
 Section = namedtuple("Section", ["title", "content", "metadata"])
 
-def gather_linkedin() -> Section:
-    """Gather LinkedIn profile data."""
-    ...
+def gather_my_source(path) -> list[Section]:
+    """Gather data from my source."""
+    return [Section(title="My Data", content="...", metadata={})]
 ```
 
 ## Testing
@@ -84,7 +117,7 @@ def test_gatherer(mock_chromadb, mock_llm):
     ...
 ```
 
-**Mocking:** Mock external services:
+Mock external services:
 
 ```python
 from unittest.mock import patch
@@ -95,17 +128,16 @@ def test_portfolio_fetch(mock_get):
     ...
 ```
 
-**Running Tests:**
+### Running Tests
 
 ```bash
 pytest tests/ -q                    # All tests
 pytest tests/ -k "gather"           # By keyword
 pytest tests/ --cov=src             # With coverage
+python scripts/run_tests.py         # Via test runner script
 ```
 
-### Integration Tests
-
-**Fresh Install Connectivity Check:**
+### Integration Tests: Fresh Install Check
 
 Validate a clean pipx install plus MCP/LLM connectivity:
 
@@ -124,7 +156,7 @@ This script:
 - Tests MCP client connectivity
 - Cleans up afterward
 
-**Apt Package Validation (Docker):**
+### Apt Package Validation (Docker)
 
 Test .deb package installs/uninstalls cleanly:
 
@@ -144,11 +176,9 @@ Verifies: install → version → reinstall → remove → purge → clean
 
 ### Vagrant Testing
 
-Use Vagrant for isolated testing of the apt installation path without risking your host OS.
+Use Vagrant for isolated testing of the apt installation path.
 
-**Requirements:**
-- Vagrant
-- VirtualBox (or another provider)
+**Requirements:** Vagrant + VirtualBox (or another provider)
 
 **Available Boxes:**
 
@@ -156,8 +186,6 @@ Use Vagrant for isolated testing of the apt installation path without risking yo
 |-----|-------------|
 | `ubuntu2404` | Ubuntu 24.04 LTS |
 | `debian12` | Debian 12 (Bookworm) |
-
-**Running Tests:**
 
 ```bash
 # Test Ubuntu 24.04
@@ -173,14 +201,12 @@ scripts/run_vagrant_apt_smoke.sh all
 scripts/run_vagrant_apt_smoke.sh debian12 --keep
 ```
 
-**What the Script Does:**
+**Multi-agent Vagrant test:**
+```bash
+scripts/vagrant_test_multi.sh
+```
 
-1. Boots a disposable VM from `vagrant/Vagrantfile`
-2. Adds the public apt repository
-3. Runs `install`, `reinstall`, `remove`, and `purge` for `fu7ur3pr00f`
-4. Destroys the VM after the run (unless `--keep` is used)
-
-**Manual Vagrant Usage:**
+**Manual Vagrant usage:**
 
 ```bash
 cd vagrant
@@ -195,33 +221,57 @@ vagrant destroy -f ubuntu2404 debian12
 
 **Development VM:**
 
-For interactive development in a VM:
-
 ```bash
 scripts/vagrant_dev_setup.sh setup   # Copy data/.env and start VM
 scripts/vagrant_dev_setup.sh ssh     # SSH into VM
 scripts/vagrant_dev_setup.sh destroy # Clean up
 ```
 
-See [vagrant/README.md](../vagrant/README.md) for details.
+See `vagrant/README.md` for details.
 
 ## Debugging
 
 ```bash
-fu7ur3pr00f --debug  # Verbose logging
+fu7ur3pr00f --debug  # Verbose logging to terminal
 ```
+
+Or toggle inside chat with `/debug`.
+
+Full logs always at `~/.fu7ur3pr00f/data/fu7ur3pr00f.log`.
+
+## Pre-commit Hooks
+
+```bash
+# Set up pre-commit hooks
+scripts/setup_precommit.sh
+
+# Or manually
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+The `.pre-commit-config.yaml` runs ruff lint and format checks.
 
 ## Cleaning Up
 
 ```bash
-# Remove build artifacts
+# Remove build artifacts (__pycache__, dist/, data/cache/)
 scripts/clean_dev_artifacts.sh
 ```
 
 See [Scripts Reference](scripts.md) for all available scripts.
 
+## Key Environment Files
+
+| File | Purpose |
+|------|---------|
+| `.env` | Local development settings (gitignored) |
+| `.env.example` | Template with all available options |
+| `~/.fu7ur3pr00f/.env` | User-level settings (written by `/setup`) |
+
 ## See Also
 
-- [Contributing](../CONTRIBUTING.md)
 - [Architecture](architecture.md)
+- [Scripts Reference](scripts.md)
 - [QWEN.md](../QWEN.md)

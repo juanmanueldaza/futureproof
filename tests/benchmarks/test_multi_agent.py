@@ -25,7 +25,7 @@ async def test_routing_latency():
     assert system.orchestrator is not None
     start = time.perf_counter()
     for query in TEST_QUERIES:
-        route = system.orchestrator._route_query(query)
+        route = system.orchestrator._route(query)
         assert route in ["coach", "learning", "jobs", "code", "founder"]
     elapsed = time.perf_counter() - start
     assert elapsed < 0.01, f"Routing took {elapsed * 1000:.2f}ms"
@@ -50,8 +50,8 @@ async def test_concurrent_routing():
 
     assert system.orchestrator is not None
 
-    async def route(q):
-        return system.orchestrator._route_query(q)  # type: ignore[union-attr]
+    async def route(q: str) -> str:
+        return system.orchestrator._route(q)  # type: ignore[union-attr]
 
     start = time.perf_counter()
     tasks = [route(q) for q in TEST_QUERIES * 10]
@@ -76,9 +76,7 @@ async def test_routing_accuracy():
 
     assert system.orchestrator is not None
     correct = sum(
-        1
-        for query, expected in cases
-        if system.orchestrator._route_query(query) == expected
+        1 for query, expected in cases if system.orchestrator._route(query) == expected
     )
 
     accuracy = correct / len(cases)

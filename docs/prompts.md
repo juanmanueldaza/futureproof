@@ -6,18 +6,18 @@ How FutureProof uses prompts to guide LLM responses.
 
 ## Overview
 
-FutureProof uses a modular prompt system:
+FutureProof uses a modular prompt system. Prompts are Markdown files in `src/fu7ur3pr00f/prompts/md/`, loaded at runtime by `prompts/loader.py`.
 
-| Prompt | Purpose |
-|--------|---------|
-| `system.md` | Main system prompt (always active) |
+| Prompt File | Purpose |
+|-------------|---------|
+| `system.md` | Main system prompt (injected on every model call) |
 | `analyze_career.md` | Career alignment analysis |
 | `analyze_gaps.md` | Skill gap analysis |
 | `generate_cv.md` | CV generation |
 | `market_fit.md` | Market fit analysis |
 | `market_skill_gap.md` | Market skill gaps |
 | `strategic_advice.md` | Strategic career advice |
-| `synthesis.md` | Response synthesis |
+| `synthesis.md` | Response synthesis (used by `AnalysisSynthesisMiddleware`) |
 | `trending_skills.md` | Tech trends analysis |
 
 ---
@@ -34,32 +34,17 @@ The system prompt defines:
 - Knowledge base sources
 - Human-in-the-loop rules
 
-### Key Sections
-
-```markdown
-## About FutureProof
-You are FutureProof, a career intelligence assistant...
-
-## User Profile
-<user_data>
-{user_profile}
-</user_data>
-
-## Critical Behaviors
-1. Data fidelity: Use only data from knowledge base
-2. Search before claiming: Always search first
-3. Complete multi-step requests
-4. Auto-index after gathering
-...
-```
-
 ### Dynamic Injection
 
-The following are injected at runtime:
-- `{user_profile}` — Current user profile
-- `{career_data}` — Indexed career data
-- `{market_data}` — Market intelligence
-- `{tool_results}` — Tool execution results
+The system prompt is regenerated on every model call via `build_dynamic_prompt` middleware. It uses a 5-second TTL cache to avoid repeated disk I/O and ChromaDB queries across the 3–5 model calls per user message.
+
+At runtime, the following is injected:
+- `{user_profile}` — Current user profile (from `~/.fu7ur3pr00f/profile.yaml`), PII-anonymized
+- Live knowledge base stats — Appended as a "Data Availability (live)" section showing source → chunk counts
+
+If the profile is empty but the knowledge base has data, `build_dynamic_prompt` will auto-populate the profile from indexed career data.
+
+**Security:** Profile content is passed through `anonymize_career_data()` and `sanitize_for_prompt()` before injection to prevent PII leakage and XML boundary injection.
 
 ---
 
@@ -69,16 +54,8 @@ The following are injected at runtime:
 
 Analyzes how well current career aligns with goals.
 
-**Used by:** `analyze_career_alignment` tool
-
-**Template:**
-```markdown
-Analyze career alignment considering:
-1. Current role vs target role
-2. Skills vs requirements
-3. Industry trends
-4. Growth opportunities
-```
+**Used by:** `analyze_career_alignment` tool  
+**Orchestrator action:** `analyze_full`
 
 ### Skill Gaps (`analyze_gaps.md`)
 
@@ -86,26 +63,19 @@ Identifies skill gaps between current and target role.
 
 **Used by:** `analyze_skill_gaps` tool
 
-**Template:**
-```markdown
-Compare current skills to target role requirements:
-1. Missing skills
-2. Skills to strengthen
-3. Learning resources
-4. Timeline estimates
-```
-
 ### Market Fit (`market_fit.md`)
 
 Analyzes market fit for target roles.
 
-**Used by:** `analyze_market_fit` tool
+**Used by:** `analyze_market_fit` tool  
+**Orchestrator action:** `analyze_market_fit`
 
 ### Market Skill Gap (`market_skill_gap.md`)
 
 Identifies in-demand skills for target market.
 
-**Used by:** `analyze_market_skills` tool
+**Used by:** `analyze_market_skills` tool  
+**Orchestrator action:** `analyze_skills`
 
 ---
 
@@ -113,30 +83,16 @@ Identifies in-demand skills for target market.
 
 ### CV Generation (`generate_cv.md`)
 
-Generates ATS-optimized CV.
+Generates ATS-optimized CV content from indexed career data.
 
 **Used by:** `generate_cv` tool
 
-**Key requirements:**
-- ATS-friendly formatting
-- Keyword optimization
+**Key requirements enforced:**
+- ATS-friendly formatting (no tables, no graphics)
+- Standard section headings
 - Quantified achievements
 - Reverse chronological order
-
-**Template:**
-```markdown
-Generate an ATS-optimized CV with:
-1. Contact information
-2. Professional summary
-3. Experience (reverse chronological)
-4. Education
-5. Skills
-6. Certifications
-7. Projects
-
-Use data from: {career_data}
-Target role: {target_role}
-```
+- Keyword density matching target role
 
 ---
 
@@ -144,17 +100,16 @@ Target role: {target_role}
 
 **File:** `prompts/md/synthesis.md`
 
-Used by `AnalysisSynthesisMiddleware` to replace generic LLM responses with focused synthesis.
+Used by `AnalysisSynthesisMiddleware` to generate the final response when analysis tools have been called.
 
-**Purpose:**
-- GPT-4o tends to genericize responses
-- Synthesis prompt forces specific, data-backed insights
-- Uses reasoning models (o4-mini, etc.)
+**Why this exists:** GPT-4o tends to genericize analysis tool results when writing its final response. The synthesis middleware:
 
-**Flow:**
-```
-Agent → Tool execution → Generic response → Middleware → Synthesis → Final response
-```
+1. **Pass 1 (before model):** Replaces analysis tool messages with a short `[Detailed analysis was displayed directly to the user...]` marker. The agent model cannot see or rewrite the actual results.
+2. **Pass 2 (after model):** If the agent's final response (no tool calls remaining) was produced with masked analysis data, it is **discarded** and replaced with a fresh synthesis call using a reasoning model (e.g., `o4-mini`) that sees the actual tool data.
+
+The synthesis prompt receives:
+- `{user_question}` — The original user message
+- `{tool_results}` — All analysis + other tool results from the current turn (PII-anonymized)
 
 ---
 
@@ -164,17 +119,8 @@ Agent → Tool execution → Generic response → Middleware → Synthesis → F
 
 Generates long-term career strategy.
 
-**Used by:** `get_career_advice` tool
-
-**Template:**
-```markdown
-Provide strategic career advice:
-1. Short-term actions (0-6 months)
-2. Medium-term goals (6-18 months)
-3. Long-term vision (18+ months)
-4. Risk mitigation
-5. Success metrics
-```
+**Used by:** `get_career_advice` tool  
+**Orchestrator action:** `advise`
 
 ---
 
@@ -182,15 +128,11 @@ Provide strategic career advice:
 
 **File:** `prompts/md/trending_skills.md`
 
-Analyzes technology trends.
+Analyzes technology trends from multiple sources.
 
 **Used by:** `get_tech_trends` tool
 
-**Sources:**
-- Hacker News "Who's Hiring"
-- Job postings
-- Stack Overflow trends
-- Dev.to articles
+**Sources:** Hacker News "Who's Hiring", job postings, Stack Overflow trends, Dev.to articles
 
 ---
 
@@ -206,9 +148,7 @@ cv_prompt = load_prompt("generate_cv")
 
 # Get builder for dynamic prompts
 builder = get_prompt_builder()
-builder.set_user_profile(profile)
-builder.set_career_data(data)
-prompt = builder.build()
+prompt = builder.build_analysis_prompt("analyze_full", career_data)
 ```
 
 ### Lazy Loading
@@ -216,10 +156,10 @@ prompt = builder.build()
 Prompts are loaded lazily from `prompts/md/*.md`:
 
 ```python
-from fu7ur3pr00f.prompts import GENERATE_CV_PROMPT
+from fu7ur3pr00f.prompts.loader import load_prompt
 
-# Loads generate_cv.md on first access
-print(GENERATE_CV_PROMPT)
+# Loads generate_cv.md on first access, caches thereafter
+text = load_prompt("generate_cv")
 ```
 
 ---
@@ -228,53 +168,38 @@ print(GENERATE_CV_PROMPT)
 
 ### Modify Existing Prompts
 
-Edit files in `src/fu7ur3pr00f/prompts/md/`:
+Edit files directly in `src/fu7ur3pr00f/prompts/md/`:
 
 ```bash
-# Edit CV generation prompt
 nano src/fu7ur3pr00f/prompts/md/generate_cv.md
 ```
+
+Changes take effect on the next model call (subject to the 5-second system prompt TTL cache for `system.md`; other prompts are loaded fresh each call).
 
 ### Add New Prompts
 
 1. Create `prompts/md/my_prompt.md`
-2. Add to `prompts/__init__.py`:
+2. Load via:
    ```python
-   _PROMPT_MAP["MY_PROMPT"] = "my_prompt"
+   from fu7ur3pr00f.prompts.loader import load_prompt
+   text = load_prompt("my_prompt")
    ```
-3. Access via:
-   ```python
-   from fu7ur3pr00f.prompts import MY_PROMPT
-   ```
-
-### Dynamic Prompt Building
-
-```python
-from fu7ur3pr00f.prompts.builders import get_prompt_builder
-
-builder = get_prompt_builder()
-builder.set_user_profile(profile)
-builder.set_career_data(data)
-builder.set_target_role("Senior Engineer")
-prompt = builder.build("analyze_gaps")
-```
+3. Register in `prompts/__init__.py` if you need it accessible as a named export
 
 ---
 
 ## Prompt Variables
 
-Available variables for injection:
+Variables available for injection (via `str.format()` in code):
 
-| Variable | Description |
-|----------|-------------|
-| `{user_profile}` | Current user profile |
-| `{career_data}` | Indexed career data |
-| `{market_data}` | Market intelligence |
-| `{target_role}` | Target job title |
-| `{skills}` | User skills |
-| `{experience}` | Work experience |
-| `{education}` | Education history |
-| `{tool_results}` | Tool execution results |
+| Variable | Description | Used In |
+|----------|-------------|---------|
+| `{user_profile}` | Current user profile (PII-anonymized) | `system.md` |
+| `{target_role}` | Target job title | `analyze_gaps.md`, `generate_cv.md` |
+| `{career_data}` | Indexed career data chunks | `generate_cv.md`, analysis prompts |
+| `{market_context}` | Market intelligence data | `market_fit.md`, `market_skill_gap.md` |
+| `{user_question}` | Original user message | `synthesis.md` |
+| `{tool_results}` | Tool execution results | `synthesis.md` |
 
 ---
 
@@ -282,56 +207,50 @@ Available variables for injection:
 
 ### Writing Prompts
 
-1. **Be specific** — Clear instructions
-2. **Use examples** — Show expected output format
-3. **Set constraints** — Length, style, tone
-4. **Inject data** — Use `{variables}` for dynamic content
-5. **Test iteratively** — Refine based on outputs
+1. **Be specific** — Clear, unambiguous instructions
+2. **Specify output format** — Markdown sections, lists, tables
+3. **Set constraints** — Length, tone, what NOT to do
+4. **Use variables sparingly** — Only inject data that changes per call
 
-### Prompt Engineering
+### Prompt Engineering Notes
 
-1. **Chain of thought** — Ask model to reason step-by-step
-2. **Few-shot learning** — Provide examples
-3. **Role prompting** — "You are an expert career advisor"
-4. **Output formatting** — Specify Markdown, JSON, etc.
-5. **Temperature tuning** — Lower for consistency, higher for creativity
+- **Analysis prompts** are used by tools, not the main system prompt — changes here affect specific tool outputs
+- **Synthesis prompt** is critical: it controls what the user sees as the final response after analysis tools run. Tune this if synthesis feels off.
+- **System prompt** controls the agent's general behavior. Avoid making it too long — it's injected on every model call and contributes to token cost.
 
 ---
 
 ## Troubleshooting
 
-### Prompt not loading
+### Prompt not found
 
-**Error:** `AttributeError: module has no attribute 'MY_PROMPT'`
+**Error:** `FileNotFoundError: No such file: prompts/md/my_prompt.md`
 
 **Solution:**
-1. Check file exists: `prompts/md/my_prompt.md`
-2. Add to `_PROMPT_MAP` in `prompts/__init__.py`
-3. Restart application
+1. Check file exists: `ls src/fu7ur3pr00f/prompts/md/`
+2. Use exact filename without `.md` extension in `load_prompt()`
 
 ### Variables not injected
 
 **Issue:** `{variable}` appears literally in output
 
 **Solution:**
-1. Use `get_prompt_builder()` for dynamic prompts
-2. Call `builder.set_<variable>()` for each variable
-3. Call `builder.build()` to finalize
+1. Call `str.format(variable=value)` after loading the prompt
+2. Use `get_prompt_builder()` for complex cases with multiple variables
 
-### Generic responses
+### Generic responses despite analysis tools
 
-**Issue:** LLM gives generic advice
+**Issue:** Agent rewrites analysis results into generic advice
 
 **Solution:**
-1. Check `AnalysisSynthesisMiddleware` is active
-2. Use reasoning model for synthesis
-3. Add more specific instructions to prompt
-4. Inject more data context
+1. Check `AnalysisSynthesisMiddleware` is in the middleware list in `career_agent.py`
+2. Verify the synthesis prompt (`synthesis.md`) is specific enough
+3. Confirm a reasoning model is configured for synthesis (`SYNTHESIS_MODEL=o4-mini`)
 
 ---
 
 ## See Also
 
-- [Architecture](architecture.md) — System design
-- [Tools Reference](tools.md) — Tool documentation
+- [Architecture](architecture.md) — Middleware and synthesis design
+- [Tools Reference](tools.md) — Which tools use which prompts
 - [CV Generation](cv_generation.md) — CV prompt details
