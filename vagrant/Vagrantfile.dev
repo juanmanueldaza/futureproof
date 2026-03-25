@@ -143,6 +143,116 @@ Vagrant.configure("2") do |config|
       log "GitHub MCP server already installed"
     fi
 
+    log "=== Auto-gathering career data ==="
+    RAW_DIR="/home/vagrant/.fu7ur3pr00f/data/raw"
+    mkdir -p "${RAW_DIR}"
+
+    # Count data files
+    ZIP_COUNT=$(find "${RAW_DIR}" -maxdepth 1 -name "*.zip" 2>/dev/null | wc -l)
+    PDF_COUNT=$(find "${RAW_DIR}" -maxdepth 1 -name "*.pdf" 2>/dev/null | wc -l)
+    MD_COUNT=$(find "${RAW_DIR}"  -maxdepth 1 -name "*.md"  2>/dev/null | wc -l)
+    TXT_COUNT=$(find "${RAW_DIR}" -maxdepth 1 -name "*.txt" 2>/dev/null | wc -l)
+    TOTAL_FILES=$(( ZIP_COUNT + PDF_COUNT + MD_COUNT + TXT_COUNT ))
+
+    log "Data files found in ${RAW_DIR}:"
+    log "  - ZIP (LinkedIn exports): ${ZIP_COUNT}"
+    log "  - PDF (CliftonStrengths/CV): ${PDF_COUNT}"
+    log "  - Markdown (CV): ${MD_COUNT}"
+    log "  - Text (CV): ${TXT_COUNT}"
+    log "  - Total: ${TOTAL_FILES}"
+
+    if [ "${TOTAL_FILES}" -gt 0 ]; then
+      log "Running gather — this may take a minute..."
+      cd /workspace
+      .venv/bin/python - <<'PYEOF' 2>&1 | tee -a "${LOG_FILE}"
+import logging
+import sys
+
+# Stream INFO to stdout so Vagrant captures it in the provision log
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
+logger = logging.getLogger("gather")
+logger.info("Starting GathererService...")
+
+try:
+    from fu7ur3pr00f.services.gatherer_service import GathererService
+
+    service = GathererService()
+    logger.info("GathererService created — starting gather_all()...")
+
+    sections = service.gather_all()
+
+    by_source: dict[str, int] = {}
+    for s in sections:
+        src = getattr(s, "source", getattr(s, "name", "unknown"))
+        by_source[src] = by_source.get(src, 0) + 1
+
+    logger.info("Gather complete — %d sections indexed", len(sections))
+    for src, count in sorted(by_source.items()):
+        logger.info("  %-30s %d chunks", src, count)
+
+    sys.exit(0)
+except ImportError as exc:
+    logger.warning("GathererService import failed (%s), trying direct gatherers...", exc)
+
+    from pathlib import Path
+
+    from fu7ur3pr00f.gatherers.cliftonstrengths import CliftonStrengthsGatherer
+    from fu7ur3pr00f.gatherers.cv import CVGatherer
+    from fu7ur3pr00f.gatherers.linkedin import LinkedInGatherer
+
+    data_dir = Path("/home/vagrant/.fu7ur3pr00f/data/raw")
+    total = 0
+
+    for zip_file in data_dir.glob("*.zip"):
+        logger.info("LinkedIn: processing %s", zip_file.name)
+        sections = LinkedInGatherer().gather(zip_file)
+        total += len(sections)
+        logger.info("LinkedIn: %d sections indexed", len(sections))
+
+    pdf_strength_files = [
+        f for f in data_dir.glob("*.pdf")
+        if any(kw in f.name.lower() for kw in
+               ("strength", "gallup", "clifton", "top_5", "top_10", "all_34"))
+    ]
+    if pdf_strength_files:
+        logger.info("CliftonStrengths: processing %d PDF(s)...", len(pdf_strength_files))
+        sections = CliftonStrengthsGatherer().gather(data_dir)
+        total += len(sections)
+        logger.info("CliftonStrengths: %d sections indexed", len(sections))
+
+    for cv_file in list(data_dir.glob("*.md")) + list(data_dir.glob("*.txt")):
+        logger.info("CV: processing %s", cv_file.name)
+        try:
+            sections = CVGatherer().gather(cv_file)
+            total += len(sections)
+            logger.info("CV: %d sections indexed from %s", len(sections), cv_file.name)
+        except Exception as err:
+            logger.warning("CV: skipping %s — %s", cv_file.name, err)
+
+    logger.info("Direct gather complete — %d sections total", total)
+    sys.exit(0)
+except Exception as exc:
+    logger.error("Gather failed: %s", exc, exc_info=True)
+    sys.exit(1)
+PYEOF
+
+      if [ $? -eq 0 ]; then
+        log "Gather completed successfully."
+      else
+        log "WARNING: Gather encountered errors — check the log above."
+        log "You can re-run inside the VM with: cd /workspace && source .venv/bin/activate && fu7ur3pr00f (then /gather)"
+      fi
+    else
+      log "No data files found — skipping gather."
+      log "To gather later, place files in ${RAW_DIR} and run /gather in the chat."
+    fi
+
     log "=== Provision complete ==="
     log ""
     log "To start the FutureProof chat:"
@@ -150,7 +260,7 @@ Vagrant.configure("2") do |config|
     log "  source .venv/bin/activate"
     log "  fu7ur3pr00f"
     log ""
-    log "Your data is at: /workspace/data/raw"
+    log "Your data is at: ${RAW_DIR}"
     log "Your config is at: /home/vagrant/.fu7ur3pr00f/.env"
     log "Provision log saved to: ${LOG_FILE}"
   SHELL

@@ -120,6 +120,51 @@ def _build_prompt_uncached() -> str:
     return base + data_section
 
 
+def _get_base_prompt() -> str:
+    """Get the base system prompt, using the shared TTL cache.
+
+    Shared across all specialist dynamic prompts so the expensive
+    profile + ChromaDB stats lookup is only done once per 5s window
+    regardless of how many specialists are active.
+    """
+    global _prompt_cache, _prompt_cache_time
+
+    now = time.monotonic()
+    with _prompt_cache_lock:
+        if _prompt_cache is not None and (now - _prompt_cache_time) < _PROMPT_TTL:
+            return _prompt_cache
+
+    result = _build_prompt_uncached()
+
+    with _prompt_cache_lock:
+        _prompt_cache = result
+        _prompt_cache_time = time.monotonic()
+
+    return result
+
+
+def make_specialist_prompt(specialist_addendum: str):
+    """Create a dynamic_prompt middleware for a specialist agent.
+
+    Uses the shared base prompt cache (profile + KB stats) and appends
+    the specialist's focused system instructions on each call.
+
+    Args:
+        specialist_addendum: Specialist persona and instructions to append
+            after the base system prompt.
+
+    Returns:
+        A @dynamic_prompt middleware function for use in create_agent().
+    """
+
+    @dynamic_prompt
+    def _specialist_prompt(request: ModelRequest) -> str:  # noqa: ARG001
+        base = _get_base_prompt()
+        return base + f"\n\n## Your Specialist Role\n{specialist_addendum}"
+
+    return _specialist_prompt
+
+
 def _invalidate_prompt_cache() -> None:
     """Clear the dynamic prompt TTL cache. For tests."""
     global _prompt_cache

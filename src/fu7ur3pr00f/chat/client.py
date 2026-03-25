@@ -4,7 +4,6 @@ Combines prompt-toolkit for input handling with Rich for output display.
 Provides both sync and async chat loops for different use cases.
 """
 
-import asyncio
 import logging
 import re
 import time
@@ -22,14 +21,11 @@ from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 
-from fu7ur3pr00f.agents.career_agent import (
-    create_career_agent,
+from fu7ur3pr00f.agents.specialists.orchestrator import (
     get_agent_config,
-    get_agent_model_name,
-    reset_career_agent,
+    get_orchestrator,
+    reset_orchestrator,
 )
-from fu7ur3pr00f.agents.multi_agent import handle_query as handle_multi_agent_query
-from fu7ur3pr00f.agents.multi_agent import list_agents as list_multi_agents
 from fu7ur3pr00f.chat.ui import (
     console,
     display_error,
@@ -422,45 +418,16 @@ def handle_command(  # noqa: C901 TODO: refactor
             console.print(f"[dim]{traceback.format_exc()}[/dim]\n")
         return False
 
-    if cmd == "/multi":
-        # Multi-agent system command
-        if arg == "agents":
-            # List available specialist agents
-            try:
-                agents = asyncio.run(list_multi_agents())
-                console.print("[bold #5bc0be]Specialist Agents[/bold #5bc0be]\n")
-                for agent in agents:
-                    agent_line = (
-                        f"  [bold #ffd700]{agent['name']}[/bold #ffd700]: "
-                        f"{agent['description']}"
-                    )
-                    console.print(agent_line)
-                console.print()
-            except Exception as e:
-                display_error(f"Failed to list agents: {e}")
-        elif arg == "test":
-            # Test multi-agent system
-            console.print("[bold #5bc0be]Testing multi-agent system...[/bold #5bc0be]")
-            try:
-                response = asyncio.run(
-                    handle_multi_agent_query("What agents are available?")
-                )
-                console.print("[#10b981]Multi-agent system is working![/#10b981]")
-                console.print(f"Response preview: {response[:200]}...")
-            except Exception as e:
-                display_error(f"Multi-agent test failed: {e}")
-        else:
-            console.print("[bold #5bc0be]Multi-Agent System[/bold #5bc0be]\n")
-            console.print("Usage: /multi [command]\n")
-            console.print("Commands:")
-            console.print("  /multi agents  - List available specialist agents")
-            console.print("  /multi test    - Test multi-agent system\n")
-            console.print("The multi-agent system provides specialized agents for:")
-            console.print("  - Career growth (Coach)")
-            console.print("  - Skill development (Learning)")
-            console.print("  - Job search (Jobs)")
-            console.print("  - Code projects (Code)")
-            console.print("  - Startups (Founder)\n")
+    if cmd == "/agents":
+        # List available specialist agents
+        orchestrator = get_orchestrator()
+        agents = orchestrator.list_agents()
+        console.print("[bold #5bc0be]Specialist Agents[/bold #5bc0be]\n")
+        for a in agents:
+            console.print(
+                f"  [bold #ffd700]{a['name']}[/bold #ffd700]: {a['description']}"
+            )
+        console.print()
         return False
 
     if cmd == "/debug":
@@ -484,10 +451,11 @@ def handle_command(  # noqa: C901 TODO: refactor
         # Show detailed system info
         from fu7ur3pr00f.memory.checkpointer import get_data_dir
 
+        model_name = get_orchestrator().get_model_name() or "unknown"
         console.print("[bold #5bc0be]System Information[/bold #5bc0be]\n")
         console.print(f"Data directory: {get_data_dir()}")
         console.print(f"LLM Provider: {settings.llm_provider or 'auto-detect'}")
-        console.print(f"Model: {get_agent_model_name()}")
+        console.print(f"Model: {model_name}")
         console.print(f"Portfolio URL: {settings.portfolio_url or 'Not configured'}")
         console.print(
             f"GitHub MCP: {'Enabled' if settings.has_github_mcp else 'Disabled'}"
@@ -774,12 +742,12 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
 
         run_setup(console, first_run=True)
 
-    # Create agent
+    # Initialise the orchestrator and display which model is active
     try:
-        agent = create_career_agent()
+        orchestrator = get_orchestrator()
         config = get_agent_config(thread_id=thread_id)
 
-        model_name = get_agent_model_name()
+        model_name = orchestrator.get_model_name()
         if model_name:
             display_model_info(model_name)
     except Exception as e:
@@ -794,7 +762,7 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
 
             run_setup(console, first_run=True)
             try:
-                agent = create_career_agent()
+                orchestrator = get_orchestrator()
                 config = get_agent_config(thread_id=thread_id)
             except Exception as retry_err:
                 display_error(_sanitize_error(f"Still failing: {retry_err}"))
@@ -829,9 +797,9 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
 
                     changed = run_setup(console)
                     if changed:
-                        reset_career_agent()
-                        agent = create_career_agent()
-                        model_name = get_agent_model_name()
+                        reset_orchestrator()
+                        orchestrator = get_orchestrator()
+                        model_name = orchestrator.get_model_name()
                         if model_name:
                             display_model_info(model_name)
                     continue
@@ -841,27 +809,31 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
                 config = chat_state["config"]
                 continue
 
-            # Send to agent and stream response
+            # Route to the right specialist, then stream its compiled agent
             console.print()  # Blank line before response
+
+            specialist_name = orchestrator.route(user_input)
+            agent = orchestrator.get_compiled_agent(specialist_name)
+            specialist = orchestrator.get_specialist(specialist_name)
+            console.print(
+                f"[dim][ {specialist_name.upper()} ] {specialist.description}[/dim]"
+            )
 
             input_message = _make_input(user_input)
 
-            # Collect full response for markdown rendering
             full_response = ""
-            shown_tools: set[str] = set()  # Track which tools we've shown
+            shown_tools: set[str] = set()
 
-            # Retry loop for automatic fallback on rate limits
-            max_retries = 8  # Support full fallback chain
+            # Retry loop for automatic fallback on rate limits / tool state errors
+            max_retries = 8
             for attempt in range(max_retries):
                 try:
                     full_response, shown_tools = _stream_response(
                         agent, input_message, config, console, session
                     )
-                    break  # Success, exit retry loop
+                    break
 
                 except Exception as e:
-                    # Tool call state error: retry with same model — the
-                    # ToolCallRepairMiddleware will fix state on next attempt
                     if _is_tool_call_state_error(e) and attempt < max_retries - 1:
                         logger.warning(
                             "Tool state error (attempt %d/%d), retrying",
@@ -874,10 +846,8 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
                         )
                         continue
 
-                    # Check if this is an error we can recover from via fallback
                     fallback_mgr = get_fallback_manager()
                     if fallback_mgr.handle_error(e) and attempt < max_retries - 1:
-                        # Try with fallback model
                         status = fallback_mgr.get_status()
                         available = status.get("available_models", [])
                         next_model = available[0] if available else "unknown"
@@ -889,16 +859,15 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
                             next_model,
                         )
                         display_model_switch(next_model)
-                        # Recreate agent with new model
-                        reset_career_agent()
-                        agent = create_career_agent()
+                        # Reset all compiled agents so they rebuild with new model
+                        reset_orchestrator()
+                        orchestrator = get_orchestrator()
+                        agent = orchestrator.get_compiled_agent(specialist_name)
                         continue
                     else:
-                        # Log full traceback to file only, show user-friendly message
                         logger.exception("Unrecoverable agent error")
                         error_msg = _sanitize_error(f"Agent error: {e}")
 
-                        # Provide helpful context for common errors
                         if "Connection error" in str(e) or "ConnectError" in str(
                             type(e).__name__
                         ):

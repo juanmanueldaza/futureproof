@@ -1,23 +1,105 @@
-"""Founder Agent — Startups and entrepreneurship specialist.
+"""Founder Agent — Startups and entrepreneurship specialist."""
 
-Uses LLM with focused system prompt to help developers launch
-startups, validate ideas, and build companies.
-"""
-
-from typing import Any
 
 from fu7ur3pr00f.agents.specialists.base import BaseAgent
+from fu7ur3pr00f.agents.tools.analysis import (
+    analyze_career_alignment,
+    analyze_skill_gaps,
+    get_career_advice,
+)
+from fu7ur3pr00f.agents.tools.financial import compare_salary_ppp, convert_currency
+from fu7ur3pr00f.agents.tools.gathering import (
+    gather_all_career_data,
+    gather_assessment_data,
+    gather_cv_data,
+    gather_linkedin_data,
+    gather_portfolio_data,
+)
+from fu7ur3pr00f.agents.tools.knowledge import (
+    clear_career_knowledge,
+    get_knowledge_stats,
+    index_career_knowledge,
+    search_career_knowledge,
+)
+from fu7ur3pr00f.agents.tools.market import (
+    analyze_market_fit,
+    analyze_market_skills,
+    gather_market_data,
+    get_salary_insights,
+    get_tech_trends,
+    search_jobs,
+)
+from fu7ur3pr00f.agents.tools.memory import (
+    get_memory_stats,
+    recall_memories,
+    remember_decision,
+    remember_job_application,
+)
+from fu7ur3pr00f.agents.tools.profile import (
+    get_user_profile,
+    set_target_roles,
+    update_current_role,
+    update_salary_info,
+    update_user_goal,
+    update_user_name,
+    update_user_skills,
+)
+from fu7ur3pr00f.agents.tools.settings import get_current_config, update_setting
+
+_TOOLS: list = [
+    # Profile
+    get_user_profile,
+    update_user_name,
+    update_current_role,
+    update_salary_info,
+    update_user_skills,
+    set_target_roles,
+    update_user_goal,
+    # Gathering
+    gather_portfolio_data,
+    gather_linkedin_data,
+    gather_assessment_data,
+    gather_cv_data,
+    gather_all_career_data,
+    # Knowledge
+    search_career_knowledge,
+    get_knowledge_stats,
+    index_career_knowledge,
+    clear_career_knowledge,
+    # Analysis — founder-market fit
+    analyze_skill_gaps,
+    analyze_career_alignment,
+    get_career_advice,
+    # Market — opportunity and demand research
+    search_jobs,
+    get_salary_insights,
+    analyze_market_fit,
+    analyze_market_skills,
+    get_tech_trends,
+    gather_market_data,
+    # Financial — runway and revenue modelling
+    convert_currency,
+    compare_salary_ppp,
+    # Memory
+    remember_decision,
+    remember_job_application,
+    recall_memories,
+    get_memory_stats,
+    # Settings
+    get_current_config,
+    update_setting,
+]
 
 
 class FounderAgent(BaseAgent):
-    """Startups and entrepreneurship specialist.
+    """Startups, entrepreneurship, and developer-to-founder transition.
 
-    Focus areas:
-    - Idea validation and market sizing
-    - MVP planning and technical architecture
-    - Finding co-founders and early team
-    - Developer-to-founder transition
-    - Bootstrapping vs. fundraising strategy
+    Specialises in:
+    - Idea validation and founder-market fit analysis
+    - MVP scoping based on existing skills
+    - Bootstrapping vs. fundraising trade-offs
+    - Market opportunity research
+    - Developer-to-founder transition planning
     """
 
     KEYWORDS = frozenset(
@@ -33,7 +115,6 @@ class FounderAgent(BaseAgent):
             "side project",
             "business idea",
             "company",
-            "build",
             "bootstrap",
             "fundraising",
             "revenue",
@@ -41,6 +122,8 @@ class FounderAgent(BaseAgent):
             "indie",
             "solo",
             "validate",
+            "build a product",
+            "productize",
         }
     )
 
@@ -50,45 +133,29 @@ class FounderAgent(BaseAgent):
 
     @property
     def description(self) -> str:
-        return "Startups and entrepreneurship"
+        return "Startups and developer-to-founder strategy"
 
     @property
     def system_prompt(self) -> str:
         return (
-            "You are a startup advisor specializing in developer-founders.\n\n"
-            "Your expertise:\n"
-            "- Idea validation and market sizing for technical products\n"
-            "- MVP planning (scope, tech stack, timeline)\n"
-            "- Developer-to-founder transition strategies\n"
-            "- Bootstrapping vs. fundraising trade-offs\n"
-            "- Building with existing skills (leveraging career experience)\n"
-            "- Open source business models\n\n"
-            "Response style:\n"
-            "- Analyze the user's technical skills for founder-market fit\n"
-            "- Be realistic about timelines and effort required\n"
-            "- Suggest MVPs they can build with their existing stack\n"
-            "- Reference their work experience for domain expertise angles\n"
-            "- Warn about common developer-founder mistakes\n"
-            "- Prefer sustainable bootstrapping over VC when appropriate\n"
+            "You are a startup advisor specialising in developer-founders.\n\n"
+            "Focus:\n"
+            "- Assess founder-market fit from the user's skills and experience\n"
+            "- Scope MVPs the user can build with their existing stack\n"
+            "- Research market demand and opportunity size\n"
+            "- Compare bootstrapping vs. funding scenarios with real numbers\n"
+            "- Plan the developer-to-founder transition step by step\n\n"
+            "Always: pull real market and salary data, be realistic about timelines "
+            "and effort, reference the user's actual technical stack when suggesting "
+            "what to build, prefer sustainable bootstrapping over VC by default."
         )
 
+    @property
+    def tools(self) -> list:
+        return _TOOLS
+
     def can_handle(self, intent: str) -> bool:
-        intent_lower = intent.lower()
-        return any(kw in intent_lower for kw in self.KEYWORDS)
-
-    async def process(self, context: dict[str, Any]) -> str:
-        """Process with technical skills context."""
-        context.get("query", "")
-
-        # Pull skills and project data for founder-market fit analysis
-        skills = self.search_knowledge("skills technologies expertise", limit=5)
-        projects = self.search_knowledge("projects products built", limit=3)
-        extra = skills + projects
-        if extra:
-            context.setdefault("_extra_kb", [])
-            context["_extra_kb"].extend(extra)
-
-        return await super().process(context)
+        return any(kw in intent.lower() for kw in self.KEYWORDS)
 
 
 __all__ = ["FounderAgent"]

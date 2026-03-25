@@ -211,10 +211,10 @@ class TestUpdateSettingTool:
 
     @patch("fu7ur3pr00f.agents.tools.settings.write_user_setting")
     @patch("fu7ur3pr00f.agents.tools.settings.reload_settings")
-    @patch("fu7ur3pr00f.agents.career_agent.reset_career_agent")
+    @patch("fu7ur3pr00f.agents.specialists.orchestrator.reset_orchestrator")
     @patch("fu7ur3pr00f.llm.fallback.reset_fallback_manager")
     def test_restart_keys_trigger_agent_reset(
-        self, mock_reset_fb, mock_reset_agent, mock_reload, mock_write
+        self, mock_reset_fb, mock_reset_orch, mock_reload, mock_write
     ) -> None:
         from fu7ur3pr00f.agents.tools.settings import update_setting
 
@@ -222,14 +222,14 @@ class TestUpdateSettingTool:
             {"key": "agent_model", "value": "gpt-4o"},
         )
         mock_reset_fb.assert_called_once()
-        mock_reset_agent.assert_called_once()
+        mock_reset_orch.assert_called_once()
         assert "next message" in result
 
     @patch("fu7ur3pr00f.agents.tools.settings.write_user_setting")
     @patch("fu7ur3pr00f.agents.tools.settings.reload_settings")
-    @patch("fu7ur3pr00f.agents.career_agent.reset_career_agent")
+    @patch("fu7ur3pr00f.agents.specialists.orchestrator.reset_orchestrator")
     def test_non_restart_key_no_agent_reset(
-        self, mock_reset_agent, mock_reload, mock_write
+        self, mock_reset_orch, mock_reload, mock_write
     ) -> None:
         from fu7ur3pr00f.agents.tools.settings import update_setting
 
@@ -237,7 +237,7 @@ class TestUpdateSettingTool:
         update_setting.invoke(
             {"key": "market_cache_hours", "value": "48"},
         )
-        mock_reset_agent.assert_not_called()
+        mock_reset_orch.assert_not_called()
 
     def test_normalizes_key_to_lowercase(self) -> None:
         from fu7ur3pr00f.agents.tools.settings import update_setting

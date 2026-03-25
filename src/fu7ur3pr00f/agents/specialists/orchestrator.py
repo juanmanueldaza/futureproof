@@ -1,14 +1,23 @@
-"""Orchestrator Agent — Routes requests to specialist agents.
+"""Orchestrator — routes queries to the right specialist and exposes their agent.
 
-Uses keyword scoring for fast routing, then delegates to the appropriate
-specialist agent which calls the LLM with its focused system prompt.
+The orchestrator is the single entry point for all user messages.  It does
+keyword-based routing (no LLM call, sub-millisecond) and then returns the
+compiled specialist agent for the chat client to stream against directly.
+
+Usage (from the chat client):
+    orchestrator = get_orchestrator()
+
+    # Route a query → get the compiled LangGraph agent for streaming
+    specialist_name = orchestrator.route(user_input)
+    agent = orchestrator.get_compiled_agent(specialist_name)
+    agent.stream({"messages": [HumanMessage(content=user_input)]}, config, ...)
 """
 
-import asyncio
 import logging
+import threading
 from typing import Any
 
-from fu7ur3pr00f.agents.specialists.base import BaseAgent
+from fu7ur3pr00f.agents.specialists.base import BaseAgent, reset_all_specialists
 from fu7ur3pr00f.agents.specialists.coach import CoachAgent
 from fu7ur3pr00f.agents.specialists.code import CodeAgent
 from fu7ur3pr00f.agents.specialists.founder import FounderAgent
@@ -18,122 +27,149 @@ from fu7ur3pr00f.agents.specialists.learning import LearningAgent
 logger = logging.getLogger(__name__)
 
 
-class OrchestratorAgent(BaseAgent):
-    """Routes queries to specialist agents and returns their LLM-powered responses.
+class OrchestratorAgent:
+    """Routes user queries to specialist agents.
 
-    Routing is keyword-based (fast, no LLM call for routing).
-    Each specialist handles its own LLM call with a focused system prompt.
+    Routing is keyword-based — no LLM call, deterministic and fast.
+    Each specialist is a compiled LangGraph agent (cached on first use).
+    All specialists share the same SqliteSaver checkpointer so conversation
+    history is continuous across specialist switches within a thread.
     """
 
-    specialists: dict[str, BaseAgent]
-
     def __init__(self) -> None:
-        self.specialists = {}
-
-    @property
-    def name(self) -> str:
-        return "orchestrator"
-
-    @property
-    def description(self) -> str:
-        return "Routes requests to specialist agents"
-
-    @property
-    def system_prompt(self) -> str:
-        return ""  # Orchestrator doesn't call LLM directly
-
-    def can_handle(self, intent: str) -> bool:
-        return True  # Routes everything
-
-    async def initialize(self) -> None:
-        """Initialize all specialist agents."""
-        self.specialists = {
+        self._specialists: dict[str, BaseAgent] = {
             "coach": CoachAgent(),
             "learning": LearningAgent(),
             "jobs": JobsAgent(),
             "code": CodeAgent(),
             "founder": FounderAgent(),
         }
-        logger.info(
-            "Orchestrator initialized with %d specialists: %s",
-            len(self.specialists),
-            ", ".join(self.specialists.keys()),
-        )
 
-    async def process(self, context: dict[str, Any]) -> str:
-        """Route query to best specialist and return its LLM response."""
-        query = context.get("query", "")
-        specialist_name = self._route(query)
-        specialist = self.specialists.get(specialist_name)
+    # ── Routing ──────────────────────────────────────────────────────────
 
-        if not specialist:
-            return self._fallback_message()
+    def route(self, query: str) -> str:
+        """Pick the best specialist for this query.
 
-        logger.info("Routing to %s agent: %s", specialist_name, query[:80])
-        return await specialist.process(context)
-
-    async def process_parallel(
-        self,
-        context: dict[str, Any],
-        agent_names: list[str] | None = None,
-    ) -> dict[str, str]:
-        """Query multiple specialists in parallel.
-
-        Returns dict mapping agent name → response.
+        Scores each specialist by counting keyword matches.  Returns the
+        specialist name with the highest score, defaulting to "coach" for
+        ambiguous queries.
         """
-        if agent_names is None:
-            agent_names = list(self.specialists.keys())
-
-        async def _run(name: str) -> tuple[str, str]:
-            agent = self.specialists.get(name)
-            if agent:
-                resp = await agent.process(context)
-                return name, resp
-            return name, ""
-
-        results = await asyncio.gather(*[_run(n) for n in agent_names])
-        return dict(results)
-
-    def _route(self, query: str) -> str:
-        """Score each specialist by keyword overlap and pick the best."""
-        best_name = "coach"  # Default
+        best_name = "coach"
         best_score = 0
+        intent = query.lower()
 
-        for name, agent in self.specialists.items():
-            if agent.can_handle(query):
-                # Count keyword matches for ranking
-                intent_lower = query.lower()
-                keywords: frozenset[str] = getattr(agent, "KEYWORDS", frozenset())
-                score = sum(1 for kw in keywords if kw in intent_lower)
-                if score > best_score:
-                    best_score = score
-                    best_name = name
+        for name, agent in self._specialists.items():
+            keywords: frozenset[str] = getattr(agent, "KEYWORDS", frozenset())
+            score = sum(1 for kw in keywords if kw in intent)
+            if score > best_score:
+                best_score = score
+                best_name = name
 
+        logger.debug("route(%r) → %s (score=%d)", query[:60], best_name, best_score)
         return best_name
 
-    def _fallback_message(self) -> str:
-        agents = "\n".join(
-            f"- **{a.name}**: {a.description}" for a in self.specialists.values()
-        )
-        return (
-            "I can help you with:\n\n"
-            f"{agents}\n\n"
-            "Which area would you like to explore?"
-        )
+    # ── Agent access ─────────────────────────────────────────────────────
 
-    async def handle(self, query: str, context: dict[str, Any] | None = None) -> str:
-        """Convenience: handle a query string."""
-        if context is None:
-            context = {}
-        context["query"] = query
-        return await self.process(context)
+    def get_compiled_agent(self, specialist_name: str) -> Any:
+        """Return the compiled LangGraph agent for the given specialist.
 
-    def get_available_agents(self) -> list[dict[str, str]]:
-        """List available specialist agents."""
+        Lazily compiled and cached on first call — subsequent calls return
+        the same graph without re-building.
+        """
+        specialist = self._specialists.get(specialist_name)
+        if specialist is None:
+            logger.warning(
+                "Unknown specialist %r, falling back to coach", specialist_name
+            )
+            specialist = self._specialists["coach"]
+        return specialist.get_compiled_agent()
+
+    def get_specialist(self, name: str) -> BaseAgent:
+        """Return the specialist agent object by name."""
+        return self._specialists.get(name, self._specialists["coach"])
+
+    # ── Info ─────────────────────────────────────────────────────────────
+
+    def list_agents(self) -> list[dict[str, str]]:
+        """List all available specialists."""
         return [
             {"name": a.name, "description": a.description}
-            for a in self.specialists.values()
+            for a in self._specialists.values()
         ]
 
+    def get_model_name(self, specialist_name: str | None = None) -> str | None:
+        """Return the model description used by the given specialist (or coach)."""
+        try:
+            from fu7ur3pr00f.llm.fallback import get_model_with_fallback
 
-__all__ = ["OrchestratorAgent"]
+            _, config = get_model_with_fallback(purpose="agent")
+            return config.description
+        except Exception:
+            return None
+
+    def reset(self) -> None:
+        """Clear all compiled specialist agent caches.
+
+        Call after a model fallback or provider change so the next
+        invocation recompiles with the new model.
+        """
+        reset_all_specialists()
+
+
+# ── Module-level singleton ────────────────────────────────────────────────────
+
+_orchestrator: OrchestratorAgent | None = None
+_orchestrator_lock = threading.Lock()
+
+
+def get_orchestrator() -> OrchestratorAgent:
+    """Get or create the global orchestrator singleton."""
+    global _orchestrator
+    if _orchestrator is not None:
+        return _orchestrator
+    with _orchestrator_lock:
+        if _orchestrator is None:
+            _orchestrator = OrchestratorAgent()
+            logger.info(
+                "Orchestrator initialised with %d specialists",
+                len(_orchestrator._specialists),
+            )
+    return _orchestrator
+
+
+def reset_orchestrator() -> None:
+    """Reset the orchestrator singleton and all compiled agent caches."""
+    global _orchestrator
+    with _orchestrator_lock:
+        if _orchestrator is not None:
+            _orchestrator.reset()
+        _orchestrator = None
+
+
+def get_agent_config(
+    thread_id: str = "main",
+    user_id: str = "default",
+) -> dict[str, Any]:
+    """Build the LangGraph config dict for invoking a specialist agent.
+
+    Args:
+        thread_id: Conversation thread identifier for checkpointing
+        user_id: User identifier for profile/memory scoping
+
+    Returns:
+        Config dict to pass to agent.invoke() or agent.stream()
+    """
+    return {
+        "configurable": {
+            "thread_id": thread_id,
+            "user_id": user_id,
+        }
+    }
+
+
+__all__ = [
+    "OrchestratorAgent",
+    "get_orchestrator",
+    "reset_orchestrator",
+    "get_agent_config",
+]

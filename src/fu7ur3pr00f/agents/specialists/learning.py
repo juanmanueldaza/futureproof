@@ -1,23 +1,87 @@
-"""Learning Agent — Skill development and expertise building specialist.
+"""Learning Agent — Skill development and expertise building specialist."""
 
-Uses LLM with focused system prompt to help users build skills,
-plan learning paths, and become recognized experts.
-"""
-
-from typing import Any
 
 from fu7ur3pr00f.agents.specialists.base import BaseAgent
+from fu7ur3pr00f.agents.tools.analysis import analyze_skill_gaps
+from fu7ur3pr00f.agents.tools.gathering import (
+    gather_all_career_data,
+    gather_assessment_data,
+    gather_cv_data,
+    gather_linkedin_data,
+    gather_portfolio_data,
+)
+from fu7ur3pr00f.agents.tools.generation import generate_cv, generate_cv_draft
+from fu7ur3pr00f.agents.tools.knowledge import (
+    clear_career_knowledge,
+    get_knowledge_stats,
+    index_career_knowledge,
+    search_career_knowledge,
+)
+from fu7ur3pr00f.agents.tools.market import analyze_market_skills, get_tech_trends
+from fu7ur3pr00f.agents.tools.memory import (
+    get_memory_stats,
+    recall_memories,
+    remember_decision,
+    remember_job_application,
+)
+from fu7ur3pr00f.agents.tools.profile import (
+    get_user_profile,
+    set_target_roles,
+    update_current_role,
+    update_salary_info,
+    update_user_goal,
+    update_user_name,
+    update_user_skills,
+)
+from fu7ur3pr00f.agents.tools.settings import get_current_config, update_setting
+
+_TOOLS: list = [
+    # Profile
+    get_user_profile,
+    update_user_name,
+    update_current_role,
+    update_salary_info,
+    update_user_skills,
+    set_target_roles,
+    update_user_goal,
+    # Gathering
+    gather_portfolio_data,
+    gather_linkedin_data,
+    gather_assessment_data,
+    gather_cv_data,
+    gather_all_career_data,
+    # Knowledge
+    search_career_knowledge,
+    get_knowledge_stats,
+    index_career_knowledge,
+    clear_career_knowledge,
+    # Analysis — skill focus
+    analyze_skill_gaps,
+    # Market — tech trends and in-demand skills
+    get_tech_trends,
+    analyze_market_skills,
+    # Generation
+    generate_cv,
+    generate_cv_draft,
+    # Memory
+    remember_decision,
+    remember_job_application,
+    recall_memories,
+    get_memory_stats,
+    # Settings
+    get_current_config,
+    update_setting,
+]
 
 
 class LearningAgent(BaseAgent):
-    """Skill development and expertise building specialist.
+    """Skill development, learning roadmaps, and expertise building.
 
-    Focus areas:
-    - Learning roadmaps for target roles
-    - Identifying skill gaps from career data
-    - Certification and course recommendations
-    - Building public expertise (writing, speaking, teaching)
-    - Deep vs. broad skill development strategy
+    Specialises in:
+    - Personalised learning roadmaps for target roles
+    - Identifying the highest-leverage skills to learn next
+    - Technology trend analysis (what the market values)
+    - Building expertise through teaching (blogs, talks, OSS)
     """
 
     KEYWORDS = frozenset(
@@ -44,6 +108,7 @@ class LearningAgent(BaseAgent):
             "specialize",
             "roadmap",
             "curriculum",
+            "knowledge",
         }
     )
 
@@ -59,36 +124,22 @@ class LearningAgent(BaseAgent):
     def system_prompt(self) -> str:
         return (
             "You are an expert learning strategist for software developers.\n\n"
-            "Your expertise:\n"
-            "- Designing personalized learning roadmaps\n"
-            "- Identifying the highest-leverage skills to learn next\n"
-            "- Recommending certifications, courses, and resources\n"
-            "- Building expertise through teaching (blogs, talks, OSS)\n"
-            "- Balancing depth vs. breadth in skill development\n\n"
-            "Response style:\n"
-            "- Analyze the user's current skills from their career data\n"
-            "- Compare against requirements for their target role\n"
-            "- Prioritize skills by impact (what moves the needle most)\n"
-            "- Give specific resource recommendations, not vague 'learn X'\n"
-            "- Include timelines: what to learn in 1 month, 3 months, 6 months\n"
-            "- Suggest ways to demonstrate skills (projects, writing, talks)\n"
+            "Focus:\n"
+            "- Designing personalised learning roadmaps based on the user's goals\n"
+            "- Identifying highest-leverage skills using market trend data\n"
+            "- Recommending specific resources (courses, books, projects, talks)\n"
+            "- Building public expertise through teaching and contribution\n\n"
+            "Always: check tech trends and market data, compare current skills against "
+            "requirements for the target role, give concrete timelines "
+            "(1 month / 3 months / 6 months), and suggest demonstrable outputs."
         )
 
+    @property
+    def tools(self) -> list:
+        return _TOOLS
+
     def can_handle(self, intent: str) -> bool:
-        intent_lower = intent.lower()
-        return any(kw in intent_lower for kw in self.KEYWORDS)
-
-    async def process(self, context: dict[str, Any]) -> str:
-        """Process with extra skills context if available."""
-        context.get("query", "")
-
-        # Also pull skills-specific data
-        skills_data = self.search_knowledge("skills technologies tools", limit=5)
-        if skills_data:
-            context.setdefault("_extra_kb", [])
-            context["_extra_kb"].extend(skills_data)
-
-        return await super().process(context)
+        return any(kw in intent.lower() for kw in self.KEYWORDS)
 
 
 __all__ = ["LearningAgent"]

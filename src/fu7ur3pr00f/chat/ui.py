@@ -318,9 +318,7 @@ def display_help() -> None:
 | `/memory` | Show memory and profile stats |
 | `/debug` | Toggle debug mode (verbose logging) |
 | `/verbose` | Show system information |
-| `/multi` | Multi-agent system commands |
-| `/multi agents` | List specialist agents |
-| `/multi test` | Test multi-agent system |
+| `/agents` | List available specialist agents |
 | `/clear` | Clear current thread history |
 | `/reset` | Factory reset (delete all generated data) |
 | `/quit` or `/q` | Exit chat |

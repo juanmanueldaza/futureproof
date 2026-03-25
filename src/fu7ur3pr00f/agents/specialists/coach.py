@@ -1,23 +1,89 @@
-"""Coach Agent — Career growth and leadership coaching specialist.
+"""Coach Agent — Career growth and leadership specialist."""
 
-Uses LLM with focused system prompt and career data context to provide
-CliftonStrengths-based coaching advice.
-"""
-
-from typing import Any
 
 from fu7ur3pr00f.agents.specialists.base import BaseAgent
+from fu7ur3pr00f.agents.tools.analysis import (
+    analyze_career_alignment,
+    analyze_skill_gaps,
+    get_career_advice,
+)
+from fu7ur3pr00f.agents.tools.gathering import (
+    gather_all_career_data,
+    gather_assessment_data,
+    gather_cv_data,
+    gather_linkedin_data,
+    gather_portfolio_data,
+)
+from fu7ur3pr00f.agents.tools.generation import generate_cv, generate_cv_draft
+from fu7ur3pr00f.agents.tools.knowledge import (
+    clear_career_knowledge,
+    get_knowledge_stats,
+    index_career_knowledge,
+    search_career_knowledge,
+)
+from fu7ur3pr00f.agents.tools.memory import (
+    get_memory_stats,
+    recall_memories,
+    remember_decision,
+    remember_job_application,
+)
+from fu7ur3pr00f.agents.tools.profile import (
+    get_user_profile,
+    set_target_roles,
+    update_current_role,
+    update_salary_info,
+    update_user_goal,
+    update_user_name,
+    update_user_skills,
+)
+from fu7ur3pr00f.agents.tools.settings import get_current_config, update_setting
+
+_TOOLS: list = [
+    # Profile
+    get_user_profile,
+    update_user_name,
+    update_current_role,
+    update_salary_info,
+    update_user_skills,
+    set_target_roles,
+    update_user_goal,
+    # Gathering
+    gather_portfolio_data,
+    gather_linkedin_data,
+    gather_assessment_data,
+    gather_cv_data,
+    gather_all_career_data,
+    # Knowledge
+    search_career_knowledge,
+    get_knowledge_stats,
+    index_career_knowledge,
+    clear_career_knowledge,
+    # Analysis (core focus)
+    analyze_skill_gaps,
+    analyze_career_alignment,
+    get_career_advice,
+    # Generation
+    generate_cv,
+    generate_cv_draft,
+    # Memory
+    remember_decision,
+    remember_job_application,
+    recall_memories,
+    get_memory_stats,
+    # Settings
+    get_current_config,
+    update_setting,
+]
 
 
 class CoachAgent(BaseAgent):
-    """Career growth and leadership coaching specialist.
+    """Career growth, promotions, and leadership coaching.
 
-    Focus areas:
-    - Promotions (Senior → Staff → Principal)
-    - Leadership development
-    - CliftonStrengths-based growth strategies
-    - Navigating organizational dynamics
-    - Building influence and visibility
+    Specialises in:
+    - Promotion strategy (Senior → Staff → Principal)
+    - CliftonStrengths-based development planning
+    - Leadership and influence building
+    - Skill gap analysis for target roles
     """
 
     KEYWORDS = frozenset(
@@ -41,6 +107,9 @@ class CoachAgent(BaseAgent):
             "mentoring",
             "visibility",
             "impact",
+            "advice",
+            "strategy",
+            "next step",
         }
     )
 
@@ -55,46 +124,23 @@ class CoachAgent(BaseAgent):
     @property
     def system_prompt(self) -> str:
         return (
-            "You are a senior career coach specializing in developer career growth.\n\n"
-            "Your expertise:\n"
-            "- Promotion strategies (IC track: Senior → Staff → Principal)\n"
-            "- Leadership development for engineers\n"
-            "- CliftonStrengths-based coaching (if data available)\n"
-            "- Building influence and organizational visibility\n"
-            "- Navigating organizational dynamics\n\n"
-            "Response style:\n"
-            "- Assess current position based on the user's actual career data\n"
-            "- Identify specific gaps between current level and target\n"
-            "- Provide a concrete action plan with timelines\n"
-            "- Reference CliftonStrengths themes when available\n"
-            "- Use real examples from the user's experience, not generic advice\n"
-            "- Be direct — say what's missing, not just what's strong\n"
+            "You are a senior career coach for software engineers.\n\n"
+            "Focus:\n"
+            "- Promotion strategy (IC track: Senior → Staff → Principal)\n"
+            "- CliftonStrengths-based coaching when data is available\n"
+            "- Leadership development and influence building\n"
+            "- Concrete skill gap analysis against the user's target role\n\n"
+            "Always: search the knowledge base first, reference the user's actual "
+            "experience and strengths, give specific action plans with timelines. "
+            "Be direct about gaps — don't just affirm what's already strong."
         )
 
+    @property
+    def tools(self) -> list:
+        return _TOOLS
+
     def can_handle(self, intent: str) -> bool:
-        intent_lower = intent.lower()
-        return any(kw in intent_lower for kw in self.KEYWORDS)
-
-    async def process(self, context: dict[str, Any]) -> str:
-        """Process with extra strengths context if available."""
-        query = context.get("query", "")
-
-        # Augment context with strengths data specifically
-        strengths = self.search_knowledge(query, limit=3, source="cliftonstrengths")
-        if strengths:
-            extra = "\n\n## CliftonStrengths Data\n"
-            extra += "\n".join(r.content for r in strengths)
-            context.setdefault("_extra_context", "")
-            context["_extra_context"] = extra
-
-        return await super().process(context)
-
-    def _build_system_prompt(self, profile: str, kb_context: str) -> str:
-        """Override to inject extra context (e.g., strengths)."""
-        base = super()._build_system_prompt(profile, kb_context)
-        # Check if process() added extra context
-        # (can't access context dict here, so handled via class-level cache)
-        return base
+        return any(kw in intent.lower() for kw in self.KEYWORDS)
 
 
 __all__ = ["CoachAgent"]

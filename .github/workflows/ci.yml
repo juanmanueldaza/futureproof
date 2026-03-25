@@ -30,7 +30,7 @@ jobs:
       - name: Install project
         run: |
           pip install -e .
-          pip install pytest pytest-asyncio pyright ruff
+          pip install pytest pytest-asyncio pytest-cov pyright ruff
 
       - name: Lint (ruff)
         run: ruff check .

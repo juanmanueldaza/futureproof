@@ -252,11 +252,11 @@ def update_setting(key: str, value: str) -> str:
     result = f"Updated {key} = {value}"
 
     if key in _RESTART_KEYS:
-        from fu7ur3pr00f.agents.career_agent import reset_career_agent
+        from fu7ur3pr00f.agents.specialists.orchestrator import reset_orchestrator
         from fu7ur3pr00f.llm.fallback import reset_fallback_manager
 
         reset_fallback_manager()
-        reset_career_agent()
+        reset_orchestrator()
         result += ". New model will be used on the next message."
 
     logger.info("Setting updated via agent tool: %s=%s", key, value)

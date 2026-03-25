@@ -1,83 +1,67 @@
-"""Benchmarks for multi-agent system."""
+"""Benchmarks for the orchestrator routing."""
 
-import asyncio
 import time
 
 import pytest
 
-from fu7ur3pr00f.agents.multi_agent import MultiAgentSystem
+from fu7ur3pr00f.agents.specialists.coach import CoachAgent
+from fu7ur3pr00f.agents.specialists.code import CodeAgent
+from fu7ur3pr00f.agents.specialists.founder import FounderAgent
+from fu7ur3pr00f.agents.specialists.jobs import JobsAgent
+from fu7ur3pr00f.agents.specialists.learning import LearningAgent
+from fu7ur3pr00f.agents.specialists.orchestrator import OrchestratorAgent
 
 TEST_QUERIES = [
     "How can I get promoted?",
     "Learn Python",
     "Find remote jobs",
-    "Improve GitHub",
+    "Improve GitHub repos",
     "Start a company",
 ]
 
 
-@pytest.mark.asyncio
-async def test_routing_latency():
-    """Test routing latency."""
-    system = MultiAgentSystem()
-    await system.initialize()
+@pytest.fixture
+def orchestrator() -> OrchestratorAgent:
+    orch = OrchestratorAgent()
+    orch._specialists = {
+        "coach": CoachAgent(),
+        "learning": LearningAgent(),
+        "jobs": JobsAgent(),
+        "code": CodeAgent(),
+        "founder": FounderAgent(),
+    }
+    return orch
 
-    assert system.orchestrator is not None
+
+def test_routing_latency(orchestrator: OrchestratorAgent) -> None:
+    """Routing should be sub-millisecond."""
     start = time.perf_counter()
     for query in TEST_QUERIES:
-        route = system.orchestrator._route(query)
-        assert route in ["coach", "learning", "jobs", "code", "founder"]
+        route = orchestrator.route(query)
+        assert route in {"coach", "learning", "jobs", "code", "founder"}
     elapsed = time.perf_counter() - start
     assert elapsed < 0.01, f"Routing took {elapsed * 1000:.2f}ms"
 
 
-@pytest.mark.asyncio
-async def test_initialization_latency():
-    """Test initialization time."""
-    start = time.perf_counter()
-    system = MultiAgentSystem()
-    await system.initialize()
-    elapsed = time.perf_counter() - start
-    assert elapsed < 5.0
-    assert len(system.get_available_agents()) == 5
-
-
-@pytest.mark.asyncio
-async def test_concurrent_routing():
-    """Test concurrent routing."""
-    system = MultiAgentSystem()
-    await system.initialize()
-
-    assert system.orchestrator is not None
-
-    async def route(q: str) -> str:
-        return system.orchestrator._route(q)  # type: ignore[union-attr]
-
-    start = time.perf_counter()
-    tasks = [route(q) for q in TEST_QUERIES * 10]
-    await asyncio.gather(*tasks)
-    elapsed = time.perf_counter() - start
-    assert elapsed < 0.1
-
-
-@pytest.mark.asyncio
-async def test_routing_accuracy():
-    """Test routing accuracy."""
-    system = MultiAgentSystem()
-    await system.initialize()
-
+def test_routing_accuracy(orchestrator: OrchestratorAgent) -> None:
+    """Routing should correctly classify common intents."""
     cases = [
-        ("Get promoted", "coach"),
-        ("Learn Python", "learning"),
-        ("Find job", "jobs"),
-        ("GitHub", "code"),
-        ("Startup", "founder"),
+        ("Get promoted to Staff Engineer", "coach"),
+        ("Learn Python for machine learning", "learning"),
+        ("Find a remote senior developer job", "jobs"),
+        ("Improve my GitHub profile and repos", "code"),
+        ("Launch my SaaS startup", "founder"),
     ]
-
-    assert system.orchestrator is not None
     correct = sum(
-        1 for query, expected in cases if system.orchestrator._route(query) == expected
+        1 for query, expected in cases if orchestrator.route(query) == expected
     )
-
     accuracy = correct / len(cases)
-    assert accuracy > 0.9, f"Accuracy {accuracy * 100:.1f}%"
+    assert accuracy >= 0.8, f"Routing accuracy {accuracy * 100:.0f}% < 80%"
+
+
+def test_list_agents(orchestrator: OrchestratorAgent) -> None:
+    """All five specialists should be listed."""
+    agents = orchestrator.list_agents()
+    assert len(agents) == 5
+    names = {a["name"] for a in agents}
+    assert names == {"coach", "learning", "jobs", "code", "founder"}

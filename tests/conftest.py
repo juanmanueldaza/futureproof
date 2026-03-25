@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_asyncio import fixture as async_fixture
 
-from fu7ur3pr00f.agents.multi_agent import MultiAgentSystem
+from fu7ur3pr00f.agents.specialists.orchestrator import OrchestratorAgent
 
 
 @pytest.fixture
@@ -51,12 +51,7 @@ def mock_llm_with_structured_format() -> MagicMock:
     return mock
 
 
-# Multi-agent benchmarks fixtures
-
-
 @async_fixture
-async def multi_agent_system():
-    """Initialize multi-agent system for tests."""
-    system = MultiAgentSystem()
-    await system.initialize()
-    yield system
+async def orchestrator():
+    """Orchestrator for tests."""
+    yield OrchestratorAgent()
