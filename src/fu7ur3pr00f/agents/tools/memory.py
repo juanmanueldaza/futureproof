@@ -56,7 +56,10 @@ def remember_decision(
 
     return _store_to_episodic(
         lambda: create_decision(decision, context, outcome),
-        f"Remembered: {decision!r}. I'll be able to recall this in future conversations.",
+        (
+            f"Remembered: {decision!r}. "
+            "I'll be able to recall this in future conversations."
+        ),
         "decision",
     )
 

@@ -203,7 +203,7 @@ class BaseAgent(ABC):
                 tool_fn = tool_map.get(tool_name)
                 if tool_fn is None:
                     result_str = (
-                        f"Tool '{tool_name}' not available to {self.name} specialist."
+                        f"Tool {tool_name!r} not available to {self.name} specialist."
                     )
                     logger.warning("%s: tool not found: %s", self.name, tool_name)
                 else:
