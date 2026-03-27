@@ -416,99 +416,6 @@ def handle_command(  # noqa: C901 TODO: refactor
     return False
 
 
-def _run_blackboard_query(
-    orchestrator: Any,
-    user_input: str,
-    specialist_names: list[str],
-    con: Console,
-    session: Any = None,
-) -> None:
-    """Execute a query through the blackboard with the given specialists.
-
-    Args:
-        orchestrator: The OrchestratorAgent instance
-        user_input: The user's query
-        specialist_names: Which specialists to involve (from route())
-        con: Rich console for output
-        session: PromptSession for human-in-the-loop confirmations
-    """
-    from fu7ur3pr00f.memory.profile import load_profile
-
-    profile = load_profile()
-    user_profile = {
-        "name": profile.name,
-        "current_role": profile.current_role,
-        "years_experience": profile.years_experience,
-        "technical_skills": profile.technical_skills or [],
-        "target_roles": profile.target_roles or [],
-        "goals": [g.description for g in (profile.goals or [])],
-    }
-
-    # Show which specialists will run
-    spec_label = " · ".join(s.upper() for s in specialist_names)
-    con.print(f"[dim][ {spec_label} ][/dim]")
-    con.print()
-
-    executor = orchestrator.get_blackboard_executor(specialist_names)
-    start = time.monotonic()
-    tool_start_times: dict[str, float] = {}
-
-    def _on_specialist_complete(name: str, finding: dict) -> None:
-        display_specialist_progress(name, "done")
-        reasoning = finding.get("reasoning", "")
-        if reasoning and len(specialist_names) > 1:
-            # Show reasoning for multi-specialist analysis
-            con.print(Markdown(reasoning))
-            con.print()
-
-    def _on_tool_start(specialist: str, tool_name: str, args: dict) -> None:
-        tool_start_times[f"{specialist}:{tool_name}"] = time.monotonic()
-        display_tool_start(tool_name, args)
-
-    def _on_tool_result(specialist: str, tool_name: str, result: str) -> None:
-        key = f"{specialist}:{tool_name}"
-        elapsed = time.monotonic() - tool_start_times.pop(key, time.monotonic())
-        display_tool_result(tool_name, result, elapsed)
-
-    def _confirm(question: str, details: str) -> bool:
-        """Handle human-in-the-loop confirmation for tool interrupts."""
-        display_interrupt_confirmation(question, details)
-        if session is None:
-            return False
-        try:
-            response = session.prompt("Approve? [y/N] ").strip().lower()
-            return response in ("y", "yes")
-        except (EOFError, KeyboardInterrupt):
-            return False
-
-    try:
-        blackboard = executor.execute(
-            query=user_input,
-            user_profile=user_profile,
-            on_specialist_start=lambda name: display_specialist_progress(
-                name, "working"
-            ),
-            on_specialist_complete=_on_specialist_complete,
-            on_tool_start=_on_tool_start,
-            on_tool_result=_on_tool_result,
-            confirm_fn=_confirm,
-        )
-    except Exception as e:
-        logger.exception("Blackboard execution failed")
-        display_error(_sanitize_error(f"Analysis failed: {e}"))
-        return
-
-    elapsed = time.monotonic() - start
-    synthesis = blackboard.get("synthesis", {})
-    specialists_ran = list(blackboard.get("findings", {}).keys())
-
-    display_blackboard_result(
-        synthesis=synthesis,
-        specialists_contributed=specialists_ran,
-        elapsed=elapsed,
-    )
-
-
 def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
     """Run the synchronous chat loop.
 
@@ -601,10 +508,44 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
             console.print()  # Blank line before response
 
             engine = get_conversation_engine()
+            tool_start_times: dict[str, float] = {}
+
+            def _on_specialist_start(name: str) -> None:
+                display_specialist_progress(name, "working")
+
+            def _on_specialist_complete(name: str, finding: dict) -> None:
+                display_specialist_progress(name, "done")
+                reasoning = finding.get("reasoning", "")
+                if reasoning:
+                    console.print(Markdown(reasoning))
+                    console.print()
+
+            def _on_tool_start(specialist: str, tool_name: str, args: dict) -> None:
+                tool_start_times[f"{specialist}:{tool_name}"] = time.monotonic()
+                display_tool_start(tool_name, args)
+
+            def _on_tool_result(specialist: str, tool_name: str, result: str) -> None:
+                key = f"{specialist}:{tool_name}"
+                elapsed_t = time.monotonic() - tool_start_times.pop(key, time.monotonic())
+                display_tool_result(tool_name, result, elapsed_t)
+
+            def _confirm(question: str, details: str) -> bool:
+                display_interrupt_confirmation(question, details)
+                try:
+                    resp = session.prompt("Approve? [y/N] ").strip().lower()
+                    return resp in ("y", "yes")
+                except (EOFError, KeyboardInterrupt):
+                    return False
+
             try:
                 result = engine.invoke_turn(
                     query=user_input,
                     thread_id=chat_state["thread_id"],
+                    on_specialist_start=_on_specialist_start,
+                    on_specialist_complete=_on_specialist_complete,
+                    on_tool_start=_on_tool_start,
+                    on_tool_result=_on_tool_result,
+                    confirm_fn=_confirm,
                 )
                 # Display synthesis result
                 display_blackboard_result(

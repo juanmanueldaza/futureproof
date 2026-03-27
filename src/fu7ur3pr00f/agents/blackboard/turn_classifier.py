@@ -13,8 +13,11 @@ logger = logging.getLogger(__name__)
 TurnType = Literal["factual", "follow_up", "steer", "new_query", "workflow_step"]
 
 # Regex patterns for fast classification
+# Matches direct questions about the user's profile data (single-fact answers)
 _FACTUAL_PATTERN = re.compile(
-    r"^(what|who|where|when|how many|how much|is|are|was|were)\s+(is|are|was|were|do|does|did|have|has|had)\s+my",
+    r"^(what\s+(is|are|was|were)|who\s+(is|are)|where\s+(is|are)|when\s+(is|are|was|were)"
+    r"|how\s+(many|much|old)\s+(is|are|am|do|does|did|have|has)"
+    r"|(is|are|was|were|do|does|did)\s+i)\s+(my|i|the)",
     re.IGNORECASE,
 )
 
