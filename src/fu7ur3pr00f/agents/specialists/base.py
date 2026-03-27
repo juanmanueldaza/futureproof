@@ -260,17 +260,9 @@ class BaseAgent(ABC):
         full_prompt = f"User Profile:\n{profile_context}\n\nQuery: {query}"
 
         # Append specialist guidance from prompt
-        try:
-            from fu7ur3pr00f.prompts import load_prompt
-            guidance = load_prompt("specialist_guidance")
-            full_prompt += f"\n\n{guidance}"
-        except Exception:
-            # Fallback if prompt not found
-            full_prompt += (
-                "\n\nIMPORTANT: The user may have career data indexed in the"
-                " knowledge base. Always use search_career_knowledge to find"
-                " relevant information specific to the user's query."
-            )
+        from fu7ur3pr00f.prompts import load_prompt
+        guidance = load_prompt("specialist_guidance")
+        full_prompt += f"\n\n{guidance}"
         if context_msg:
             full_prompt += f"\n\nContext from other specialists:\n{context_msg}"
 
