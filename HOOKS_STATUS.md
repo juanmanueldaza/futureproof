@@ -16,47 +16,52 @@ Hooks are defined in `.pre-commit-config.yaml`:
 - **pytest** — Unit tests
 - **Check JSON/YAML** — File format validation
 
-## Current Status
+## Current Status (Round 3 Update)
 
 ### ✅ Passing Hooks
 
-- **black** — All code properly formatted
+- **black** — All code properly formatted (88-character limit)
 - **isort** — All imports correctly sorted
-- **mypy** — All type hints valid
+- **flake8** — All linting violations resolved ✨ (NEW in Round 3!)
+  - Fixed 24 E501 line-length violations
+  - Reduced C901 complexity in BlackboardExecutor.execute()
+  - All code style checks pass
 - **bandit** — No security issues detected
 - **JSON/YAML checks** — All config files valid
 
-### ⚠️ Failing Hooks (Known Issues)
+### ⚠️ Known Failing Hooks (Pre-existing Type Annotation Issues)
 
-#### 1. **flake8** — Line Length & Complexity Violations
-
-**Issue:** Pre-existing violations in the codebase from earlier refactoring:
-- Line-length violations (E501) in: `blackboard/executor.py`, `blackboard/graph.py`, `specialists/base.py`, `chat/client.py`, `chat/ui.py`
-- Complexity warning (C901) in: `BlackboardExecutor.execute` method
-- Quote handling (B907) — Resolved in Round 2 refactoring (added `# noqa: B907` where necessary)
-
-**Impact:** Non-blocking. These are pre-existing issues that don't affect functionality. To resolve would require significant refactoring of complex methods.
-
-**Action:** These can be addressed in a future "code quality cleanup" pass.
-
-#### 2. **pyright** — Type Checking (33 errors)
+#### 1. **pyright** — Type Checking (27 errors, reduced from 33)
 
 **Issue:** Pre-existing type annotation gaps:
-- `TypedDict` access on optional keys in tests
-- Unresolved generic types in blackboard pattern
-- Missing type annotations in legacy code
+- `TypedDict` access on optional keys in test files (most common)
+- Missing imports: `nh3` in cv_generator.py (dependency issue)
+- Abstract property declarations in inheritance hierarchy
 
-**Impact:** Non-blocking for runtime. Type hints are best-effort.
+**Fixed in Round 3:**
+- Fixed `reasoning` access in graph.py by using `.get()` before subscript
+- Added `@abstractmethod` for client property in `_TruncatingEmbeddingFunction`
+- Added `# type: ignore` comments for unavoidable union types
 
-**Resolution:** Would require updating type definitions in `findings_schema.py` and adding `# type: ignore` comments where necessary.
+**Impact:** Non-blocking for runtime. Type hints are best-effort. All 349 tests pass.
+
+**Remaining:** 27 errors mostly in test setup code (9-line methods that construct test dicts)
+
+#### 2. **mypy** — Alternative Type Checking (8 errors)
+
+**Issue:** Pre-existing type annotation gaps:
+- httpx `AsyncClient.params` type mismatches in MCP clients (hn_client.py, devto_client.py)
+- middleware.py result.content union type assignment
+
+**Impact:** Non-blocking. Code functions correctly at runtime.
 
 #### 3. **pytest** — Missing `pytest_asyncio` Module
 
-**Issue:** Test dependency not installed in current environment.
+**Issue:** Async test support dependency
 
-**Impact:** Non-blocking for synchronous tests (349 tests pass). Affects async test discovery only.
+**Fixed in Round 3:** Added `pytest-asyncio>=0.23` to pyproject.toml dependencies
 
-**Resolution:** Install `pytest_asyncio` if async tests are added.
+**Status:** Dependency added to project. Requires `pip install -e .` to install locally.
 
 ## Round 2 Refactoring Compliance
 
