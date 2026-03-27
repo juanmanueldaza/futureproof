@@ -263,8 +263,11 @@ class BaseAgent(ABC):
         full_prompt += (
             "\n\nIMPORTANT: The user may have career data indexed in the"
             " knowledge base (LinkedIn, GitHub, portfolio). Always use"
-            " search_career_knowledge to find relevant information before"
-            " responding. Do NOT say you lack data without searching first."
+            " search_career_knowledge to find relevant information SPECIFIC"
+            " to the user's query before responding. Do NOT say you lack data"
+            " without searching first. Pay attention to the user's EXACT"
+            " question — if they ask about Spain, search for Spain-related"
+            " data or opportunities, not generic profiles."
         )
         if context_msg:
             full_prompt += f"\n\nContext from other specialists:\n{context_msg}"
