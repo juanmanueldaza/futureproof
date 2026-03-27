@@ -74,29 +74,44 @@ graph LR
     Agent --> MCP[12 MCP Clients<br/>GitHub, Jobs, Search]
 ```
 
-### Multi-Agent (New — `/multi` command)
+### Multi-Agent (LLM-Routed)
 
 ```mermaid
 graph TB
     User --> Chat[Chat Client]
-    Chat --> Orchestrator[Orchestrator Agent]
-    Orchestrator --> Coach[Coach Agent]
-    Orchestrator --> Learning[Learning Agent]
-    Orchestrator --> Jobs[Jobs Agent]
-    Orchestrator --> Code[Code Agent]
-    Orchestrator --> Founder[Founder Agent]
+    Chat --> Engine[Outer Graph<br/>Session State]
+    Engine --> Router["Router<br/>(LLM + Fallback)"]
+    Router -->|"How can I leverage<br/>my strengths<br/>to win money?"| Multi["Coach + Jobs<br/>+ Learning"]
+    Router -->|"What is my<br/>job title?"| Single["Coach<br/>(Factual)"]
+    Multi & Single --> Blackboard[Inner Blackboard Graph]
+    Blackboard --> Coach[Coach Agent]
+    Blackboard --> Learning[Learning Agent]
+    Blackboard --> Jobs[Jobs Agent]
+    Blackboard --> Code[Code Agent]
+    Blackboard --> Founder[Founder Agent]
     Coach & Learning & Jobs & Code & Founder --> ChromaDB[(Shared ChromaDB)]
 ```
+
+**Routing Architecture:**
+
+- **LLM-based semantic routing**: Understands query intent, selects 1-4 specialists
+- **Keyword fallback**: Automatic fallback if LLM unavailable (rate limits, network errors)
+- **Fast paths**: Factual queries → coach only; follow-ups → reuse previous specialists
+- **Structured output**: `RoutingDecision` model guarantees valid specialist names
+- **Specialist guidance**: All instructions load from `prompts/md/specialist_guidance.md` (no fallbacks)
 
 **Design decisions:**
 
 | Decision | Why |
 |----------|-----|
 | Single agent | Multi-agent handoffs failed with GPT-4.1 (over-delegation, lost context) |
+| LLM routing | Keyword matching too brittle — "leverage strengths to win money" should route to 3 specialists, not 1 |
+| Keyword fallback | Network-resilient: continues working if LLM unavailable |
+| Blackboard pattern | Multi-specialist analysis with shared context and iteration |
 | Database-first | Gatherers index directly to ChromaDB — no intermediate files |
 | Two-pass synthesis | `AnalysisSynthesisMiddleware` replaces generic LLM output with focused reasoning |
 | HITL confirmation | Destructive/expensive operations require user approval via `interrupt()` |
-| Multi-agent | Specialized agents for different career paths (growth, learning, jobs, code, startups) |
+| Prompt-driven | All specialist behavior from prompts folder, zero hardcoded fallbacks |
 
 ## Development
 
