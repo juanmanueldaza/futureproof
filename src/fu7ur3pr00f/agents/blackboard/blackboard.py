@@ -15,7 +15,7 @@ from typing import Annotated, Any
 
 from typing_extensions import TypedDict
 
-_MAX_ITERATIONS = 3  # Hard cap on multi-specialist iteration loops
+_MAX_ITERATIONS = 5  # Hard cap on multi-specialist iteration loops
 
 
 def _merge_change_log(
@@ -43,6 +43,9 @@ class SpecialistFinding(TypedDict, total=False):
     reasoning: str
     confidence: float
     iteration_contributed: int
+    trade_offs: list[str]
+    action_items: list[str]
+    open_questions: list[str]
 
 
 class CareerBlackboard(TypedDict, total=False):

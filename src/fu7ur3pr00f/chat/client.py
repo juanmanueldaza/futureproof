@@ -23,6 +23,7 @@ from prompt_toolkit.styles import Style as PTStyle  # noqa: E402
 from rich.console import Console  # noqa: E402
 from rich.markdown import Markdown  # noqa: E402
 
+from fu7ur3pr00f.agents.blackboard import get_conversation_engine  # noqa: E402
 from fu7ur3pr00f.agents.specialists.orchestrator import (  # noqa: E402
     get_agent_config,
     get_orchestrator,
@@ -596,13 +597,30 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
                 config = chat_state["config"]
                 continue
 
-            # All queries go through the blackboard
+            # All queries go through conversation engine (outer graph)
             console.print()  # Blank line before response
 
-            specialist_names = orchestrator.route(user_input)
-            _run_blackboard_query(
-                orchestrator, user_input, specialist_names, console, session=session
-            )
+            engine = get_conversation_engine()
+            try:
+                result = engine.invoke_turn(
+                    query=user_input,
+                    thread_id=chat_state["thread_id"],
+                )
+                # Display synthesis result
+                display_blackboard_result(
+                    synthesis=result.synthesis,
+                    specialists_contributed=result.specialists,
+                    elapsed=result.elapsed,
+                )
+                # Display suggestions if any
+                if result.suggested_next:
+                    console.print()
+                    console.print("[dim]Suggested next:[/dim]")
+                    for i, suggestion in enumerate(result.suggested_next, 1):
+                        console.print(f"  {i}. {suggestion}")
+            except Exception as e:
+                logger.exception("Conversation execution failed")
+                display_error(_sanitize_error(f"Analysis failed: {e}"))
 
         except KeyboardInterrupt:
             console.print("\n[#415a77]Use /quit to exit[/#415a77]")

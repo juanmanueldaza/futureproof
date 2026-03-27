@@ -54,7 +54,31 @@ class SpecialistFindingsModel(BaseModel):
     reasoning: str = Field(
         default="",
         max_length=_STR_MAX,
-        description="Specialist's reasoning and analysis",
+        description=(
+            "Direct response to the user in first person "
+            "(e.g. 'Your current title is Senior Analyst at Accenture'). "
+            "For factual questions: one direct sentence. "
+            "For analysis/strategy questions: comprehensive narrative. "
+            "Never use third-person analyst framing like 'The specialist identified...'."
+        ),
+    )
+
+    trade_offs: list[str] = Field(
+        default_factory=list,
+        max_length=_LIST_MAX,
+        description="Trade-offs or decision points identified (e.g. 'remote vs stability')",
+    )
+
+    action_items: list[str] = Field(
+        default_factory=list,
+        max_length=_LIST_MAX,
+        description="Concrete next actions user can take",
+    )
+
+    open_questions: list[str] = Field(
+        default_factory=list,
+        max_length=_LIST_MAX,
+        description="Questions that need user input to resolve",
     )
 
     confidence: float = Field(

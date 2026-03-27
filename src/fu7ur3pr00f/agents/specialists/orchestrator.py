@@ -67,7 +67,12 @@ class OrchestratorAgent:
 
     # ── Routing ──────────────────────────────────────────────────────────
 
-    def route(self, query: str) -> list[str]:
+    def route(
+        self,
+        query: str,
+        conversation_history: list[dict] | None = None,
+        turn_type: str | None = None,
+    ) -> list[str]:
         """Route query to one or more specialists.
 
         Returns a list of specialist names to involve (always a list).
@@ -77,7 +82,28 @@ class OrchestratorAgent:
         Scoring: count keyword matches per specialist.
         For comprehensive queries, include all specialists with score >= 0
         (capped at 4); for targeted queries, return only the best match.
+
+        Args:
+            query: User's query
+            conversation_history: Prior turns (optional, for context-aware routing)
+            turn_type: Turn classification (optional, from turn_classifier)
         """
+        # Context-aware routing: reuse previous specialists for follow-ups
+        if (
+            turn_type == "follow_up"
+            and conversation_history
+            and len(conversation_history) > 0
+        ):
+            last_turn = conversation_history[-1]
+            prev_specialists = last_turn.get("specialist_names", [])
+            if prev_specialists:
+                logger.debug(
+                    "route(%r) → %s (follow_up, reusing previous)",
+                    query[:60],
+                    prev_specialists,
+                )
+                return prev_specialists
+
         # Normalize hyphens so "5-year" matches "5 year"
         intent = query.lower().replace("-", " ")
 

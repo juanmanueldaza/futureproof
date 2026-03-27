@@ -260,6 +260,14 @@ class BaseAgent(ABC):
         full_prompt = f"User Profile:\n{profile_context}\n\nQuery: {query}"
         if context_msg:
             full_prompt += f"\n\nContext from other specialists:\n{context_msg}"
+
+        # Cross-turn context (from prior conversation turns)
+        constraints = blackboard.get("constraints", [])
+        prior_turns = [c for c in constraints if c.startswith("PRIOR_TURNS:")]
+        if prior_turns:
+            cross_turn_ctx = prior_turns[0][11:]  # Strip "PRIOR_TURNS:"
+            full_prompt += f"\n\nContext from previous conversation:\n{cross_turn_ctx}"
+
         return full_prompt
 
     def _format_previous_findings(
@@ -322,7 +330,13 @@ class BaseAgent(ABC):
             extraction_prompt = (
                 f"Extract career findings from this specialist analysis.\n\n"
                 f"Query: {query}\n\n"
-                f"Specialist output:\n{agent_text}"
+                f"Specialist output:\n{agent_text}\n\n"
+                f"IMPORTANT: Write the 'reasoning' field as a direct response to the user "
+                f"in first person (e.g. 'Your current title is Senior Analyst'). "
+                f"For factual questions: one direct sentence. "
+                f"For analysis/strategy: comprehensive narrative. "
+                f"Never write in third person (e.g. do NOT write "
+                f"'The specialist identified...' or 'Based on the query...')."
             )
 
             result: SpecialistFindingsModel = extractor.invoke(  # type: ignore

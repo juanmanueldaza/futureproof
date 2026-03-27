@@ -36,14 +36,14 @@ class TestCareerBlackboard:
         assert blackboard["change_log"] == []
 
     def test_make_initial_blackboard_clamps_max_iterations(self):
-        """Test that max_iterations is clamped to hard cap (3)."""
-        # Request 5 iterations, but should be clamped to 3
+        """Test that max_iterations is clamped to hard cap (5)."""
+        # Request 10 iterations, but should be clamped to 5
         blackboard = make_initial_blackboard(
             query="test",
             user_profile={},
             max_iterations=10,
         )
-        assert blackboard["max_iterations"] == 3
+        assert blackboard["max_iterations"] == 5
 
         # Request 0 iterations, but should be clamped to 1 (minimum)
         blackboard = make_initial_blackboard(

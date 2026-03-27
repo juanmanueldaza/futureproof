@@ -20,10 +20,23 @@ from fu7ur3pr00f.agents.blackboard.blackboard import (
     CareerBlackboard,
     make_initial_blackboard,
 )
+from fu7ur3pr00f.agents.blackboard.conversation_graph import build_conversation_graph
+from fu7ur3pr00f.agents.blackboard.engine import (
+    ConversationEngine,
+    TurnResult,
+    get_conversation_engine,
+)
 from fu7ur3pr00f.agents.blackboard.executor import BlackboardExecutor
 from fu7ur3pr00f.agents.blackboard.findings_schema import SpecialistFindingsModel
 from fu7ur3pr00f.agents.blackboard.graph import build_blackboard_graph
 from fu7ur3pr00f.agents.blackboard.scheduler import BlackboardScheduler
+from fu7ur3pr00f.agents.blackboard.session import (
+    ActiveGoal,
+    ConversationTurn,
+    SessionState,
+    make_initial_session,
+)
+from fu7ur3pr00f.agents.blackboard.turn_classifier import classify
 
 __all__ = [
     "CareerBlackboard",
@@ -32,4 +45,13 @@ __all__ = [
     "SpecialistFindingsModel",
     "build_blackboard_graph",
     "make_initial_blackboard",
+    "SessionState",
+    "ConversationTurn",
+    "ActiveGoal",
+    "make_initial_session",
+    "classify",
+    "build_conversation_graph",
+    "ConversationEngine",
+    "TurnResult",
+    "get_conversation_engine",
 ]
