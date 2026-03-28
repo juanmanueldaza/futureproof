@@ -134,6 +134,18 @@ class BaseAgent(ABC):
         )
         human_content = self._build_context(blackboard)
 
+        logger.warning(
+            "[%s] system_prompt length=%d, query=%r",
+            self.name,
+            len(system_content),
+            query[:80],
+        )
+        logger.warning(
+            "[%s] human_content first 500 chars: %s",
+            self.name,
+            human_content[:500],
+        )
+
         messages: list[Any] = [
             SystemMessage(content=system_content),
             HumanMessage(content=human_content),
@@ -158,7 +170,11 @@ class BaseAgent(ABC):
                 response = model_with_tools.invoke(messages)
             except Exception as e:
                 logger.error(
-                    "%s: LLM call failed (round %d): %s", self.name, round_num, e
+                    "%s: LLM call failed (round %d): %s",
+                    self.name,
+                    round_num,
+                    e,
+                    exc_info=True,
                 )
                 break
 
@@ -320,6 +336,10 @@ class BaseAgent(ABC):
 
         messages = agent_result.get("messages", [])
         if not messages:
+            logger.warning(
+                "%s._extract_findings: no messages in agent_result",
+                self.name,
+            )
             return {"reasoning": "No output from agent", "confidence": 0.50}
 
         # Find last AI message with text content (skip tool-call-only messages)
@@ -335,6 +355,13 @@ class BaseAgent(ABC):
             # Fall back to last message of any type
             last_msg = messages[-1]
             agent_text = str(getattr(last_msg, "content", str(last_msg)))[:4000]
+            logger.warning(
+                "%s._extract_findings: no AI text found, "
+                "fell back to last msg type=%s, text=%r",
+                self.name,
+                type(last_msg).__name__,
+                agent_text[:200],
+            )
 
         try:
             model, _ = get_model_with_fallback(purpose="analysis")
@@ -360,9 +387,12 @@ class BaseAgent(ABC):
 
         except Exception as e:
             logger.warning(
-                "%s._extract_findings structured extraction failed: %s",
+                "%s._extract_findings structured extraction "
+                "failed: %s — agent_text=%r",
                 self.name,
                 e,
+                agent_text[:500],
+                exc_info=True,
             )
             return {
                 "reasoning": sanitize_for_prompt(agent_text[:2000]),

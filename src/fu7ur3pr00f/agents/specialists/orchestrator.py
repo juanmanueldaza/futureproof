@@ -131,10 +131,14 @@ class OrchestratorAgent:
                         )
                         if sum(1 for kw in keywords if kw in intent) >= 2:
                             result.append(name)
-            logger.debug("route_llm(%r) → %s", query[:60], result)
+            logger.warning("route_llm(%r) → %s", query[:60], result)
             return result
-        except Exception as e:
-            logger.debug("LLM routing failed (%s), falling back to keywords", e)
+        except Exception:
+            logger.warning(
+                "LLM routing failed for %r, falling back to keywords",
+                query[:60],
+                exc_info=True,
+            )
 
         # Keyword fallback
         return self._route_with_keywords(query)
@@ -277,6 +281,11 @@ class OrchestratorAgent:
             _, config = get_model_with_fallback(purpose="agent")
             return config.description
         except Exception:
+            logger.warning(
+                "get_model_name() failed for %s",
+                specialist_name,
+                exc_info=True,
+            )
             return None
 
     def reset(self) -> None:

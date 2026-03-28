@@ -40,6 +40,11 @@ def _make_specialist_node(specialist: Any):
 
             stream_writer = get_stream_writer()
         except (ImportError, RuntimeError):
+            logger.warning(
+                "Stream writer unavailable for %s",
+                specialist_name,
+                exc_info=True,
+            )
             stream_writer = None
 
         # Emit start event
@@ -261,11 +266,16 @@ def _synthesize_node(state: CareerBlackboard) -> dict[str, Any]:
         logger.info("Synthesis complete: %d specialists → narrative", len(findings))
 
     except Exception as e:
-        logger.error("Synthesis LLM call failed: %s", e)
+        logger.error(
+            "Synthesis LLM call failed: %s — " "findings_text=%r",
+            e,
+            findings_text[:500],
+            exc_info=True,
+        )
         # Fall back to concatenated reasoning
         synthesis["narrative"] = (
             "\n\n".join(
-                f"**{name.upper()}:** {sanitize_for_prompt(f.get('reasoning', ''))}"
+                f"**{name.upper()}:** " f"{sanitize_for_prompt(f.get('reasoning', ''))}"
                 for name, f in findings.items()
                 if f.get("reasoning")
             )

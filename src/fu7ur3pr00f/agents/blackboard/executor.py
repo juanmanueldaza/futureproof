@@ -86,9 +86,11 @@ class BlackboardExecutor:
             max_iterations=self.scheduler.max_iterations,
         )
 
-        logger.info(
-            "Starting blackboard execution: %s (max_iterations=%d)",
-            query[:60],
+        logger.warning(
+            "Starting blackboard execution: query=%r, "
+            "specialists=%s, max_iterations=%d",
+            query[:80],
+            list(self.specialists.keys()),
             self.scheduler.max_iterations,
         )
 
@@ -166,12 +168,24 @@ class BlackboardExecutor:
 
         execution_time = time.time() - execution_start
 
-        logger.info(
-            "Blackboard execution complete: %d specialists, %d iterations, %.2fs total",
-            len(final_state.get("findings", {})),
+        findings = final_state.get("findings", {})
+        logger.warning(
+            "Blackboard execution complete: "
+            "%d specialists, %d iterations, %.2fs — "
+            "findings_keys=%s, errors=%s",
+            len(findings),
             final_state.get("iteration", 0) + 1,
             execution_time,
+            list(findings.keys()),
+            final_state.get("errors", []),
         )
+        for spec_name, finding in findings.items():
+            logger.warning(
+                "  [%s] confidence=%.2f, " "reasoning=%r",
+                spec_name,
+                finding.get("confidence", 0),
+                finding.get("reasoning", "")[:200],
+            )
 
         return final_state
 

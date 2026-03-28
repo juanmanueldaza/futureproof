@@ -53,7 +53,12 @@ def build_conversation_graph(  # noqa: C901
         active_goals = state.get("active_goals", [])
 
         turn_type = classify(query, turns, active_goals)
-        logger.debug("Turn %d: classified as %r", len(turns) + 1, turn_type)
+        logger.warning(
+            "Turn %d: query=%r → classified as %r",
+            len(turns) + 1,
+            query[:80],
+            turn_type,
+        )
 
         return {"turn_type": turn_type}
 
@@ -77,7 +82,12 @@ def build_conversation_graph(  # noqa: C901
             # new_query, steer, workflow_step → standard routing
             routed = orchestrator.route(query, conversation_history, turn_type)
 
-        logger.debug("Routed to: %s", routed)
+        logger.warning(
+            "Routed: query=%r, turn_type=%s → %s",
+            query[:60],
+            turn_type,
+            routed,
+        )
         return {"routed_specialists": routed}
 
     def execute_inner_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -100,6 +110,14 @@ def build_conversation_graph(  # noqa: C901
         orchestrator = get_orchestrator()
         executor = orchestrator.get_blackboard_executor(routed)
 
+        logger.warning(
+            "execute_inner: query=%r, routed=%s, " "turn_type=%s, constraints=%d",
+            query[:80],
+            routed,
+            turn_type,
+            len(constraints),
+        )
+
         try:
             blackboard = executor.execute(
                 query=query,
@@ -111,9 +129,16 @@ def build_conversation_graph(  # noqa: C901
                 on_tool_result=on_tool_result,
                 confirm_fn=confirm_fn,
             )
-            logger.debug("Inner blackboard completed")
+            logger.warning(
+                "Inner blackboard completed: " "findings=%s",
+                list(blackboard.get("findings", {}).keys()),
+            )
         except Exception as e:
-            logger.error("Inner blackboard failed: %s", e)
+            logger.error(
+                "Inner blackboard failed: %s",
+                e,
+                exc_info=True,
+            )
             blackboard = {
                 "query": query,
                 "findings": {},
@@ -217,9 +242,12 @@ def build_conversation_graph(  # noqa: C901
             raw = response.content if hasattr(response, "content") else str(response)
             suggestions = _parse_suggestions(str(raw))
             logger.debug("Generated %d suggestions", len(suggestions))
-        except Exception as e:
+        except Exception:
             # LLM call failed — fall back to heuristic extraction
-            logger.debug("Suggest LLM failed (%s), using heuristics", e)
+            logger.warning(
+                "Suggest LLM failed, using heuristics",
+                exc_info=True,
+            )
             suggestions = []
             if action_items:
                 suggestions.append(f"Start with: {action_items[0]}")
