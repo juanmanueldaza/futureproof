@@ -120,12 +120,21 @@ class OrchestratorAgent:
         # Try LLM-based semantic routing first
         try:
             result = self._route_with_llm(query, conversation_history, turn_type)
+            # Safety net: if LLM returned coach-only, add any specialist
+            # with 2+ keyword matches (clear domain signal the LLM missed)
+            if len(result) == 1 and result[0] == "coach":
+                intent = query.lower().replace("-", " ")
+                for name, agent in self._specialists.items():
+                    if name != "coach" and name not in result and len(result) < 4:
+                        keywords: frozenset[str] = getattr(
+                            agent, "KEYWORDS", frozenset()
+                        )
+                        if sum(1 for kw in keywords if kw in intent) >= 2:
+                            result.append(name)
             logger.debug("route_llm(%r) → %s", query[:60], result)
             return result
         except Exception as e:
-            logger.debug(
-                "LLM routing failed (%s), falling back to keywords", e
-            )
+            logger.debug("LLM routing failed (%s), falling back to keywords", e)
 
         # Keyword fallback
         return self._route_with_keywords(query)
@@ -148,9 +157,7 @@ class OrchestratorAgent:
         is_comprehensive = any(kw in intent for kw in _MULTI_SPECIALIST_KEYWORDS)
 
         if is_comprehensive:
-            sorted_specs = sorted(
-                scores.items(), key=lambda x: x[1], reverse=True
-            )
+            sorted_specs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
             result = ["coach"]
             for name, _score in sorted_specs:
                 if name != "coach" and len(result) < 4:
@@ -191,9 +198,7 @@ class OrchestratorAgent:
         context = "No prior context."
         if turn_type in ("steer", "workflow_step") and conversation_history:
             recent = conversation_history[-3:]
-            context_lines = [
-                f"- {t.get('query', '')[:80]}" for t in recent
-            ]
+            context_lines = [f"- {t.get('query', '')[:80]}" for t in recent]
             context = "\n".join(context_lines)
 
         prompt_template = load_prompt("route_specialists")
@@ -202,15 +207,14 @@ class OrchestratorAgent:
             context=context,
         )
 
-        model, _ = get_model_with_fallback(
-            purpose="summary", temperature=0.0
-        )
+        model, _ = get_model_with_fallback(purpose="summary", temperature=0.0)
         router = model.with_structured_output(RoutingDecision)
         result = router.invoke([HumanMessage(content=prompt)])  # type: ignore
 
         # Validate names against known specialists
         valid = [
-            name for name in result.specialists  # type: ignore
+            name
+            for name in result.specialists  # type: ignore
             if name in self._specialists
         ]
         return valid or ["coach"]
