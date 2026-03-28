@@ -4,11 +4,6 @@ import time
 
 import pytest
 
-from fu7ur3pr00f.agents.specialists.coach import CoachAgent
-from fu7ur3pr00f.agents.specialists.code import CodeAgent
-from fu7ur3pr00f.agents.specialists.founder import FounderAgent
-from fu7ur3pr00f.agents.specialists.jobs import JobsAgent
-from fu7ur3pr00f.agents.specialists.learning import LearningAgent
 from fu7ur3pr00f.agents.specialists.orchestrator import OrchestratorAgent
 
 TEST_QUERIES = [
@@ -22,15 +17,8 @@ TEST_QUERIES = [
 
 @pytest.fixture
 def orchestrator() -> OrchestratorAgent:
-    orch = OrchestratorAgent()
-    orch._specialists = {
-        "coach": CoachAgent(),
-        "learning": LearningAgent(),
-        "jobs": JobsAgent(),
-        "code": CodeAgent(),
-        "founder": FounderAgent(),
-    }
-    return orch
+    """Return orchestrator with default specialists (no modification needed)."""
+    return OrchestratorAgent()
 
 
 VALID_SPECIALISTS = {"coach", "learning", "jobs", "code", "founder"}

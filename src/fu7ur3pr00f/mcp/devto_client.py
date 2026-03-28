@@ -6,6 +6,8 @@ https://dev.to/ - Developer community with trending articles.
 
 from typing import Any
 
+from fu7ur3pr00f.constants import DEVTO_API_BASE
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 
@@ -17,7 +19,7 @@ class DevToMCPClient(HTTPMCPClient):
     Returns trending articles from dev.to.
     """
 
-    BASE_URL = "https://dev.to/api/articles"
+    BASE_URL = DEVTO_API_BASE
 
     async def list_tools(self) -> list[str]:
         """List available tools."""

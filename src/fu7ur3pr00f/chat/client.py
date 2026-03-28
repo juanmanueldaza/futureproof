@@ -22,8 +22,10 @@ from prompt_toolkit.styles import Style as PTStyle  # noqa: E402
 from rich.markdown import Markdown  # noqa: E402
 
 from fu7ur3pr00f.agents.blackboard import get_conversation_engine  # noqa: E402
-from fu7ur3pr00f.agents.specialists.orchestrator import (  # noqa: E402
+from fu7ur3pr00f.agents.specialists.blackboard_factory import (  # noqa: E402
     get_agent_config,
+)
+from fu7ur3pr00f.agents.specialists.orchestrator import (  # noqa: E402
     get_orchestrator,
     reset_orchestrator,
 )
@@ -42,13 +44,20 @@ from fu7ur3pr00f.chat.ui import (  # noqa: E402
     display_welcome,
 )
 from fu7ur3pr00f.config import settings  # noqa: E402
+from fu7ur3pr00f.constants import (  # noqa: E402
+    COLOR_ACCENT,
+    COLOR_ERROR,
+    COLOR_INFO,
+    COLOR_SUCCESS,
+    COLOR_WARNING,
+)
 from fu7ur3pr00f.memory.checkpointer import get_data_dir  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 # ── Prompt styling ────────────────────────────────────────────────────────
 
-_PROMPT_STYLE = PTStyle.from_dict({"prompt": "#ffd700 bold"})
+_PROMPT_STYLE = PTStyle.from_dict({"prompt": f"{COLOR_WARNING} bold"})
 _PROMPT_MSG = HTML("<prompt>\u25b6 </prompt>")
 
 # Patterns that might leak API keys or tokens in error messages
@@ -74,7 +83,7 @@ def get_history_path() -> Path:
     return get_data_dir() / "chat_history"
 
 
-def handle_command(  # noqa: C901 TODO: refactor
+def handle_command(  # noqa: C901 - Command dispatcher with 15+ slash commands
     command: str, *, chat_state: dict
 ) -> bool:
     """Handle slash commands.
@@ -91,7 +100,9 @@ def handle_command(  # noqa: C901 TODO: refactor
     arg = parts[1].strip() if len(parts) > 1 else ""
 
     if cmd in ("/quit", "/q", "/exit"):
-        console.print("[#415a77]Goodbye! Your conversation is saved.[/#415a77]")
+        console.print(
+            f"[{COLOR_INFO}]Goodbye! Your conversation is saved.[/{COLOR_INFO}]"
+        )
         return True
 
     if cmd in ("/help", "/h"):
@@ -110,25 +121,27 @@ def handle_command(  # noqa: C901 TODO: refactor
         from fu7ur3pr00f.memory.checkpointer import clear_thread_history
 
         clear_thread_history(chat_state["thread_id"])
-        console.print("[#415a77]Conversation history cleared.[/#415a77]")
+        console.print(f"[{COLOR_INFO}]Conversation history cleared.[/{COLOR_INFO}]")
         return False
 
     if cmd == "/thread":
         if not arg:
             console.print(
-                f"[#415a77]Current thread: [bold]{chat_state['thread_id']}[/bold][/#415a77]"  # noqa: E501
+                f"[{COLOR_INFO}]Current thread: [bold]{chat_state['thread_id']}[/bold][/{COLOR_INFO}]"  # noqa: E501
             )
         else:
             # Validate thread ID to prevent injection attacks
             if not _VALID_THREAD_ID_RE.match(arg):
                 console.print(
-                    "[#ff6b6b]Invalid thread ID: use alphanumeric characters, "
-                    "dashes, and underscores only (max 64 chars).[/#ff6b6b]"
+                    f"[{COLOR_ERROR}]Invalid thread ID: use alphanumeric characters, "
+                    f"dashes, and underscores only (max 64 chars).[/{COLOR_ERROR}]"
                 )
                 return False
             chat_state["thread_id"] = arg
             chat_state["config"] = get_agent_config(thread_id=arg)
-            console.print(f"[#10b981]Switched to thread: [bold]{arg}[/bold][/#10b981]")
+            console.print(
+                f"[{COLOR_SUCCESS}]Switched to thread: [bold]{arg}[/bold][/{COLOR_SUCCESS}]"
+            )
         return False
 
     if cmd == "/threads":
@@ -136,12 +149,18 @@ def handle_command(  # noqa: C901 TODO: refactor
 
         thread_list = list_threads()
         if thread_list:
-            console.print("[bold #e0d8c0]Conversation threads:[/bold #e0d8c0]")
+            console.print(
+                f"[bold {COLOR_ACCENT}]Conversation threads:[/bold {COLOR_ACCENT}]"
+            )
             for t in thread_list:
                 marker = " (active)" if t == chat_state["thread_id"] else ""
-                console.print(f"  - {t}[bold #ffd700]{marker}[/bold #ffd700]")
+                console.print(
+                    f"  - {t}[bold {COLOR_WARNING}]{marker}[/bold {COLOR_WARNING}]"
+                )
         else:
-            console.print("[#415a77]No conversation threads found.[/#415a77]")
+            console.print(
+                f"[{COLOR_INFO}]No conversation threads found.[/{COLOR_INFO}]"
+            )
         return False
 
     if cmd == "/memory":
@@ -175,8 +194,12 @@ def handle_command(  # noqa: C901 TODO: refactor
             service = GathererService()
             sections = service.gather_all()
 
-            console.print(f"\n[#10b981]✓ Gathered {len(sections)} sections[/#10b981]")
-            console.print("[#10b981]✓ Data indexed to knowledge base[/#10b981]\n")
+            console.print(
+                f"\n[{COLOR_SUCCESS}]✓ Gathered {len(sections)} sections[/{COLOR_SUCCESS}]"
+            )
+            console.print(
+                f"[{COLOR_SUCCESS}]✓ Data indexed to knowledge base[/{COLOR_SUCCESS}]\n"
+            )
         except ImportError as e:
             # Fallback: run gatherers directly
             console.print(f"[dim]Fallback mode (ImportError: {e})[/dim]\n")
@@ -202,9 +225,11 @@ def handle_command(  # noqa: C901 TODO: refactor
                     sections = gatherer.gather(zip_file)
                     elapsed = time.time() - start
                     total += len(sections)
-                    console.print(f"  [#10b981]✓ {len(sections)} sections[/#10b981]")
+                    console.print(
+                        f"  [{COLOR_SUCCESS}]✓ {len(sections)} sections[/{COLOR_SUCCESS}]"
+                    )
             else:
-                console.print("  [#ff6b6b]No LinkedIn ZIP found[/#ff6b6b]")
+                console.print(f"  [{COLOR_ERROR}]No LinkedIn ZIP found[/{COLOR_ERROR}]")
             console.print()
 
             # CliftonStrengths
@@ -220,10 +245,12 @@ def handle_command(  # noqa: C901 TODO: refactor
                 elapsed = time.time() - start
                 total += len(sections)
                 console.print(
-                    f"  [#10b981]✓ {len(sections)} sections in {elapsed:.1f}s[/#10b981]"
+                    f"  [{COLOR_SUCCESS}]✓ {len(sections)} sections in {elapsed:.1f}s[/{COLOR_SUCCESS}]"
                 )
             else:
-                console.print("  [#ff6b6b]No CliftonStrengths PDFs found[/#ff6b6b]")
+                console.print(
+                    f"  [{COLOR_ERROR}]No CliftonStrengths PDFs found[/{COLOR_ERROR}]"
+                )
             console.print()
 
             # CV
@@ -243,14 +270,14 @@ def handle_command(  # noqa: C901 TODO: refactor
                         elapsed = time.time() - start
                         total += len(sections)
                         console.print(
-                            f"  [#10b981]✓ {len(sections)} sections[/#10b981]"
+                            f"  [{COLOR_SUCCESS}]✓ {len(sections)} sections[/{COLOR_SUCCESS}]"
                         )
                     except Exception as e:
                         console.print(
-                            f"  [#ff6b6b]✗ Skip: {cv_file.name} ({e})[/#ff6b6b]"
+                            f"  [{COLOR_ERROR}]✗ Skip: {cv_file.name} ({e})[/{COLOR_ERROR}]"
                         )
             else:
-                console.print("  [#ff6b6b]No CV files found[/#ff6b6b]")
+                console.print(f"  [{COLOR_ERROR}]No CV files found[/{COLOR_ERROR}]")
             console.print()
 
             # Portfolio
@@ -263,27 +290,27 @@ def handle_command(  # noqa: C901 TODO: refactor
                 elapsed = time.time() - start
                 total += len(sections)
                 console.print(
-                    f"  [#10b981]✓ {len(sections)} sections in {elapsed:.1f}s[/#10b981]"
+                    f"  [{COLOR_SUCCESS}]✓ {len(sections)} sections in {elapsed:.1f}s[/{COLOR_SUCCESS}]"
                 )
             else:
                 console.print(
-                    "[bold]Portfolio:[/bold] [#ff6b6b]No URL configured[/#ff6b6b]"
+                    f"[bold]Portfolio:[/bold] [{COLOR_ERROR}]No URL configured[/{COLOR_ERROR}]"
                 )
             console.print()
 
             if total > 0:
                 console.print(
-                    "\n[bold #10b981]═══════════════════════════════════════[/bold #10b981]"  # noqa: E501
+                    f"\n[bold {COLOR_SUCCESS}]═══════════════════════════════════════[/bold {COLOR_SUCCESS}]"  # noqa: E501
                 )
                 console.print(
-                    f"[bold #10b981]  Total: {total} sections indexed[/bold #10b981]"
+                    f"[bold {COLOR_SUCCESS}]  Total: {total} sections indexed[/bold {COLOR_SUCCESS}]"
                 )
                 console.print(
-                    "[bold #10b981]═══════════════════════════════════════[/bold #10b981]\n"  # noqa: E501
+                    f"[bold {COLOR_SUCCESS}]═══════════════════════════════════════[/bold {COLOR_SUCCESS}]\n"  # noqa: E501
                 )
             else:
                 console.print(
-                    "\n[#ff6b6b]No data files found. Add files to data/raw/[/#ff6b6b]\n"
+                    f"\n[{COLOR_ERROR}]No data files found. Add files to data/raw/[/{COLOR_ERROR}]\n"
                 )
                 console.print("Expected files:")
                 console.print("  - LinkedIn: linkedin.zip (from LinkedIn export)")
@@ -293,7 +320,7 @@ def handle_command(  # noqa: C901 TODO: refactor
         except Exception as e:
             import traceback
 
-            console.print(f"\n[#ff6b6b]Gather failed:[/#ff6b6b] {e}")
+            console.print(f"\n[{COLOR_ERROR}]Gather failed:[/{COLOR_ERROR}] {e}")
             console.print(f"[dim]{traceback.format_exc()}[/dim]\n")
         return False
 
@@ -304,7 +331,7 @@ def handle_command(  # noqa: C901 TODO: refactor
         console.print("[bold #5bc0be]Specialist Agents[/bold #5bc0be]\n")
         for a in agents:
             console.print(
-                f"  [bold #ffd700]{a['name']}[/bold #ffd700]: {a['description']}"
+                f"  [bold {COLOR_WARNING}]{a['namef']}[/bold {COLOR_WARNING}]: {a['description']}"
             )
         console.print()
         return False
@@ -314,11 +341,11 @@ def handle_command(  # noqa: C901 TODO: refactor
         current_level = logging.getLogger().level
         if current_level <= logging.DEBUG:
             logging.getLogger().setLevel(logging.WARNING)
-            console.print("[#ff6b6b]Debug mode OFF[/#ff6b6b]\n")
+            console.print(f"[{COLOR_ERROR}]Debug mode OFF[/{COLOR_ERROR}]\n")
         else:
             logging.getLogger().setLevel(logging.DEBUG)
             logging.getLogger("fu7ur3pr00f").setLevel(logging.DEBUG)
-            console.print("[#10b981]Debug mode ON[/#10b981]\n")
+            console.print(f"[{COLOR_SUCCESS}]Debug mode ON[/{COLOR_SUCCESS}]\n")
             console.print("[dim]You will now see:[/dim]")
             console.print("  - LLM API calls and responses")
             console.print("  - Tool execution details")
@@ -365,13 +392,15 @@ def handle_command(  # noqa: C901 TODO: refactor
             ("Market cache", data_dir / "cache"),
         ]
 
-        console.print("[bold #ff6b6b]Factory Reset[/bold #ff6b6b]\n")
+        console.print(f"[bold {COLOR_ERROR}]Factory Reset[/bold {COLOR_ERROR}]\n")
         console.print("This will delete:")
         for label, path in targets:
             exists = path.exists()
             status = "" if exists else " [dim](not found)[/dim]"
             console.print(f"  - {label}: {path}{status}")
-        console.print("\n[#10b981]Preserved:[/#10b981] data/raw/ (LinkedIn ZIPs, PDFs)")
+        console.print(
+            f"\n[{COLOR_SUCCESS}]Preserved:[/{COLOR_SUCCESS}] data/raw/ (LinkedIn ZIPs, PDFs)"
+        )
 
         try:
             confirm = chat_state["session"].prompt("\nProceed? [y/N] ").strip().lower()
@@ -379,7 +408,7 @@ def handle_command(  # noqa: C901 TODO: refactor
             confirm = ""
 
         if confirm not in ("y", "yes"):
-            console.print("[#415a77]Reset cancelled.[/#415a77]")
+            console.print(f"[{COLOR_INFO}]Reset cancelled.[/{COLOR_INFO}]")
             return False
 
         deleted = 0
@@ -403,18 +432,22 @@ def handle_command(  # noqa: C901 TODO: refactor
 
         settings.ensure_directories()
         console.print(
-            f"\n[#10b981]Factory reset complete.[/#10b981] Cleared {deleted} items."
+            f"\n[{COLOR_SUCCESS}]Factory reset complete.[/{COLOR_SUCCESS}] Cleared {deleted} items."
         )
-        console.print("[#415a77]Restart FutureProof to start fresh.[/#415a77]")
+        console.print(
+            f"[{COLOR_INFO}]Restart FutureProof to start fresh.[/{COLOR_INFO}]"
+        )
         return True
 
     console.print(
-        f"[#ffd700]Unknown command: {cmd}. Type /help for available commands.[/#ffd700]"
+        f"[{COLOR_WARNING}]Unknown command: {cmd}. Type /help for available commands.[/{COLOR_WARNING}]"
     )
     return False
 
 
-def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
+def run_chat(
+    thread_id: str = "main",
+) -> None:  # noqa: C901 - Main chat loop with command/tool handling
     """Run the synchronous chat loop.
 
     Args:
@@ -524,7 +557,9 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
 
             def _on_tool_result(specialist: str, tool_name: str, result: str) -> None:
                 key = f"{specialist}:{tool_name}"
-                elapsed_t = time.monotonic() - tool_start_times.pop(key, time.monotonic())
+                elapsed_t = time.monotonic() - tool_start_times.pop(
+                    key, time.monotonic()
+                )
                 display_tool_result(tool_name, result, elapsed_t)
 
             def _confirm(question: str, details: str) -> bool:
@@ -562,10 +597,10 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
                 display_error(_sanitize_error(f"Analysis failed: {e}"))
 
         except KeyboardInterrupt:
-            console.print("\n[#415a77]Use /quit to exit[/#415a77]")
+            console.print(f"\n[{COLOR_INFO}]Use /quit to exit[/{COLOR_INFO}]")
             continue
         except EOFError:
-            console.print("\n[#415a77]Goodbye![/#415a77]")
+            console.print(f"\n[{COLOR_INFO}]Goodbye![/{COLOR_INFO}]")
             break
         except Exception as e:
             # Catch unhandled exceptions from event loop / nest_asyncio
@@ -576,5 +611,7 @@ def run_chat(thread_id: str = "main") -> None:  # noqa: C901 TODO: refactor
             else:
                 # Bare Exception() with no message — typically from
                 # nest_asyncio/prompt_toolkit event loop conflicts
-                console.print("\n[#415a77]Press ENTER to continue...[/#415a77]")
+                console.print(
+                    f"\n[{COLOR_INFO}]Press ENTER to continue...[/{COLOR_INFO}]"
+                )
             continue

@@ -12,6 +12,7 @@ import httpx
 
 from .agents.tools import get_all_tools
 from .config import settings
+from .constants import GITHUB_API_BASE, HTTP_TIMEOUT
 from .mcp.factory import MCPClientFactory, MCPServerType
 
 
@@ -44,7 +45,7 @@ def _check_gitlab() -> bool:
             [glab_path, "auth", "status"],
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=HTTP_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
         _print_result("GitLab (glab)", False, "auth status timed out")
@@ -71,8 +72,8 @@ async def _check_mcp_server(server_type: MCPServerType) -> bool:
 
     client = MCPClientFactory.create(server_type)
     try:
-        await asyncio.wait_for(client.connect(), timeout=20)
-        tools = await asyncio.wait_for(client.list_tools(), timeout=20)
+        await asyncio.wait_for(client.connect(), timeout=HTTP_TIMEOUT)
+        tools = await asyncio.wait_for(client.list_tools(), timeout=HTTP_TIMEOUT)
         _print_result(f"MCP:{server_type}", True, f"{len(tools)} tools")
         return True
     except Exception as exc:  # pragma: no cover - diagnostics surface raw failure
@@ -100,7 +101,9 @@ def _check_github_rest() -> tuple[bool, str]:
         "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
-        response = httpx.get("https://api.github.com/user", headers=headers, timeout=20)
+        response = httpx.get(
+            f"{GITHUB_API_BASE}/user", headers=headers, timeout=HTTP_TIMEOUT
+        )
         if response.status_code >= 400:
             return False, f"REST {response.status_code}"
         return True, "rest fallback"

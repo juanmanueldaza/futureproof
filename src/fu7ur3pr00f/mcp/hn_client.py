@@ -9,6 +9,8 @@ import re
 from collections import Counter
 from typing import Any
 
+from fu7ur3pr00f.constants import HN_API_BASE, HN_BASE_URL
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 
@@ -22,7 +24,7 @@ class HackerNewsMCPClient(HTTPMCPClient):
     Rate limit: 10,000 requests/hour from a single IP.
     """
 
-    BASE_URL = "https://hn.algolia.com/api/v1"
+    BASE_URL = HN_API_BASE
 
     # Tech terms to track in job postings
     TECH_TERMS: dict[str, list[str]] = {
@@ -187,10 +189,7 @@ class HackerNewsMCPClient(HTTPMCPClient):
                     "points": hit.get("points", 0),
                     "num_comments": hit.get("num_comments", 0),
                     "created_at": hit.get("created_at", ""),
-                    "hn_url": (
-                        "https://news.ycombinator.com/"
-                        f"item?id={hit.get('objectID', '')}"
-                    ),
+                    "hn_url": (f"{HN_BASE_URL}/" f"item?id={hit.get('objectID', '')}"),
                 }
             )
 
@@ -251,8 +250,7 @@ class HackerNewsMCPClient(HTTPMCPClient):
             }
             if include_hn_url:
                 thread["hn_url"] = (
-                    f"https://news.ycombinator.com/item?"
-                    f"id={hit.get('objectID', '')}"
+                    f"{HN_BASE_URL}/item?" f"id={hit.get('objectID', '')}"
                 )
             threads.append(thread)
             if len(threads) >= months:
@@ -351,10 +349,7 @@ class HackerNewsMCPClient(HTTPMCPClient):
                     "points": hit.get("points", 0),
                     "num_comments": hit.get("num_comments", 0),
                     "created_at": hit.get("created_at", ""),
-                    "hn_url": (
-                        "https://news.ycombinator.com/"
-                        f"item?id={hit.get('objectID', '')}"
-                    ),
+                    "hn_url": (f"{HN_BASE_URL}/" f"item?id={hit.get('objectID', '')}"),
                 }
             )
 
@@ -527,9 +522,7 @@ class HackerNewsMCPClient(HTTPMCPClient):
             "tech_stack": tech_stack,
             "text_preview": clean_text[:500],
             "full_text": clean_text,
-            "hn_url": (
-                "https://news.ycombinator.com/" f"item?id={comment.get('objectID', '')}"
-            ),
+            "hn_url": (f"{HN_BASE_URL}/" f"item?id={comment.get('objectID', '')}"),
             "author": comment.get("author", ""),
             "created_at": comment.get("created_at", ""),
             "site": "hn_hiring",

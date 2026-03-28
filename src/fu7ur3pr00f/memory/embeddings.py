@@ -21,6 +21,7 @@ from typing import Any
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
 from fu7ur3pr00f.config import settings
+from fu7ur3pr00f.constants import MAX_EMBEDDING_CACHE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,7 @@ class CachedEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(
         self,
         base_function: EmbeddingFunction[Documents],
-        max_cache_size: int = 1000,
+        max_cache_size: int = MAX_EMBEDDING_CACHE_SIZE,
     ) -> None:
         self._base = base_function
         self._cache: dict[str, Any] = {}  # Can be list[float] or numpy array

@@ -12,4 +12,10 @@ If the question asks for advice, strategy, or analysis, then additionally synthe
 - Concrete recommended skills or steps
 - Your overall reasoning and confidence
 
+**Sovereignty-First Enhancements**:
+- Include Confidence Score (0-100) and what data is missing
+- Include Sovereignty Score for recommendations (0-100 based on portability and freedom)
+- If proprietary roles are discussed, calculate Freedom Tax
+- Prioritize open source and public proof over company-locked achievements
+
 Be concrete and data-driven — use specific examples from this person's actual profile, projects, market data, and other findings. Avoid generic advice.

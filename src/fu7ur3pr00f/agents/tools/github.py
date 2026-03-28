@@ -8,10 +8,10 @@ import logging
 from langchain_core.tools import tool
 
 from fu7ur3pr00f.config import settings
+from fu7ur3pr00f.constants import GITHUB_API_BASE as _GITHUB_API_BASE
 from fu7ur3pr00f.mcp.pool import MCPErrorType, call_mcp, get_error_type
 
 logger = logging.getLogger(__name__)
-_GITHUB_API_BASE = "https://api.github.com"
 
 
 def _github_http_headers() -> tuple[dict[str, str] | None, str]:

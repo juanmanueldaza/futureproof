@@ -15,38 +15,6 @@ class CoachAgent(BaseAgent):
     - Skill gap analysis for target roles
     """
 
-    KEYWORDS = frozenset(
-        {
-            "promotion",
-            "promoted",
-            "leadership",
-            "lead",
-            "manager",
-            "staff",
-            "principal",
-            "senior",
-            "career growth",
-            "career path",
-            "influence",
-            "office politics",
-            "cliftonstrengths",
-            "strengths",
-            "coaching",
-            "mentor",
-            "mentoring",
-            "visibility",
-            "impact",
-            "advice",
-            "strategy",
-            "next step",
-            "linkedin",
-            "generate",
-            "title",
-            "position",
-            "role",
-        }
-    )
-
     @property
     def name(self) -> str:
         return "coach"

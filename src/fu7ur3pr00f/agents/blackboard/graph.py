@@ -97,6 +97,7 @@ def _make_specialist_node(specialist: Any):
                 "findings": state.get("findings", {}) | {specialist_name: finding},
                 "change_log": [change_entry],
                 "current_specialist": specialist_name,
+                "_tool_cache": state.get("_tool_cache", {}),
             }
 
         except _GraphInterrupt:

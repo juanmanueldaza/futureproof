@@ -41,7 +41,7 @@ class ContentTrendsGatherer(MarketGatherer):
         focus = kwargs.get("focus", "all")
         return f"content_trends_{focus}".lower().replace(" ", "_")
 
-    async def gather(  # noqa: C901 TODO: refactor
+    async def gather(  # noqa: C901 - Multi-source data gathering with error handling
         self, **kwargs: Any
     ) -> dict[str, Any]:
         """Gather content trends from developer communities.

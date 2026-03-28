@@ -17,6 +17,12 @@ import subprocess  # nosec B404 — required for pdftotext CLI
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from fu7ur3pr00f.constants import (
+    CLIFTON_ALL_34_MAX_RANK,
+    CLIFTON_TOP_5_MAX_RANK,
+    CLIFTON_TOP_10_MAX_RANK,
+)
+
 from ..memory.chunker import Section
 
 logger = logging.getLogger(__name__)
@@ -172,7 +178,7 @@ class CliftonStrengthsGatherer:
         return any(indicator in name for indicator in GALLUP_PDF_INDICATORS)
 
     def _extract_ranked_strengths(
-        self, text: str, max_rank: int = 34
+        self, text: str, max_rank: int = CLIFTON_ALL_34_MAX_RANK
     ) -> list[StrengthInsight]:
         """Extract ranked strengths from text into StrengthInsight objects.
 
@@ -285,11 +291,11 @@ class CliftonStrengthsGatherer:
         data.all_34 = [s.name for s in all_strengths]
 
         # Also populate top_5 and top_10 if not already done
-        if not data.top_5 and len(data.all_34) >= 5:
-            data.top_5 = list(all_strengths[:5])
+        if not data.top_5 and len(data.all_34) >= CLIFTON_TOP_5_MAX_RANK:
+            data.top_5 = list(all_strengths[:CLIFTON_TOP_5_MAX_RANK])
 
-        if not data.top_10 and len(data.all_34) >= 10:
-            data.top_10 = list(all_strengths[:10])
+        if not data.top_10 and len(data.all_34) >= CLIFTON_TOP_10_MAX_RANK:
+            data.top_10 = list(all_strengths[:CLIFTON_TOP_10_MAX_RANK])
 
         # Parse detailed insights for each strength
         self._parse_strength_details(text, data)
@@ -299,7 +305,9 @@ class CliftonStrengthsGatherer:
         if data.top_5:
             return
 
-        data.top_5 = self._extract_ranked_strengths(text, max_rank=5)
+        data.top_5 = self._extract_ranked_strengths(
+            text, max_rank=CLIFTON_TOP_5_MAX_RANK
+        )
         self._parse_strength_details(text, data)
 
     def _parse_top_10(self, text: str, data: CliftonStrengthsData) -> None:
@@ -307,7 +315,9 @@ class CliftonStrengthsGatherer:
         if data.top_10:
             return
 
-        data.top_10 = self._extract_ranked_strengths(text, max_rank=10)
+        data.top_10 = self._extract_ranked_strengths(
+            text, max_rank=CLIFTON_TOP_10_MAX_RANK
+        )
         self._parse_strength_details(text, data)
 
     # -----------------------------------------------------------------
@@ -318,9 +328,11 @@ class CliftonStrengthsGatherer:
         """Populate top_10 from a ranked list in text if not already done."""
         if data.top_10:
             return
-        data.top_10 = self._extract_ranked_strengths(text, max_rank=10)
-        if not data.top_5 and len(data.top_10) >= 5:
-            data.top_5 = list(data.top_10[:5])
+        data.top_10 = self._extract_ranked_strengths(
+            text, max_rank=CLIFTON_TOP_10_MAX_RANK
+        )
+        if not data.top_5 and len(data.top_10) >= CLIFTON_TOP_5_MAX_RANK:
+            data.top_5 = list(data.top_10[:CLIFTON_TOP_5_MAX_RANK])
 
     def _split_personalized_insights(self, text: str) -> list[str]:
         """Split personalized insights text into individual paragraphs.
@@ -574,7 +586,11 @@ class CliftonStrengthsGatherer:
             rank = 1
             for name in matches:
                 name = name.strip()
-                if name in STRENGTH_TO_DOMAIN and name not in seen and rank <= 5:
+                if (
+                    name in STRENGTH_TO_DOMAIN
+                    and name not in seen
+                    and rank <= CLIFTON_TOP_5_MAX_RANK
+                ):
                     seen.add(name)
                     data.top_5.append(
                         StrengthInsight(
@@ -727,7 +743,7 @@ class CliftonStrengthsGatherer:
         text = re.sub(r"\d+\s*$", "", text)
         return text.strip()
 
-    def _build_sections(  # noqa: C901 TODO: refactor
+    def _build_sections(  # noqa: C901 - Builds 10+ labeled sections from assessment data
         self, data: CliftonStrengthsData
     ) -> list[Section]:
         """Build labeled sections from parsed CliftonStrengths data."""

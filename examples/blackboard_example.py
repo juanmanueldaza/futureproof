@@ -5,7 +5,6 @@ a comprehensive 5-year career prediction with integrated analysis from
 all 5 specialists (Coach, Learning, Code, Jobs, Founder).
 """
 
-from fu7ur3pr00f.agents.blackboard.scheduler import BlackboardScheduler
 from fu7ur3pr00f.agents.specialists.orchestrator import get_orchestrator
 
 
@@ -30,11 +29,7 @@ def example_blackboard_execution():
     }
 
     # Create blackboard executor with iterative strategy
-    scheduler = BlackboardScheduler(
-        strategy="linear_iterative",
-        max_iterations=3,  # Do 3 passes through all specialists
-    )
-    executor = orchestrator.get_blackboard_executor(scheduler=scheduler)
+    executor = orchestrator.get_executor(strategy="linear_iterative", max_iterations=3)
 
     print("=" * 70)
     print("BLACKBOARD PATTERN: Multi-Specialist Career Analysis")

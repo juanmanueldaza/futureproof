@@ -37,6 +37,7 @@ Route this query to specialists using this step-by-step process:
   <rule priority="5">Include **founder** when entrepreneurship, side income, startups, or business ideas are implied</rule>
   <rule priority="6">For factual questions (job title, skills list): route to coach only (single specialist)</rule>
   <rule priority="7">For follow-up questions: reuse specialists from prior turn if context is related</rule>
+  <rule priority="8">For sovereignty-related questions (OSS, ethics, freedom): prioritize code + founder</rule>
 </routing_rules>
 
 <examples>
@@ -86,6 +87,12 @@ Route this query to specialists using this step-by-step process:
 <query>"Advise me on my portfolio and developer visibility"</query>
 <specialists>["code", "coach"]</specialists>
 <reasoning>Code audits GitHub/GitLab repos, READMEs, and open source contributions. Coach provides career strategy context. Code leads because primary ask is portfolio improvement.</reasoning>
+</example>
+
+<example>
+<query>"Which open source projects should I contribute to for maximum career impact?"</query>
+<specialists>["code", "jobs", "founder"]</specialists>
+<reasoning>Code identifies high-impact OSS projects aligned with user's stack. Jobs provides market data on which contributions lead to hiring. Founder explores dual-licensing or sponsorship opportunities. Code leads because primary ask is OSS strategy.</reasoning>
 </example>
 </examples>
 

@@ -122,14 +122,22 @@ class TestExtractTextMarkdown:
 class TestParseSectionsPdf:
     def test_structured_text_returns_sections(self):
         gatherer = CVGatherer()
-        sections = gatherer._parse_sections(STRUCTURED_PDF_TEXT, "pdf")
+        mock_sections = [
+            Section("Experience", "Software Engineer at Acme Corp"),
+            Section("Education", "MSc Computer Science, MIT"),
+        ]
+        with patch.object(
+            gatherer, "_parse_sections_with_llm", return_value=mock_sections
+        ):
+            sections = gatherer._parse_sections_with_llm(STRUCTURED_PDF_TEXT)
         names = [s.name for s in sections]
         assert any("Experience" in n for n in names)
         assert any("Education" in n for n in names)
 
     def test_unstructured_text_returns_empty(self):
         gatherer = CVGatherer()
-        sections = gatherer._parse_sections(UNSTRUCTURED_TEXT, "pdf")
+        with patch.object(gatherer, "_parse_sections_with_llm", return_value=[]):
+            sections = gatherer._parse_sections_with_llm(UNSTRUCTURED_TEXT)
         assert sections == []
 
 
@@ -141,7 +149,14 @@ class TestParseSectionsPdf:
 class TestParseSectionsMarkdown:
     def test_structured_md_returns_two_sections(self):
         gatherer = CVGatherer()
-        sections = gatherer._parse_sections(STRUCTURED_MD_TEXT, "markdown")
+        mock_sections = [
+            Section("Experience", "Software Engineer at Acme Corp"),
+            Section("Education", "MSc Computer Science, MIT"),
+        ]
+        with patch.object(
+            gatherer, "_parse_sections_with_llm", return_value=mock_sections
+        ):
+            sections = gatherer._parse_sections_with_llm(STRUCTURED_MD_TEXT)
         assert len(sections) == 2
         names = [s.name for s in sections]
         assert "Experience" in names
@@ -150,7 +165,14 @@ class TestParseSectionsMarkdown:
     def test_partial_sections_returns_only_present(self):
         partial_md = "## Experience\nSoftware Engineer\n\n## Skills\nPython, Go\n"
         gatherer = CVGatherer()
-        sections = gatherer._parse_sections(partial_md, "markdown")
+        mock_sections = [
+            Section("Experience", "Software Engineer"),
+            Section("Skills", "Python, Go"),
+        ]
+        with patch.object(
+            gatherer, "_parse_sections_with_llm", return_value=mock_sections
+        ):
+            sections = gatherer._parse_sections_with_llm(partial_md)
         assert len(sections) == 2
         names = [s.name for s in sections]
         assert "Experience" in names
@@ -259,7 +281,14 @@ BS Computer Science
         )
 
         gatherer = CVGatherer()
-        sections = gatherer.gather(txt_file)
+        mock_sections = [
+            Section("Experience", "Software Engineer at Acme"),
+            Section("Education", "BS Computer Science"),
+        ]
+        with patch.object(
+            gatherer, "_parse_sections_with_llm", return_value=mock_sections
+        ):
+            sections = gatherer.gather(txt_file)
 
         assert len(sections) >= 2
         section_names = [s.name.lower() for s in sections]
@@ -332,7 +361,8 @@ class TestGatherFallback:
         md_file.write_text(UNSTRUCTURED_TEXT, encoding="utf-8")
 
         gatherer = CVGatherer()
-        sections = gatherer.gather(md_file)
+        with patch.object(gatherer, "_parse_sections_with_llm", return_value=[]):
+            sections = gatherer.gather(md_file)
 
         assert len(sections) == 1
         assert sections[0].name == "CV Content"

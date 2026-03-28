@@ -6,6 +6,8 @@ https://remoteok.com/ - #1 remote jobs board with 30,000+ listings.
 
 from typing import Any
 
+from fu7ur3pr00f.constants import REMOTEOK_API_BASE
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 
@@ -17,7 +19,7 @@ class RemoteOKMCPClient(HTTPMCPClient):
     Returns remote job listings from remoteok.com.
     """
 
-    BASE_URL = "https://remoteok.com/api"
+    BASE_URL = REMOTEOK_API_BASE
 
     async def list_tools(self) -> list[str]:
         """List available tools."""

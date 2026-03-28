@@ -7,6 +7,8 @@ https://himalayas.app/ - 100K+ remote job listings with salary information.
 from datetime import UTC, datetime
 from typing import Any
 
+from fu7ur3pr00f.constants import HIMALAYAS_API_BASE
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 
@@ -18,7 +20,7 @@ class HimalayasMCPClient(HTTPMCPClient):
     Returns remote job listings with salary data from himalayas.app.
     """
 
-    BASE_URL = "https://himalayas.app/jobs/api"
+    BASE_URL = HIMALAYAS_API_BASE
 
     async def list_tools(self) -> list[str]:
         """List available tools."""

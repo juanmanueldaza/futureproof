@@ -16,31 +16,6 @@ class FounderAgent(BaseAgent):
     - Developer-to-founder transition planning
     """
 
-    KEYWORDS = frozenset(
-        {
-            "startup",
-            "founder",
-            "cofounder",
-            "co-founder",
-            "launch",
-            "product",
-            "entrepreneur",
-            "mvp",
-            "side project",
-            "business idea",
-            "company",
-            "bootstrap",
-            "fundraising",
-            "revenue",
-            "saas",
-            "indie",
-            "solo",
-            "validate",
-            "build a product",
-            "productize",
-        }
-    )
-
     @property
     def name(self) -> str:
         return "founder"

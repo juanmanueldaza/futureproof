@@ -240,6 +240,7 @@ def _generate_with_llm(
     career_data: str,
     language: Literal["en", "es"],
     format: Literal["ats", "creative"],
+    target_role: str | None = None,
 ) -> str:
     """Generate CV content using LLM."""
     model, _config = get_model_with_fallback(
@@ -269,6 +270,14 @@ def _generate_with_llm(
         career_data, preserve_professional_emails=True
     )
 
+    # Build target role instruction if provided
+    target_role_instruction = ""
+    if target_role:
+        target_role_instruction = f"""
+
+TARGET ROLE: {target_role}
+Tailor the CV content, summary, and emphasis to align with this specific role."""
+
     prompt = f"""{GENERATE_CV_PROMPT}
 
 {lang_instruction[language]}
@@ -276,7 +285,7 @@ def _generate_with_llm(
 {format_instruction[format]}
 
 CAREER DATA:
-{safe_career_data}
+{safe_career_data}{target_role_instruction}
 
 Generate a complete, professional CV in Markdown format."""
 
@@ -293,12 +302,14 @@ Generate a complete, professional CV in Markdown format."""
 def create_cv(
     language: Literal["en", "es"] = "en",
     format: Literal["ats", "creative"] = "ats",
+    target_role: str | None = None,
 ) -> Path:
     """Generate CV in specified language and format.
 
     Args:
         language: Output language (en or es)
         format: CV format (ats or creative)
+        target_role: Optional target role to tailor CV content
 
     Returns:
         Path to generated CV file
@@ -312,10 +323,11 @@ def create_cv(
         console.print("[yellow]No career data found. Run 'gather' first.[/yellow]")
         return Path()
 
-    console.print(f"  Generating {language}/{format} CV...")
+    role_str = f" for {target_role}" if target_role else ""
+    console.print(f"  Generating {language}/{format} CV{role_str}...")
 
     # Generate content and strip code fences if LLM wrapped the output
-    cv_content = _generate_with_llm(career_data, language, format)
+    cv_content = _generate_with_llm(career_data, language, format, target_role)
     cv_content = _clean_llm_output(cv_content)
 
     # Save markdown with secure permissions

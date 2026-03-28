@@ -108,7 +108,7 @@ def build_conversation_graph(  # noqa: C901
 
         # Get executor and run inner graph, passing through all callbacks
         orchestrator = get_orchestrator()
-        executor = orchestrator.get_blackboard_executor(routed)
+        executor = orchestrator.get_executor(routed)
 
         logger.warning(
             "execute_inner: query=%r, routed=%s, " "turn_type=%s, constraints=%d",

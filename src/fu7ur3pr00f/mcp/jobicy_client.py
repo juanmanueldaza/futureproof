@@ -10,6 +10,8 @@ from typing import Any
 
 import defusedxml.ElementTree as ET
 
+from fu7ur3pr00f.constants import JOBICY_API_BASE, JOBICY_RSS_URL
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 from .job_schema import clean_html_entities
@@ -25,8 +27,8 @@ class JobicyMCPClient(HTTPMCPClient):
     Uses RSS feed to get salary data that the JSON API doesn't provide.
     """
 
-    BASE_URL = "https://jobicy.com/api/v2/remote-jobs"
-    RSS_URL = "https://jobicy.com/feed/newjobs"
+    BASE_URL = JOBICY_API_BASE
+    RSS_URL = JOBICY_RSS_URL
     DEFAULT_HEADERS = {
         **HTTPMCPClient.DEFAULT_HEADERS,
         "Accept": "application/json, application/rss+xml",

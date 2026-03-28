@@ -3,6 +3,8 @@
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 
+from fu7ur3pr00f.agents.tools._analysis_helpers import get_knowledge_service
+
 
 def _parse_source(source: str):
     """Parse and validate a KnowledgeSource string.
@@ -51,9 +53,7 @@ def search_career_knowledge(
     - "Accenture" with section="Connections", include_social=True to find contacts
     - "relocation" with section="Conversation", include_social=True for messages
     """
-    from fu7ur3pr00f.services.knowledge_service import KnowledgeService
-
-    service = KnowledgeService()
+    service = get_knowledge_service()
     results = service.search(
         query,
         limit=limit,
@@ -91,9 +91,7 @@ def get_knowledge_stats() -> str:
     Shows what career data is indexed and available for search.
     Use this to see if the knowledge base has been populated.
     """
-    from fu7ur3pr00f.services.knowledge_service import KnowledgeService
-
-    service = KnowledgeService()
+    service = get_knowledge_service()
     stats = service.get_stats()
 
     total = stats.get("total_chunks", 0)
@@ -120,9 +118,7 @@ def index_career_knowledge(source: str = "") -> str:
 
     All sources are auto-indexed when gathered. Use this to verify indexing status.
     """
-    from fu7ur3pr00f.services.knowledge_service import KnowledgeService
-
-    service = KnowledgeService()
+    service = get_knowledge_service()
 
     results = service.index_all(verbose=False)
 
@@ -165,9 +161,7 @@ def clear_career_knowledge(source: str = "") -> str:
     if not approved:
         return "Knowledge base clear cancelled."
 
-    from fu7ur3pr00f.services.knowledge_service import KnowledgeService
-
-    service = KnowledgeService()
+    service = get_knowledge_service()
 
     if source:
         ks = _parse_source(source)

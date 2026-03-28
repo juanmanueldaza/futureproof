@@ -15,6 +15,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from fu7ur3pr00f.constants import INDEX_BATCH_SIZE
+
 from .chromadb_store import ChromaDBStore
 from .chunker import MarkdownChunker, Section
 
@@ -102,9 +104,8 @@ class CareerKnowledgeStore(ChromaDBStore):
                 )
                 chunk_idx += 1
 
-        batch_size = 100
-        for i in range(0, len(ids), batch_size):
-            end = min(i + batch_size, len(ids))
+        for i in range(0, len(ids), INDEX_BATCH_SIZE):
+            end = min(i + INDEX_BATCH_SIZE, len(ids))
             self._add(
                 ids=ids[i:end],
                 documents=documents[i:end],

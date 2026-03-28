@@ -6,4 +6,10 @@ User profile:
 Career context:
 {career_context}
 
-Provide a concise gap analysis with 3-5 key areas to improve.
+**Sovereignty-First Analysis**: Prioritize gaps in open standards and publicly verifiable skills over proprietary certifications.
+
+Provide:
+1. **Top 3-5 Key Gaps** (be specific: "No PostgreSQL projects" not "needs database skills")
+2. **Confidence Score** (0-100 — state what data is missing)
+3. **Sovereignty Check** (distinguish: open standards > proprietary vendor lock-in)
+4. **Proof-of-Learning Requirements** (for each gap: name specific project/output to demonstrate mastery)

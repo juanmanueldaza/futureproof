@@ -110,6 +110,10 @@ class CareerBlackboard(TypedDict, total=False):
     current_specialist: str | None
     """Current specialist contributing to the blackboard (for graph routing)"""
 
+    # Turn-scoped tool result cache (reset each executor.execute() call)
+    _tool_cache: dict[str, str]
+    """Cache for idempotent tool results within a turn (key: "tool:json_args")"""
+
 
 def make_initial_blackboard(
     query: str,
@@ -140,6 +144,7 @@ def make_initial_blackboard(
         "synthesis": {},
         "errors": [],
         "current_specialist": None,
+        "_tool_cache": {},
     }
 
 

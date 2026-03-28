@@ -6,6 +6,8 @@ https://api.stackexchange.com/ - Technology popularity and trends.
 
 from typing import Any
 
+from fu7ur3pr00f.constants import STACKOVERFLOW_API_BASE
+
 from .base import MCPToolError, MCPToolResult
 from .http_client import HTTPMCPClient
 
@@ -18,7 +20,7 @@ class StackOverflowMCPClient(HTTPMCPClient):
     Returns technology popularity data from Stack Overflow.
     """
 
-    BASE_URL = "https://api.stackexchange.com/2.3"
+    BASE_URL = STACKOVERFLOW_API_BASE
 
     def __init__(self, api_key: str | None = None) -> None:
         super().__init__(api_key=api_key)

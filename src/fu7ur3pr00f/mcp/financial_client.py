@@ -10,6 +10,8 @@ Uses two free APIs (no authentication required):
 import time
 from typing import Any
 
+from fu7ur3pr00f.constants import FOREX_API_BASE, PPP_API_BASE
+
 from ..config import settings
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
@@ -133,8 +135,8 @@ class FinancialMCPClient(HTTPMCPClient):
 
     DEFAULT_TIMEOUT = 45.0  # World Bank API can be slow
 
-    FOREX_URL = "https://open.er-api.com/v6/latest"
-    PPP_URL = "https://api.worldbank.org/v2/country"
+    FOREX_URL = FOREX_API_BASE
+    PPP_URL = PPP_API_BASE
     PPP_INDICATOR = "PA.NUS.PPPC.RF"
 
     async def list_tools(self) -> list[str]:

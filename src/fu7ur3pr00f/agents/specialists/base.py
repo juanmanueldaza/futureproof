@@ -10,6 +10,7 @@ The base class handles:
 - Keyword-based intent routing
 """
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -18,6 +19,15 @@ from typing import Any
 from langgraph.errors import GraphInterrupt as _GraphInterrupt
 
 from fu7ur3pr00f.agents.blackboard.blackboard import CareerBlackboard, SpecialistFinding
+from fu7ur3pr00f.constants import (
+    CAREER_CONTEXT_MAX_CHARS,
+    ERROR_TOOL_EXECUTION,
+    ERROR_TOOL_NOT_FOUND,
+    MAX_TOOL_ROUNDS,
+    MAX_TOTAL_TOOL_CALLS,
+    TOOL_RESULT_MAX_CHARS,
+    TOOL_RESULT_PREVIEW_CHARS,
+)
 from fu7ur3pr00f.prompts import load_prompt
 from fu7ur3pr00f.utils.security import sanitize_for_prompt
 
@@ -53,13 +63,7 @@ class BaseAgent(ABC):
     - description    : str — human-readable description
     - system_prompt  : str — specialist persona and instructions
     - tools          : list — curated subset of the career tools
-    - KEYWORDS       : frozenset[str] — keywords for intent matching
-
-    Subclasses inherit can_handle() which uses KEYWORDS.
     """
-
-    # Subclasses override this with their own frozenset of keywords
-    KEYWORDS: frozenset[str] = frozenset()
 
     @property
     @abstractmethod
@@ -84,10 +88,6 @@ class BaseAgent(ABC):
     def tools(self) -> list:
         """Curated tool subset for this specialist."""
         ...
-
-    def can_handle(self, intent: str) -> bool:
-        """Keyword-based intent matching for routing."""
-        return any(kw in intent.lower() for kw in self.KEYWORDS)
 
     # ── Blackboard pattern ───────────────────────────────────────────────
 
@@ -154,15 +154,26 @@ class BaseAgent(ABC):
         # Build tool name → tool function lookup
         tool_map = {t.name: t for t in self.tools}
 
+        # Turn-scoped cache for idempotent tools (shared across all specialists)
+        _CACHEABLE_TOOLS: frozenset[str] = frozenset(
+            {
+                "get_user_profile",
+                "search_career_knowledge",
+                "get_github_profile",
+                "search_github_repos",
+                "search_gitlab_projects",
+            }
+        )
+        tool_cache: dict[str, str] = (
+            blackboard.get("_tool_cache", {}) if blackboard else {}
+        )
+
         try:
             model, _ = get_model_with_fallback(purpose="agent")
             model_with_tools = model.bind_tools(self.tools)
         except Exception as e:
             logger.error("%s: failed to bind tools: %s", self.name, e)
             return {"reasoning": f"Setup error: {e}", "confidence": 0.0}
-
-        MAX_TOOL_ROUNDS = 10
-        MAX_TOTAL_TOOL_CALLS = 25
 
         tool_call_count = 0
         for round_num in range(MAX_TOOL_ROUNDS):
@@ -201,6 +212,25 @@ class BaseAgent(ABC):
                 tool_args = tc.get("args", {})
                 tool_id = tc["id"]
 
+                # Cache hit — return silently without showing duplicate panels
+                if tool_name in _CACHEABLE_TOOLS:
+                    cache_key = f"{tool_name}:{json.dumps(tool_args, sort_keys=True)}"
+                    if cache_key in tool_cache:
+                        logger.debug(
+                            "%s: cache hit for %s(%r), skipping re-fetch",
+                            self.name,
+                            tool_name,
+                            tool_args,
+                        )
+                        messages.append(
+                            ToolMessage(
+                                content=tool_cache[cache_key], tool_call_id=tool_id
+                            )
+                        )
+                        continue
+                else:
+                    cache_key = ""
+
                 if stream_writer:
                     stream_writer(
                         {
@@ -213,21 +243,29 @@ class BaseAgent(ABC):
 
                 tool_fn = tool_map.get(tool_name)
                 if tool_fn is None:
-                    result_str = (
-                        f"Tool {tool_name!r} not available to {self.name} specialist."
+                    result_str = ERROR_TOOL_NOT_FOUND.format(
+                        name=tool_name, agent=self.name
                     )
                     logger.warning("%s: tool not found: %s", self.name, tool_name)
                 else:
                     try:
                         result = tool_fn.invoke(tool_args)
-                        result_str = str(result)[:3000]
+                        result_str = str(result)[:TOOL_RESULT_MAX_CHARS]
                     except _GraphInterrupt:
                         raise
                     except Exception as e:
-                        result_str = f"Error running {tool_name}: {e}"
+                        result_str = ERROR_TOOL_EXECUTION.format(
+                            tool=tool_name, error=e
+                        )
                         logger.warning(
                             "%s: tool error (%s): %s", self.name, tool_name, e
                         )
+
+                # Populate cache for idempotent tools
+                if cache_key and tool_fn is not None:
+                    tool_cache[cache_key] = result_str
+                    if blackboard is not None:
+                        blackboard["_tool_cache"] = tool_cache
 
                 if stream_writer:
                     stream_writer(
@@ -235,7 +273,7 @@ class BaseAgent(ABC):
                             "type": "tool_result",
                             "specialist": self.name,
                             "tool": tool_name,
-                            "result": result_str[:500],
+                            "result": result_str[:TOOL_RESULT_PREVIEW_CHARS],
                         }
                     )
 
@@ -317,7 +355,7 @@ class BaseAgent(ABC):
                         context_parts.append(f"  - {key}: {safe_value}")
 
         context_msg = "\n".join(context_parts) if context_parts else ""
-        return context_msg[:4000]
+        return context_msg[:CAREER_CONTEXT_MAX_CHARS]
 
     def _extract_findings(
         self,
@@ -350,13 +388,15 @@ class BaseAgent(ABC):
             if isinstance(msg, AIMessage):
                 content = getattr(msg, "content", "")
                 if content and isinstance(content, str) and content.strip():
-                    agent_text = content[:4000]
+                    agent_text = content[:CAREER_CONTEXT_MAX_CHARS]
                     break
 
         if not agent_text:
             # Fall back to last message of any type
             last_msg = messages[-1]
-            agent_text = str(getattr(last_msg, "content", str(last_msg)))[:4000]
+            agent_text = str(getattr(last_msg, "content", str(last_msg)))[
+                :CAREER_CONTEXT_MAX_CHARS
+            ]
             logger.warning(
                 "%s._extract_findings: no AI text found, "
                 "fell back to last msg type=%s, text=%r",

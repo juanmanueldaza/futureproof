@@ -16,6 +16,13 @@ from rich.panel import Panel
 from rich.text import Text
 
 from fu7ur3pr00f.config import reload_settings, settings, write_user_setting
+from fu7ur3pr00f.constants import (
+    COLOR_ACCENT,
+    COLOR_ERROR,
+    COLOR_INFO,
+    COLOR_SUCCESS,
+    COLOR_WARNING,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,16 +137,16 @@ def display_config_status(console: Console) -> None:
         pname = _PROVIDERS.get(provider, {}).get("name", provider)
         lines.append(
             Text.assemble(
-                ("Active provider: ", "#e0d8c0"),
-                (pname, "bold #10b981"),
+                ("Active provider: ", f"{COLOR_ACCENT}"),
+                (pname, f"bold {COLOR_SUCCESS}"),
             )
         )
     else:
-        lines.append(Text("No LLM provider configured", style="bold #ff6b6b"))
+        lines.append(Text("No LLM provider configured", style=f"bold {COLOR_ERROR}"))
     lines.append(Text(""))
 
     # Providers
-    lines.append(Text("LLM Providers", style="bold #ffd700"))
+    lines.append(Text("LLM Providers", style=f"bold {COLOR_WARNING}"))
     for pid in _PROVIDER_ORDER:
         info = _PROVIDERS[pid]
         locked = pid in _LOCKED_PROVIDERS
@@ -154,31 +161,31 @@ def display_config_status(console: Console) -> None:
             continue
         configured = _provider_status(pid)
         icon = "\u2714" if configured else "\u2718"
-        color = "#10b981" if configured else "#ff6b6b"
+        color = f"{COLOR_SUCCESS}" if configured else f"{COLOR_ERROR}"
         active = " (active)" if pid == provider else ""
         lines.append(
             Text.assemble(
                 (f"  {icon} ", color),
-                (info["name"], "#e0d8c0"),
-                (f" — {info['description']}", "#415a77"),
-                (active, "bold #ffd700"),
+                (info["name"], f"{COLOR_ACCENT}"),
+                (f" — {info['description']}", f"{COLOR_INFO}"),
+                (active, f"bold {COLOR_WARNING}"),
             )
         )
 
     lines.append(Text(""))
 
     # Integrations
-    lines.append(Text("Integrations", style="bold #ffd700"))
+    lines.append(Text("Integrations", style=f"bold {COLOR_WARNING}"))
     for iid in _INTEGRATION_ORDER:
         info = _INTEGRATIONS[iid]
         configured = _integration_status(iid)
         icon = "\u2714" if configured else "\u2718"
-        color = "#10b981" if configured else "#ff6b6b"
+        color = f"{COLOR_SUCCESS}" if configured else f"{COLOR_ERROR}"
         lines.append(
             Text.assemble(
                 (f"  {icon} ", color),
-                (info["name"], "#e0d8c0"),
-                (f" — {info['description']}", "#415a77"),
+                (info["name"], f"{COLOR_ACCENT}"),
+                (f" — {info['description']}", f"{COLOR_INFO}"),
             )
         )
 
@@ -186,8 +193,8 @@ def display_config_status(console: Console) -> None:
     console.print(
         Panel(
             content,
-            title="[bold #ffd700]Configuration[/bold #ffd700]",
-            border_style="#ffd700",
+            title=f"[bold {COLOR_WARNING}]Configuration[/bold {COLOR_WARNING}]",
+            border_style=f"{COLOR_WARNING}",
             box=box.ROUNDED,
             padding=(1, 2),
         )
@@ -197,7 +204,7 @@ def display_config_status(console: Console) -> None:
 
 def _display_menu(console: Console) -> None:
     """Show the setup menu options."""
-    console.print("[bold #ffd700]LLM Providers[/bold #ffd700]")
+    console.print(f"[bold {COLOR_WARNING}]LLM Providers[/bold {COLOR_WARNING}]")
     for i, pid in enumerate(_PROVIDER_ORDER, 1):
         info = _PROVIDERS[pid]
         if pid in _LOCKED_PROVIDERS:
@@ -205,23 +212,27 @@ def _display_menu(console: Console) -> None:
             continue
         configured = _provider_status(pid)
         status = (
-            "[#10b981]\u2714[/#10b981]" if configured else "[#ff6b6b]\u2718[/#ff6b6b]"
+            f"[{COLOR_SUCCESS}]\u2714[/{COLOR_SUCCESS}]"
+            if configured
+            else f"[{COLOR_ERROR}]\u2718[/{COLOR_ERROR}]"
         )
         console.print(f"  {status} [{i}] {info['name']}")
 
     console.print()
-    console.print("[bold #ffd700]Integrations[/bold #ffd700]")
+    console.print(f"[bold {COLOR_WARNING}]Integrations[/bold {COLOR_WARNING}]")
     offset = len(_PROVIDER_ORDER)
     for i, iid in enumerate(_INTEGRATION_ORDER, offset + 1):
         info = _INTEGRATIONS[iid]
         configured = _integration_status(iid)
         status = (
-            "[#10b981]\u2714[/#10b981]" if configured else "[#ff6b6b]\u2718[/#ff6b6b]"
+            f"[{COLOR_SUCCESS}]\u2714[/{COLOR_SUCCESS}]"
+            if configured
+            else f"[{COLOR_ERROR}]\u2718[/{COLOR_ERROR}]"
         )
         console.print(f"  {status} [{i}] {info['name']}")
 
     console.print()
-    console.print("  [#415a77][0] Done[/#415a77]")
+    console.print(f"  [{COLOR_INFO}][0] Done[/{COLOR_INFO}]")
     console.print()
 
 
@@ -244,38 +255,38 @@ def _show_azure_guide(console: Console) -> None:
     console.print(
         Panel(
             (
-                "[bold #ffd700]Step 1[/bold #ffd700]"
-                " [#e0d8c0]Create a free Azure account[/#e0d8c0]\n"
+                f"[bold {COLOR_WARNING}]Step 1[/bold {COLOR_WARNING}]"
+                f" [{COLOR_ACCENT}]Create a free Azure account[/{COLOR_ACCENT}]\n"
                 "  [#5bc0be]https://azure.microsoft.com/free[/#5bc0be]\n"
-                "  [#415a77]New accounts get $200 free credit"
-                " for 30 days.[/#415a77]\n"
+                f"  [{COLOR_INFO}]New accounts get $200 free credit"
+                f" for 30 days.[/{COLOR_INFO}]\n"
                 "\n"
-                "[bold #ffd700]Step 2[/bold #ffd700]"
-                " [#e0d8c0]Go to Azure AI Foundry[/#e0d8c0]\n"
+                f"[bold {COLOR_WARNING}]Step 2[/bold {COLOR_WARNING}]"
+                f" [{COLOR_ACCENT}]Go to Azure AI Foundry[/{COLOR_ACCENT}]\n"
                 "  [#5bc0be]https://ai.azure.com[/#5bc0be]\n"
-                "  [#415a77]Create a new project (this creates"
-                " an OpenAI resource).[/#415a77]\n"
+                f"  [{COLOR_INFO}]Create a new project (this creates"
+                f" an OpenAI resource).[/{COLOR_INFO}]\n"
                 "\n"
-                "[bold #ffd700]Step 3[/bold #ffd700]"
-                " [#e0d8c0]Deploy these models[/#e0d8c0]\n"
-                "  [#415a77]Go to Models + endpoints > Deploy"
-                " model.[/#415a77]\n"
-                "  [#415a77]Deploy each of these (use the exact"
-                " name as deployment name):[/#415a77]\n"
+                f"[bold {COLOR_WARNING}]Step 3[/bold {COLOR_WARNING}]"
+                f" [{COLOR_ACCENT}]Deploy these models[/{COLOR_ACCENT}]\n"
+                f"  [{COLOR_INFO}]Go to Models + endpoints > Deploy"
+                f" model.[/{COLOR_INFO}]\n"
+                f"  [{COLOR_INFO}]Deploy each of these (use the exact"
+                f" name as deployment name):[/{COLOR_INFO}]\n"
                 f"{model_list}\n"
                 "\n"
-                "[bold #ffd700]Step 4[/bold #ffd700]"
-                " [#e0d8c0]Get your credentials[/#e0d8c0]\n"
-                "  [#415a77]Go to your project > Overview.[/#415a77]\n"
-                "  [#415a77]Copy the [bold]API key[/bold]"
-                " and [bold]Endpoint URL[/bold].[/#415a77]\n"
-                "  [#ff6b6b]Use only the base URL"
+                f"[bold {COLOR_WARNING}]Step 4[/bold {COLOR_WARNING}]"
+                f" [{COLOR_ACCENT}]Get your credentials[/{COLOR_ACCENT}]\n"
+                f"  [{COLOR_INFO}]Go to your project > Overview.[/{COLOR_INFO}]\n"
+                f"  [{COLOR_INFO}]Copy the [bold]API key[/bold]"
+                f" and [bold]Endpoint URL[/bold].[/{COLOR_INFO}]\n"
+                f"  [{COLOR_ERROR}]Use only the base URL"
                 " (e.g. https://myresource.openai.azure.com).\n"
                 "  Remove /api/projects/... if present."
-                "[/#ff6b6b]"
+                f"[/{COLOR_ERROR}]"
             ),
-            title="[bold #ffd700]Azure OpenAI Setup Guide[/bold #ffd700]",
-            border_style="#ffd700",
+            title=f"[bold {COLOR_WARNING}]Azure OpenAI Setup Guide[/bold {COLOR_WARNING}]",
+            border_style=f"{COLOR_WARNING}",
             box=box.ROUNDED,
             padding=(1, 2),
         )
@@ -307,7 +318,7 @@ def _prompt_keys(
         True if any value was set.
     """
     console.print(f"\n[bold #5bc0be]Configure {name}[/bold #5bc0be]")
-    console.print("[#415a77]Press Enter to skip a field.[/#415a77]\n")
+    console.print(f"[{COLOR_INFO}]Press Enter to skip a field.[/{COLOR_INFO}]\n")
 
     changed = False
     is_url_key = frozenset(("ENDPOINT", "URL"))
@@ -323,15 +334,15 @@ def _prompt_keys(
                 else:
                     value = input(prompt_label).strip()
             except (EOFError, KeyboardInterrupt):
-                console.print("\n[#415a77]Cancelled.[/#415a77]")
+                console.print(f"\n[{COLOR_INFO}]Cancelled.[/{COLOR_INFO}]")
                 return changed
 
             if not value and default:
                 value = default
             if value and needs_url and not value.startswith(("https://", "http://")):
                 console.print(
-                    "  [#ff6b6b]Must be a URL starting with"
-                    " https:// — please try again.[/#ff6b6b]"
+                    f"  [{COLOR_ERROR}]Must be a URL starting with"
+                    f" https:// — please try again.[/{COLOR_ERROR}]"
                 )
                 continue
             break
@@ -339,13 +350,15 @@ def _prompt_keys(
         if value:
             write_user_setting(env_key, value)
             display = _redact(value) if is_secret else value
-            console.print(f"  [#10b981]\u2714 {env_key}[/#10b981] = {display}")
+            console.print(
+                f"  [{COLOR_SUCCESS}]\u2714 {env_key}[/{COLOR_SUCCESS}] = {display}"
+            )
             changed = True
 
     return changed
 
 
-def run_setup(  # noqa: C901 TODO: refactor
+def run_setup(  # noqa: C901 - Menu-driven wizard with multiple provider/integration options
     console: Console,
     first_run: bool = False,
 ) -> bool:
@@ -362,14 +375,14 @@ def run_setup(  # noqa: C901 TODO: refactor
         console.print(
             Panel(
                 Text.assemble(
-                    ("Welcome to FutureProof!\n\n", "bold #ffd700"),
-                    ("An LLM provider is required to start. ", "#e0d8c0"),
-                    ("Let's set one up.\n", "#e0d8c0"),
-                    ("Your keys are stored locally at ", "#415a77"),
-                    ("~/.fu7ur3pr00f/.env", "bold #415a77"),
-                    (" and never sent to the agent.", "#415a77"),
+                    ("Welcome to FutureProof!\n\n", f"bold {COLOR_WARNING}"),
+                    ("An LLM provider is required to start. ", f"{COLOR_ACCENT}"),
+                    ("Let's set one up.\n", f"{COLOR_ACCENT}"),
+                    ("Your keys are stored locally at ", f"{COLOR_INFO}"),
+                    ("~/.fu7ur3pr00f/.env", f"bold {COLOR_INFO}"),
+                    (" and never sent to the agent.", f"{COLOR_INFO}"),
                 ),
-                border_style="#ffd700",
+                border_style=f"{COLOR_WARNING}",
                 box=box.ROUNDED,
                 padding=(1, 2),
             )
@@ -391,8 +404,8 @@ def run_setup(  # noqa: C901 TODO: refactor
             # Exit setup — but enforce provider on first run
             if first_run and not settings.active_provider:
                 console.print(
-                    "[#ff6b6b]At least one LLM provider is required. "
-                    "Please configure a provider to continue.[/#ff6b6b]\n"
+                    f"[{COLOR_ERROR}]At least one LLM provider is required. "
+                    f"Please configure a provider to continue.[/{COLOR_ERROR}]\n"
                 )
                 continue
             break
@@ -400,7 +413,7 @@ def run_setup(  # noqa: C901 TODO: refactor
         try:
             idx = int(choice)
         except ValueError:
-            console.print("[#ff6b6b]Invalid choice.[/#ff6b6b]\n")
+            console.print(f"[{COLOR_ERROR}]Invalid choice.[/{COLOR_ERROR}]\n")
             continue
 
         # Map index to provider or integration
@@ -423,7 +436,7 @@ def run_setup(  # noqa: C901 TODO: refactor
             info = _INTEGRATIONS[iid]
             changed = _prompt_keys(console, info["name"], info["keys"])
         else:
-            console.print("[#ff6b6b]Invalid choice.[/#ff6b6b]\n")
+            console.print(f"[{COLOR_ERROR}]Invalid choice.[/{COLOR_ERROR}]\n")
             continue
 
         if changed:
@@ -437,8 +450,8 @@ def run_setup(  # noqa: C901 TODO: refactor
         if provider:
             pname = _PROVIDERS.get(provider, {}).get("name", provider)
             console.print(
-                f"\n[#10b981]\u2714 Settings saved. Active provider: "
-                f"[bold]{pname}[/bold][/#10b981]\n"
+                f"\n[{COLOR_SUCCESS}]\u2714 Settings saved. Active provider: "
+                f"[bold]{pname}[/bold][/{COLOR_SUCCESS}]\n"
             )
         logger.info("Settings updated via /setup, active_provider=%s", provider)
 

@@ -1,49 +1,20 @@
 """Turn classifier — categorizes incoming queries for context-aware routing.
 
 Classifies queries into: factual, follow_up, steer, new_query, workflow_step.
-Uses regex/keyword heuristics first (fast), falls back to LLM only when needed.
+Uses LLM-based classification via the classify_turn prompt.
 """
 
 import logging
-import re
 from typing import Literal
+
+from fu7ur3pr00f.prompts import load_prompt
 
 logger = logging.getLogger(__name__)
 
 TurnType = Literal["factual", "follow_up", "steer", "new_query", "workflow_step"]
-
-# Regex patterns for fast classification
-# Matches direct questions about the user's profile data (single-fact answers)
-_FACTUAL_PATTERN = re.compile(
-    r"^(what\s+(is|are|was|were)|who\s+(is|are)|where\s+(is|are)|when\s+(is|are|was|were)"  # noqa: E501
-    r"|how\s+(many|much|old)\s+(is|are|am|do|does|did|have|has)"
-    r"|(is|are|was|were|do|does|did)\s+i)\s+(my|i|the)",
-    re.IGNORECASE,
+_VALID_TYPES: frozenset[str] = frozenset(
+    {"factual", "follow_up", "steer", "new_query", "workflow_step"}
 )
-
-_FOLLOW_UP_KEYWORDS = {
-    "tell me more",
-    "go deeper",
-    "elaborate",
-    "expand",
-    "furthermore",
-    "additionally",
-    "what about",
-    "clarify",
-}
-
-_STEER_KEYWORDS = {
-    "focus on",
-    "focus more",
-    "instead",
-    "actually",
-    "skip",
-    "ignore",
-    "change",
-    "different",
-    "shift",
-    "pivot",
-}
 
 
 def classify(
@@ -51,7 +22,7 @@ def classify(
     conversation_history: list[dict] | None = None,
     active_goals: list[dict] | None = None,
 ) -> TurnType:
-    """Classify the turn type using fast heuristics.
+    """Classify the turn type using LLM-based understanding.
 
     Args:
         query: The user's input query
@@ -61,66 +32,65 @@ def classify(
     Returns:
         Turn type: factual, follow_up, steer, new_query, or workflow_step
     """
-    query_lower = query.lower()
+    from langchain_core.messages import HumanMessage
 
-    # Fast path 1: Factual questions
-    if _FACTUAL_PATTERN.match(query):
-        logger.debug("classify: %r → factual (regex match)", query[:60])
-        return "factual"
+    from fu7ur3pr00f.llm.fallback import get_model_with_fallback
 
-    # Fast path 2: No history → must be new_query
-    if not conversation_history or len(conversation_history) == 0:
+    # No history → always a new query, no LLM needed
+    if not conversation_history:
         logger.debug("classify: %r → new_query (no history)", query[:60])
         return "new_query"
 
-    # Fast path 3: Steering indicators
-    if any(kw in query_lower for kw in _STEER_KEYWORDS):
-        logger.debug("classify: %r → steer (keyword)", query[:60])
-        return "steer"
+    # Build conversation summary (last 3 turns) — include agent responses so the
+    # LLM can see e.g. "Agent asked 'Would you like to proceed?'" before "yes"
+    recent = conversation_history[-3:]
+    if recent:
+        summary_lines = []
+        for t in recent:
+            summary_lines.append(f"- User: {t.get('query', '')[:80]}")
+            narrative = t.get("narrative", "").strip()
+            if narrative:
+                # Trim to the first 120 chars to keep the prompt concise
+                summary_lines.append(f"  Agent: {narrative[:120]}")
+        conversation_summary = "\n".join(summary_lines)
+    else:
+        conversation_summary = "No prior turns."
 
-    # Fast path 4: Follow-up indicators
-    if any(kw in query_lower for kw in _FOLLOW_UP_KEYWORDS) or _is_follow_up_heuristic(
-        query_lower
-    ):
-        logger.debug("classify: %r → follow_up (heuristic)", query[:60])
-        return "follow_up"
+    # Format active goals
+    if active_goals:
+        goals_text = ", ".join(
+            g.get("description", "") for g in active_goals if g.get("description")
+        )
+        active_goals_str = goals_text or "None"
+    else:
+        active_goals_str = "None"
 
-    # Fast path 5: Workflow step
-    if active_goals and _references_active_goal(query, active_goals):
-        logger.debug("classify: %r → workflow_step", query[:60])
-        return "workflow_step"
+    prompt = load_prompt("classify_turn").format(
+        conversation_summary=conversation_summary,
+        query=query,
+        active_goals=active_goals_str,
+    )
 
-    # Default
-    logger.debug("classify: %r → new_query (default)", query[:60])
-    return "new_query"
-
-
-def _is_follow_up_heuristic(query_lower: str) -> bool:
-    """Check if query looks like a follow-up using simple heuristics."""
-    # Starts with pronoun or question word that implies prior context
-    pronouns = ("it", "that", "them", "those", "this", "these", "he", "she", "they")
-    if any(query_lower.startswith(p) for p in pronouns):
-        return True
-
-    # Very short query after longer history (often a follow-up)
-    if len(query_lower) < 20 and query_lower.count(" ") < 3:
-        return True
-
-    return False
-
-
-def _references_active_goal(query: str, active_goals: list[dict]) -> bool:
-    """Check if query references any active goal."""
-    if not active_goals:
-        return False
-
-    query_lower = query.lower()
-    for goal in active_goals:
-        goal_desc = goal.get("description", "").lower()
-        if goal_desc and goal_desc in query_lower:
-            return True
-
-    return False
+    try:
+        model, _ = get_model_with_fallback(purpose="summary", temperature=0.0)
+        result = model.invoke([HumanMessage(content=prompt)])
+        # First word of response is the turn type
+        first_word = result.content.strip().split()[0].lower().rstrip(".")  # type: ignore
+        if first_word in _VALID_TYPES:
+            logger.debug("classify: %r → %s (llm)", query[:60], first_word)
+            return first_word  # type: ignore
+        logger.warning(
+            "classify: LLM returned unknown type %r, defaulting to new_query",
+            first_word,
+        )
+        return "new_query"
+    except Exception:
+        logger.warning(
+            "classify: LLM failed for %r, defaulting to new_query",
+            query[:60],
+            exc_info=True,
+        )
+        return "new_query"
 
 
 __all__ = ["classify", "TurnType"]

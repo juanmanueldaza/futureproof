@@ -15,33 +15,6 @@ class LearningAgent(BaseAgent):
     - Building expertise through teaching (blogs, talks, OSS)
     """
 
-    KEYWORDS = frozenset(
-        {
-            "learning",
-            "study",
-            "learn",
-            "skills",
-            "courses",
-            "certification",
-            "expert",
-            "authority",
-            "teaching",
-            "conference",
-            "talk",
-            "blog",
-            "write",
-            "publish",
-            "training",
-            "tutorial",
-            "practice",
-            "master",
-            "specialize",
-            "roadmap",
-            "curriculum",
-            "knowledge",
-        }
-    )
-
     @property
     def name(self) -> str:
         return "learning"

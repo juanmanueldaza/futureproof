@@ -16,6 +16,7 @@ Generate suggestions that:
 - Are actionable (e.g., "search for remote Staff Engineer roles in Berlin", not vague aspirations)
 - Feel conversational and proactive (as if a JARVIS assistant would say them)
 - Are 1-3 bullet points, each under 15 words
+- **Sovereignty-Aligned**: Prioritize actions that build public, portable career capital (OSS, blogs, talks) over company-locked achievements
 
 Format:
 - [suggestion 1]

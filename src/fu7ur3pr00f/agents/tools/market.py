@@ -1,7 +1,5 @@
 """Market intelligence tools for the career agent."""
 
-from unicodedata import normalize
-
 from langchain_core.tools import tool
 
 from fu7ur3pr00f.agents.tools._analysis_helpers import run_market_analysis
@@ -9,120 +7,9 @@ from fu7ur3pr00f.prompts import load_prompt
 
 from ._async import run_async
 
-# Common location translations (non-English → English)
-# Covers Spanish, French, German, Portuguese, Italian, and native names
-_LOCATION_ALIASES: dict[str, str] = {
-    # Countries
-    "españa": "spain",
-    "espana": "spain",
-    "alemania": "germany",
-    "deutschland": "germany",
-    "francia": "france",
-    "italien": "italy",
-    "italia": "italy",
-    "reino unido": "united kingdom",
-    "estados unidos": "united states",
-    "países bajos": "netherlands",
-    "paises bajos": "netherlands",
-    "suiza": "switzerland",
-    "schweiz": "switzerland",
-    "suecia": "sweden",
-    "sverige": "sweden",
-    "noruega": "norway",
-    "norge": "norway",
-    "dinamarca": "denmark",
-    "danmark": "denmark",
-    "irlanda": "ireland",
-    "bélgica": "belgium",
-    "belgica": "belgium",
-    "austria": "austria",
-    "portugal": "portugal",
-    "brasil": "brazil",
-    "méxico": "mexico",
-    "mexico": "mexico",
-    "japón": "japan",
-    "japon": "japan",
-    "corea del sur": "south korea",
-    "canadá": "canada",
-    "canada": "canada",
-    "argentina": "argentina",
-    "colombia": "colombia",
-    "chile": "chile",
-    "perú": "peru",
-    "peru": "peru",
-    "polska": "poland",
-    "polonia": "poland",
-    "república checa": "czech republic",
-    "republica checa": "czech republic",
-    "grecia": "greece",
-    "rumanía": "romania",
-    "rumania": "romania",
-    "hungría": "hungary",
-    "hungria": "hungary",
-    "finlandia": "finland",
-    "suomi": "finland",
-    # Cities
-    "málaga": "malaga",
-    "múnich": "munich",
-    "munich": "munich",
-    "münchen": "munich",
-    "munchen": "munich",
-    "milán": "milan",
-    "milan": "milan",
-    "milano": "milan",
-    "lisboa": "lisbon",
-    "londres": "london",
-    "berlín": "berlin",
-    "berlin": "berlin",
-    "París": "paris",
-    "paris": "paris",
-    "bruselas": "brussels",
-    "bruxelles": "brussels",
-    "ámsterdam": "amsterdam",
-    "amsterdam": "amsterdam",
-    "copenhague": "copenhagen",
-    "estocolmo": "stockholm",
-    "varsovia": "warsaw",
-    "warszawa": "warsaw",
-    "praga": "prague",
-    "praha": "prague",
-    "viena": "vienna",
-    "wien": "vienna",
-    "ginebra": "geneva",
-    "genève": "geneva",
-    "geneve": "geneva",
-    "zúrich": "zurich",
-    "zurich": "zurich",
-    "zürich": "zurich",
-    "barcelona": "barcelona",
-    "madrid": "madrid",
-    "valencia": "valencia",
-    "sevilla": "seville",
-    "bilbao": "bilbao",
-}
-
-
-def _norm(s: object) -> str:
-    """Normalize accented chars for matching (e.g. Málaga → malaga).
-
-    Handles non-string values (e.g. NaN floats from pandas/JobSpy).
-    """
-    if not isinstance(s, str):
-        return ""
-    return normalize("NFD", s.lower()).encode("ascii", "ignore").decode()
-
-
-def _translate_location(location: str) -> str:
-    """Translate non-English location to English for API queries.
-
-    Returns the English equivalent if found, otherwise returns original.
-    """
-    key = _norm(location)
-    return _LOCATION_ALIASES.get(key, location)
-
 
 @tool
-def search_jobs(  # noqa: C901 TODO: refactor
+def search_jobs(
     query: str,
     location: str = "remote",
     limit: int = 50,
@@ -142,17 +29,13 @@ def search_jobs(  # noqa: C901 TODO: refactor
     """
     from fu7ur3pr00f.gatherers.market import JobMarketGatherer
 
-    # Translate non-English locations for API queries (España → Spain)
-    search_location = _translate_location(location)
-
     gatherer = JobMarketGatherer()
-    data = run_async(gatherer.gather(role=query, location=search_location, limit=limit))
+    data = run_async(gatherer.gather(role=query, location=location, limit=limit))
 
     jobs = data.get("job_listings", [])
     summary = data.get("summary", {})
     errors = data.get("errors", [])
 
-    # Show the user's original location in the header
     result_parts = [f"Job search results for {query!r} in {location!r}:"]
     total = summary.get("total_jobs", 0)
     sources = summary.get("sources", [])
@@ -164,8 +47,6 @@ def search_jobs(  # noqa: C901 TODO: refactor
         result_parts.append(f"Remote positions: {summary['remote_positions']}")
 
     if jobs:
-        from collections import defaultdict
-
         # Deduplicate by title+company (LinkedIn posts same job in multiple cities)
         seen: set[str] = set()
         unique_jobs: list[dict] = []
@@ -176,54 +57,8 @@ def search_jobs(  # noqa: C901 TODO: refactor
                 unique_jobs.append(job)
         jobs = unique_jobs
 
-        # Filter by role relevance — drop jobs with no keyword overlap in title
-        # (e.g. "Medical Claims Negotiator" when searching "AI Engineer")
-        query_words = {w.lower() for w in query.split() if len(w) >= 2}
-        # Common tech synonyms to broaden matching
-        _synonyms = {
-            "ai": {"ai", "ml", "machine", "learning", "data", "intelligence"},
-            "engineer": {"engineer", "developer", "dev", "architect", "lead"},
-            "full": {"full", "fullstack", "full-stack"},
-            "stack": {"stack", "fullstack", "full-stack"},
-            "frontend": {"frontend", "front-end", "front", "ui", "react", "vue"},
-            "backend": {"backend", "back-end", "back", "api", "server"},
-            "senior": {"senior", "sr", "staff", "principal", "lead"},
-            "software": {"software", "swe"},
-        }
-        expanded = set(query_words)
-        for w in query_words:
-            if w in _synonyms:
-                expanded.update(_synonyms[w])
-
-        def _is_relevant(job: dict) -> bool:
-            title = (job.get("title") or "").lower()
-            title_words = set(title.replace("-", " ").split())
-            return bool(expanded & title_words)
-
-        before_filter = len(jobs)
-        jobs = [j for j in jobs if _is_relevant(j)]
-        filtered_out = before_filter - len(jobs)
-        if filtered_out:
-            result_parts.append(
-                f"Showing {len(jobs)} relevant results"
-                f" (filtered {filtered_out} unrelated)"
-            )
-
-        # Separate location-matched vs unmatched jobs
-        matched: list[dict] = []
-        unmatched = jobs
-        if search_location.lower() != "remote":
-            # Match against both original and translated location
-            loc_norms = {_norm(location), _norm(search_location)}
-            matched = [
-                j
-                for j in jobs
-                if any(ln in _norm(j.get("location") or "") for ln in loc_norms)
-            ]
-            unmatched = [j for j in jobs if j not in matched]
-
-        def _fmt_job(job: dict) -> None:
-            """Append formatted job lines to result_parts."""
+        result_parts.append(f"\n**Top opportunities:** ({len(jobs)} found)")
+        for job in jobs[:25]:
             title = job.get("title") or "Unknown"
             company = job.get("company") or "Unknown"
             loc_raw = job.get("location")
@@ -237,37 +72,6 @@ def search_jobs(  # noqa: C901 TODO: refactor
             result_parts.append(f"  Location: {job_loc}{salary_str}")
             if url:
                 result_parts.append(f"  Apply: {url}")
-
-        # Display matched jobs first, then round-robin unmatched
-        max_display = 25
-        if matched:
-            result_parts.append(f"\n**Jobs in {location}:** ({len(matched)} found)")
-            for job in matched[:max_display]:
-                _fmt_job(job)
-
-        remaining = max_display - min(len(matched), max_display)
-        if remaining > 0 and unmatched:
-            if matched:
-                result_parts.append("\n**Remote/other opportunities:**")
-            else:
-                result_parts.append("\n**Top opportunities:**")
-
-            # Round-robin across sources
-            jobs_by_source: dict[str, list[dict]] = defaultdict(list)
-            for job in unmatched:
-                jobs_by_source[job.get("site", "unknown")].append(job)
-
-            groups = list(jobs_by_source.values())
-            idx = 0
-            shown = 0
-            while shown < remaining and groups:
-                group = groups[idx % len(groups)]
-                if group:
-                    _fmt_job(group.pop(0))
-                    shown += 1
-                    idx += 1
-                else:
-                    groups.pop(idx % len(groups))
 
     if errors:
         result_parts.append(f"\nNote: Some sources had issues: {len(errors)} errors")

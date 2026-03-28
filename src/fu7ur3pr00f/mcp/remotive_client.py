@@ -12,6 +12,8 @@ API provides structured data including:
 
 from typing import Any
 
+from fu7ur3pr00f.constants import REMOTIVE_API_BASE
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 from .job_schema import attach_salary
@@ -25,7 +27,7 @@ class RemotiveMCPClient(HTTPMCPClient):
     Returns remote job listings from remotive.com.
     """
 
-    BASE_URL = "https://remotive.com/api/remote-jobs"
+    BASE_URL = REMOTIVE_API_BASE
 
     async def list_tools(self) -> list[str]:
         """List available tools."""

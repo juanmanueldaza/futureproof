@@ -15,17 +15,25 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.theme import Theme
 
+from fu7ur3pr00f.constants import (
+    COLOR_ACCENT,
+    COLOR_ERROR,
+    COLOR_INFO,
+    COLOR_SUCCESS,
+    COLOR_WARNING,
+)
+
 # ── Nautical theme (inspired by daza.ar) ─────────────────────────────────
 
 _THEME = Theme(
     {
-        "gold": "bold #ffd700",
-        "sand": "#e0d8c0",
+        "gold": f"bold {COLOR_WARNING}",
+        "sand": f"{COLOR_ACCENT}",
         "parchment": "bold #f5f0e1",
-        "teal": "#415a77",
-        "success": "#10b981",
-        "warning": "#ffd700",
-        "error": "#ff6b6b",
+        "teal": f"{COLOR_INFO}",
+        "success": f"{COLOR_SUCCESS}",
+        "warning": f"{COLOR_WARNING}",
+        "error": f"{COLOR_ERROR}",
     }
 )
 
@@ -36,10 +44,10 @@ console = Console(theme=_THEME)
 _TOOL_CATEGORIES: dict[str, tuple[str, str]] = {
     # category: (icon, color)
     "profile": ("\u2139", "#5bc0be"),  # ℹ  soft teal
-    "gathering": ("\u2b07", "#10b981"),  # ⬇  emerald
-    "github": ("\u2b22", "#e0d8c0"),  # ⬢  sand
+    "gathering": ("\u2b07", f"{COLOR_SUCCESS}"),  # ⬇  emerald
+    "github": ("\u2b22", f"{COLOR_ACCENT}"),  # ⬢  sand
     "gitlab": ("\u2b22", "#c084fc"),  # ⬢  lavender
-    "knowledge": ("\u25c6", "#ffd700"),  # ◆  gold
+    "knowledge": ("\u25c6", f"{COLOR_WARNING}"),  # ◆  gold
     "analysis": ("\u25b2", "#60a5fa"),  # ▲  sky blue
     "generation": ("\u2605", "#fbbf24"),  # ★  amber
     "market": ("\u25cf", "#34d399"),  # ●  mint
@@ -144,7 +152,7 @@ def display_tool_start(tool_name: str, args: dict) -> None:
             val_str = str(v)
             if len(val_str) > 200:
                 val_str = val_str[:200] + "..."
-            console.print(Text(f"       {k}: {val_str}", style="#415a77"))
+            console.print(Text(f"       {k}: {val_str}", style=f"{COLOR_INFO}"))
 
 
 def display_tool_result(
@@ -168,10 +176,12 @@ def display_tool_result(
 
     console.print(
         Panel(
-            Text(display_content, style="#415a77"),
+            Text(display_content, style=f"{COLOR_INFO}"),
             title=f"[{color}]{tool_name}[/{color}]",
             subtitle=(
-                f"[italic #415a77]{subtitle}[/italic #415a77]" if subtitle else None
+                f"[italic {COLOR_INFO}]{subtitle}[/italic {COLOR_INFO}]"
+                if subtitle
+                else None
             ),
             subtitle_align="right",
             border_style=color,
@@ -181,52 +191,25 @@ def display_tool_result(
     )
 
 
-def display_node_transition(node_name: str) -> None:
-    """Show when the agent graph transitions to a new node."""
-    # Map internal node names to human-readable descriptions
-    labels = {
-        "model": "LLM thinking...",
-        "tools": "executing tools",
-    }
-    label = labels.get(node_name, node_name)
-    console.print(
-        Text.assemble(
-            ("  \u203a ", "#415a77"),
-            (label, "italic #415a77"),
-        )
-    )
-
-
 def display_timing(elapsed: float) -> None:
     """Show total response time."""
     console.print(
         Text.assemble(
-            _badge("DONE", "#10b981"),
-            (f" {elapsed:.1f}s", "#10b981"),
+            _badge("DONE", f"{COLOR_SUCCESS}"),
+            (f" {elapsed:.1f}s", f"{COLOR_SUCCESS}"),
         )
     )
     console.print()
-
-
-def display_model_switch(model_name: str) -> None:
-    """Show when the fallback manager switches to a different model."""
-    console.print(
-        Text.assemble(
-            _badge("FALLBACK", "#ffd700"),
-            (" ", ""),
-            (model_name, "bold #ffd700"),
-        )
-    )
 
 
 def display_indexing_result(source: str, chunks: int, elapsed: float) -> None:
     """Show indexing progress for a knowledge source."""
     console.print(
         Text.assemble(
-            _badge("INDEX", "#ffd700"),
-            (f" {source}", "bold #ffd700"),
-            (f" \u2014 {chunks} chunks indexed", "#e0d8c0"),
-            (f" ({elapsed:.1f}s)", "italic #415a77"),
+            _badge("INDEX", f"{COLOR_WARNING}"),
+            (f" {source}", f"bold {COLOR_WARNING}"),
+            (f" \u2014 {chunks} chunks indexed", f"{COLOR_ACCENT}"),
+            (f" ({elapsed:.1f}s)", f"italic {COLOR_INFO}"),
         )
     )
 
@@ -236,17 +219,17 @@ def display_gather_result(source: str, elapsed: float, success: bool = True) -> 
     if success:
         console.print(
             Text.assemble(
-                _badge("GATHER", "#10b981"),
-                (f" {source}", "bold #10b981"),
-                (f" ({elapsed:.1f}s)", "italic #415a77"),
+                _badge("GATHER", f"{COLOR_SUCCESS}"),
+                (f" {source}", f"bold {COLOR_SUCCESS}"),
+                (f" ({elapsed:.1f}s)", f"italic {COLOR_INFO}"),
             )
         )
     else:
         console.print(
             Text.assemble(
-                _badge("FAILED", "#ff6b6b"),
-                (f" {source}", "bold #ff6b6b"),
-                (f" ({elapsed:.1f}s)", "italic #415a77"),
+                _badge("FAILED", f"{COLOR_ERROR}"),
+                (f" {source}", f"bold {COLOR_ERROR}"),
+                (f" ({elapsed:.1f}s)", f"italic {COLOR_INFO}"),
             )
         )
 
@@ -254,29 +237,29 @@ def display_gather_result(source: str, elapsed: float, success: bool = True) -> 
 def display_welcome() -> None:
     """Display welcome message when starting a chat session."""
     content = Text.assemble(
-        ("AI Career Intelligence Agent\n\n", "#e0d8c0"),
-        (" \u25c6 ", "#ffd700"),
-        ("Analyze skills and identify gaps\n", "#e0d8c0"),
-        (" \u25c6 ", "#ffd700"),
-        ("Search for job opportunities\n", "#e0d8c0"),
-        (" \u25c6 ", "#ffd700"),
-        ("Generate tailored CVs\n", "#e0d8c0"),
-        (" \u25c6 ", "#ffd700"),
-        ("Get career strategy advice\n\n", "#e0d8c0"),
-        (" /help", "#415a77"),
-        (" \u00b7 ", "#415a77"),
-        ("/setup", "#415a77"),
-        (" \u00b7 ", "#415a77"),
-        ("/profile", "#415a77"),
-        (" \u00b7 ", "#415a77"),
-        ("/quit", "#415a77"),
+        ("AI Career Intelligence Agent\n\n", f"{COLOR_ACCENT}"),
+        (" \u25c6 ", f"{COLOR_WARNING}"),
+        ("Analyze skills and identify gaps\n", f"{COLOR_ACCENT}"),
+        (" \u25c6 ", f"{COLOR_WARNING}"),
+        ("Search for job opportunities\n", f"{COLOR_ACCENT}"),
+        (" \u25c6 ", f"{COLOR_WARNING}"),
+        ("Generate tailored CVs\n", f"{COLOR_ACCENT}"),
+        (" \u25c6 ", f"{COLOR_WARNING}"),
+        ("Get career strategy advice\n\n", f"{COLOR_ACCENT}"),
+        (" /help", f"{COLOR_INFO}"),
+        (" \u00b7 ", f"{COLOR_INFO}"),
+        ("/setup", f"{COLOR_INFO}"),
+        (" \u00b7 ", f"{COLOR_INFO}"),
+        ("/profile", f"{COLOR_INFO}"),
+        (" \u00b7 ", f"{COLOR_INFO}"),
+        ("/quit", f"{COLOR_INFO}"),
     )
 
     console.print(
         Panel(
             content,
-            title="[bold #ffd700]FUTUREPROOF[/bold #ffd700]",
-            border_style="#ffd700",
+            title=f"[bold {COLOR_WARNING}]FUTUREPROOF[/bold {COLOR_WARNING}]",
+            border_style=f"{COLOR_WARNING}",
             box=box.DOUBLE,
             padding=(1, 2),
         )
@@ -292,9 +275,9 @@ def display_error(message: str) -> None:
     """
     console.print(
         Panel(
-            Text(message, style="#ff6b6b"),
-            title="[bold #ff6b6b]Error[/bold #ff6b6b]",
-            border_style="#ff6b6b",
+            Text(message, style=f"{COLOR_ERROR}"),
+            title=f"[bold {COLOR_ERROR}]Error[/bold {COLOR_ERROR}]",
+            border_style=f"{COLOR_ERROR}",
             box=box.ROUNDED,
         )
     )
@@ -314,13 +297,13 @@ def display_interrupt_confirmation(question: str, details: str = "") -> None:
         content_parts.append("")
         content_parts.append(details)
 
-    content = Text("\n".join(content_parts), style="#ffd700")
+    content = Text("\n".join(content_parts), style=f"{COLOR_WARNING}")
 
     console.print(
         Panel(
             content,
-            title="[bold #ffd700]Confirmation[/bold #ffd700]",
-            border_style="#ffd700",
+            title=f"[bold {COLOR_WARNING}]Confirmation[/bold {COLOR_WARNING}]",
+            border_style=f"{COLOR_WARNING}",
             box=box.ROUNDED,
         )
     )
@@ -360,7 +343,7 @@ def display_help() -> None:
         Panel(
             Markdown(help_text),
             title="[bold #5bc0be]Help[/bold #5bc0be]",
-            border_style="#415a77",
+            border_style=f"{COLOR_INFO}",
             box=box.ROUNDED,
         )
     )
@@ -462,8 +445,12 @@ def display_specialist_progress(
         status: "working" | "done" | "error"
         elapsed: Optional elapsed time in seconds
     """
-    colors = {"working": "#ffd700", "done": "#10b981", "error": "#ff6b6b"}
-    color = colors.get(status, "#415a77")
+    colors = {
+        "working": f"{COLOR_WARNING}",
+        "done": f"{COLOR_SUCCESS}",
+        "error": f"{COLOR_ERROR}",
+    }
+    color = colors.get(status, f"{COLOR_INFO}")
     badge_labels = {"working": "ANALYZING", "done": "DONE", "error": "ERROR"}
     label = badge_labels.get(status, status.upper())
 
@@ -502,10 +489,10 @@ def display_blackboard_result(
             console.print(
                 Panel(
                     Markdown(narrative),
-                    title="[bold #ffd700]INTEGRATED CAREER ANALYSIS[/bold #ffd700]",
+                    title=f"[bold {COLOR_WARNING}]INTEGRATED CAREER ANALYSIS[/bold {COLOR_WARNING}]",
                     subtitle=(f"[italic]{contributors} · {elapsed:.1f}s[/italic]"),
                     subtitle_align="right",
-                    border_style="#ffd700",
+                    border_style=f"{COLOR_WARNING}",
                     box=box.DOUBLE,
                     padding=(1, 2),
                 )
@@ -535,14 +522,16 @@ def display_blackboard_result(
         parts.append(f"\n**Next Steps:**\n{steps_str}")
 
     body = "\n".join(parts) if parts else "Analysis complete."
-    subtitle_text = f"[italic #415a77]{contributors} · {elapsed:.1f}s[/italic #415a77]"
+    subtitle_text = (
+        f"[italic {COLOR_INFO}]{contributors} · {elapsed:.1f}s[/italic {COLOR_INFO}]"
+    )
     console.print(
         Panel(
             Markdown(body),
-            title="[bold #ffd700]INTEGRATED CAREER ANALYSIS[/bold #ffd700]",
+            title=f"[bold {COLOR_WARNING}]INTEGRATED CAREER ANALYSIS[/bold {COLOR_WARNING}]",
             subtitle=subtitle_text,
             subtitle_align="right",
-            border_style="#ffd700",
+            border_style=f"{COLOR_WARNING}",
             box=box.DOUBLE,
             padding=(1, 2),
         )

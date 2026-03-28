@@ -31,15 +31,6 @@ class BlackboardScheduler:
     # Coach sets direction, then others build on it
     DEFAULT_ORDER = ["coach", "learning", "code", "jobs", "founder"]
 
-    # Keywords that trigger specific specialists
-    SPECIALIST_TRIGGERS = {
-        "coach": {"promotion", "leadership", "career path", "growth", "next step"},
-        "learning": {"learn", "skill", "training", "course", "improve"},
-        "code": {"project", "portfolio", "github", "build", "technical"},
-        "jobs": {"job", "opportunity", "role", "interview", "salary", "freelance"},
-        "founder": {"startup", "saas", "founder", "business", "revenue"},
-    }
-
     def __init__(
         self,
         strategy: str = "linear",
@@ -159,24 +150,15 @@ class BlackboardScheduler:
             # First specialist is always coach
             return self._execution_order[0]
 
-        query = blackboard.get("query", "").lower()
         findings = blackboard.get("findings", {})
 
-        # Try the next specialist in order
+        # Run each specialist in order if it hasn't contributed yet
         try:
             idx = self._execution_order.index(current_specialist)
             for next_idx in range(idx + 1, len(self._execution_order)):
                 next_specialist = self._execution_order[next_idx]
-                triggers = self.SPECIALIST_TRIGGERS.get(next_specialist, set())
-
-                # Check if query mentions this specialist's domain
-                if any(kw in query for kw in triggers):
-                    return next_specialist
-
-                # Or if no previous findings yet (always run in linear order once)
                 if next_specialist not in findings:
                     return next_specialist
-
         except ValueError:
             pass
 

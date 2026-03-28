@@ -101,7 +101,9 @@
       "Bash(pip3 list)",
       "Bash(pip3 install *)",
       "Bash(touch *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(python *)",
+      "Bash(wc *)"
     ]
   },
   "$version": 3

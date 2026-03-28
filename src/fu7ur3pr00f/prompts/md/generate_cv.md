@@ -34,12 +34,18 @@ This is the most important section. It's the first thing read and the last thing
 **Structure**: Identity + Signature Achievement + Differentiator + Trajectory
 
 1. **Identity**: What you do and the impact you create. NOT "X years of experience" — that's the weakest possible opener. Lead with what makes you valuable: "Full-stack engineer who ships AI-powered products from prototype to production" beats "Full Stack AI Engineer with over 6 years of experience."
-2. **Signature achievement**: One concrete, quantified win that proves you deliver. "Cut build times 4x by migrating 200k-line codebase from Webpack to Vite" — specific, measurable, impressive.
+2. **Signature Achievement**: One concrete, quantified win that proves you deliver. "Cut build times 4x by migrating 200k-line codebase from Webpack to Vite" — specific, measurable, impressive.
 3. **Differentiator**: The unique angle that separates you from 100 similar candidates. Unusual skill combinations, career pivots that add perspective, domain expertise others lack.
 4. **Trajectory**: Where you're heading, connected to the target role. Forward-looking, not backward-listing.
 
-**Banned phrases** (these are resume filler that says nothing):
-"over X years of experience", "strong background in", "recognized for", "passionate about", "proven track record", "leveraging", "utilizing", "detail-oriented", "team player", "hard-working", "results-driven", "self-motivated", "go-getter"
+**Substance-over-Syntax Rule**:
+Instead of banning phrases, require that every "Identity" sentence in the Professional Summary be backed by a "Signature Achievement" from the data. If the data does not support a claim of passion through action, omit the sentiment entirely.
+
+**Examples of weak vs strong openers**:
+- Weak: "Results-driven software engineer with 6 years of experience" (could describe anyone)
+- Strong: "Full-stack engineer who ships AI-powered products from prototype to production" (specific, verifiable)
+- Weak: "Passionate about machine learning" (empty claim)
+- Strong: "Built and deployed RAG chatbot serving 1k+ users using LangChain and PostgreSQL" (proves it)
 
 ---
 
@@ -102,6 +108,7 @@ When exact numbers aren't in the source data, use contextual scale indicators:
 - Group by category if many: Languages, Frameworks, AI/ML, Cloud/DevOps, Tools
 - Only include skills actually demonstrated in the experience or projects
 - Place highest-demand skills first within each category
+- **Sovereignty Note**: Highlight open source technologies and contributions prominently
 
 ### Education
 - Include actual dates and completion status
@@ -111,10 +118,12 @@ When exact numbers aren't in the source data, use contextual scale indicators:
 - From portfolio and notable repositories
 - Include tech stack and what the project does in one line
 - Only include if they strengthen the narrative
+- **Prioritize**: Open source projects, public deployments, projects with live demos
 
 ### Certifications
 - Most relevant first, not chronological
 - Include issuer and date
+- **Note**: Open standards certifications (AWS, Kubernetes) rank higher than proprietary vendor certs
 
 ### Languages (spoken)
 - Only if relevant (multilingual is an asset)
@@ -142,3 +151,4 @@ When exact numbers aren't in the source data, use contextual scale indicators:
 - Varied: no two bullets should start the same way or follow the same structure
 - Professional but human: avoid robotic corporate-speak
 - Consistent formatting throughout
+- **Sovereignty-aligned**: Emphasize public proof (GitHub, OSS, talks, blogs) over internal achievements

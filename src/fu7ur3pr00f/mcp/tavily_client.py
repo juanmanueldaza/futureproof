@@ -6,6 +6,8 @@ Get your key at: https://tavily.com/
 
 from typing import Any
 
+from fu7ur3pr00f.constants import TAVILY_API_BASE
+
 from ..config import settings
 from .base import MCPConnectionError, MCPToolResult
 from .http_client import HTTPMCPClient
@@ -17,7 +19,7 @@ class TavilyMCPClient(HTTPMCPClient):
     Free tier: 1000 queries/month, no credit card required.
     """
 
-    BASE_URL = "https://api.tavily.com/search"
+    BASE_URL = TAVILY_API_BASE
 
     def __init__(self, api_key: str | None = None) -> None:
         super().__init__(api_key=api_key or settings.tavily_api_key)

@@ -16,35 +16,6 @@ class JobsAgent(BaseAgent):
     - Offer evaluation and negotiation strategy
     """
 
-    KEYWORDS = frozenset(
-        {
-            "jobs",
-            "job",
-            "hiring",
-            "interview",
-            "salary",
-            "compensation",
-            "benefits",
-            "remote",
-            "work from home",
-            "job search",
-            "apply",
-            "resume",
-            "cv",
-            "negotiate",
-            "offer",
-            "market",
-            "opportunity",
-            "recruiter",
-            "application",
-            "cover letter",
-            "market fit",
-            "search",
-            "find",
-            "looking for work",
-        }
-    )
-
     @property
     def name(self) -> str:
         return "jobs"

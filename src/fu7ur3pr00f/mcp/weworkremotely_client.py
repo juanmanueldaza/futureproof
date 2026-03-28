@@ -15,6 +15,8 @@ from xml.etree.ElementTree import Element
 
 import defusedxml.ElementTree as ET
 
+from fu7ur3pr00f.constants import WEREMOTE_BASE, WEREMOTE_FEEDS
+
 from .base import MCPToolResult
 from .http_client import HTTPMCPClient
 from .job_schema import (
@@ -34,15 +36,9 @@ class WeWorkRemotelyMCPClient(HTTPMCPClient):
     """
 
     # RSS feeds by category
-    RSS_FEEDS = {
-        "programming": "https://weworkremotely.com/categories/remote-programming-jobs.rss",  # noqa: E501
-        "design": "https://weworkremotely.com/categories/remote-design-jobs.rss",
-        "devops": "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss",  # noqa: E501
-        "management": "https://weworkremotely.com/categories/remote-management-jobs.rss",  # noqa: E501
-        "all": "https://weworkremotely.com/remote-jobs.rss",
-    }
+    RSS_FEEDS = WEREMOTE_FEEDS
 
-    BASE_URL = "https://weworkremotely.com"
+    BASE_URL = WEREMOTE_BASE
     DEFAULT_HEADERS = {
         **HTTPMCPClient.DEFAULT_HEADERS,
         "Accept": "application/rss+xml, application/xml, text/xml",

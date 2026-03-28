@@ -16,30 +16,6 @@ class CodeAgent(BaseAgent):
     - Selecting side projects for career impact
     """
 
-    KEYWORDS = frozenset(
-        {
-            "github",
-            "gitlab",
-            "repos",
-            "repositories",
-            "code",
-            "commits",
-            "open source",
-            "oss",
-            "contributions",
-            "projects",
-            "portfolio",
-            "side project",
-            "developer brand",
-            "visibility",
-            "pull request",
-            "fork",
-            "star",
-            "gist",
-            "readme",
-        }
-    )
-
     @property
     def name(self) -> str:
         return "code"

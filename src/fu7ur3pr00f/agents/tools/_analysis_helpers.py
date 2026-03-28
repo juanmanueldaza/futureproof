@@ -6,15 +6,41 @@ get_career_advice, analyze_market_fit, and analyze_market_skills.
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from langchain_core.messages import HumanMessage
 
 from fu7ur3pr00f.agents.tools._async import run_async
 from fu7ur3pr00f.llm.fallback import get_model_with_fallback
-from fu7ur3pr00f.memory.profile import load_profile
+from fu7ur3pr00f.memory.profile import UserProfile, load_profile
 from fu7ur3pr00f.services.knowledge_service import KnowledgeService
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolContext:
+    """Encapsulates dependencies for tool execution.
+
+    Provides a single point of access to profile and knowledge service,
+    eliminating repeated instantiation across tools.
+
+    Usage:
+        ctx = ToolContext.create()
+        career_data = ctx.knowledge_service.search(...)
+        profile_summary = ctx.profile.summary()
+    """
+
+    profile: UserProfile
+    knowledge_service: KnowledgeService
+
+    @classmethod
+    def create(cls) -> "ToolContext":
+        """Factory method — handles all service initialization."""
+        return cls(
+            profile=load_profile(),
+            knowledge_service=KnowledgeService(),
+        )
 
 
 def build_career_context(career_data: list[dict]) -> str:
@@ -37,6 +63,7 @@ def invoke_with_context(
     search_query: str,
     prompt: str,
     search_limit: int = 10,
+    ctx: ToolContext | None = None,
 ) -> str:
     """Run the shared profile+knowledge+LLM pipeline.
 
@@ -48,6 +75,7 @@ def invoke_with_context(
         prompt: Fully rendered prompt string with {profile_summary} and
                 {career_context} format placeholders
         search_limit: Max knowledge results to retrieve (default 10)
+        ctx: Optional pre-created ToolContext for efficiency
 
     Returns:
         Model text response (result.content)
@@ -55,13 +83,14 @@ def invoke_with_context(
     Raises:
         Exception: Propagates any LLM or service errors for caller to handle
     """
-    profile = load_profile()
-    service = KnowledgeService()
-    career_data = service.search(search_query, limit=search_limit)
+    if ctx is None:
+        ctx = ToolContext.create()
+
+    career_data = ctx.knowledge_service.search(search_query, limit=search_limit)
     career_context = build_career_context(career_data)
 
     full_prompt = prompt.format(
-        profile_summary=profile.summary(),
+        profile_summary=ctx.profile.summary(),
         career_context=career_context,
     )
 
@@ -117,3 +146,26 @@ def run_market_analysis(
             f"Could not complete {noun.lower()}: "
             f"{type(e).__name__}. Check logs for details."
         )
+
+
+def get_knowledge_service() -> KnowledgeService:
+    """Get a KnowledgeService instance.
+
+    Convenience wrapper that eliminates repeated imports and instantiation.
+    Use this in tools that only need knowledge service access.
+
+    Returns:
+        KnowledgeService instance
+    """
+    return KnowledgeService()
+
+
+def get_profile_summary() -> str:
+    """Get the current user's profile summary.
+
+    Convenience wrapper for tools that need profile context.
+
+    Returns:
+        Profile summary string
+    """
+    return load_profile().summary()
