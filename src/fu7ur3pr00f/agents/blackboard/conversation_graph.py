@@ -199,6 +199,7 @@ def build_conversation_graph(
         # Use LLM to generate contextual suggestions
         try:
             from langchain_core.messages import HumanMessage
+
             from fu7ur3pr00f.llm.fallback import get_model_with_fallback
             from fu7ur3pr00f.prompts import load_prompt
 

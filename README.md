@@ -63,7 +63,7 @@ See [.env.example](.env.example) for all options.
 
 ## Architecture
 
-### Single-Agent (Current)
+### Single-Agent (Default)
 
 ```mermaid
 graph LR
@@ -79,17 +79,19 @@ graph LR
 ```mermaid
 graph TB
     User --> Chat[Chat Client]
-    Chat --> Engine[Outer Graph<br/>Session State]
-    Engine --> Router["Router<br/>(LLM + Fallback)"]
-    Router -->|"How can I leverage<br/>my strengths<br/>to win money?"| Multi["Coach + Jobs<br/>+ Learning"]
-    Router -->|"What is my<br/>job title?"| Single["Coach<br/>(Factual)"]
-    Multi & Single --> Blackboard[Inner Blackboard Graph]
-    Blackboard --> Coach[Coach Agent]
-    Blackboard --> Learning[Learning Agent]
-    Blackboard --> Jobs[Jobs Agent]
-    Blackboard --> Code[Code Agent]
-    Blackboard --> Founder[Founder Agent]
-    Coach & Learning & Jobs & Code & Founder --> ChromaDB[(Shared ChromaDB)]
+    Chat --> Engine[Engine<br/>invoke_turn]
+    Engine --> Outer[Outer Graph<br/>SessionState persistent]
+    Outer --> Classify[classify_turn<br/>factual / follow_up / new_query]
+    Classify --> Route[route_turn<br/>LLM routing + keyword fallback]
+    Route --> Inner[Inner Blackboard Graph<br/>per-turn execution]
+    Inner --> S1[Coach]
+    Inner --> S2[Jobs]
+    Inner --> S3[Learning]
+    Inner --> S4[Code / Founder]
+    S1 & S2 & S3 & S4 --> KB[(ChromaDB<br/>career knowledge)]
+    Inner --> Synth[Synthesis<br/>LLM]
+    Outer --> Accum[accumulate findings<br/>cross-turn context]
+    Accum --> Suggest[suggest_next<br/>proactive follow-ups]
 ```
 
 **Routing Architecture:**

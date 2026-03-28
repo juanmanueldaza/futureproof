@@ -257,11 +257,15 @@ class BaseAgent(ABC):
         # Previous findings section
         context_msg = self._format_previous_findings(previous_findings)
 
-        full_prompt = f"User Profile:\n{profile_context}\n\nQuery: {query}"
+        full_prompt = f"USER QUERY: {query}\n\nUser Profile:\n{profile_context}"
 
-        # Append specialist guidance from prompt
+        # Append specialist guidance — fill placeholders with actual values
         from fu7ur3pr00f.prompts import load_prompt
-        guidance = load_prompt("specialist_guidance")
+        guidance = (
+            load_prompt("specialist_guidance")
+            .replace("{specialist_name}", self.name)
+            .replace("{user_query}", sanitize_for_prompt(query))
+        )
         full_prompt += f"\n\n{guidance}"
         if context_msg:
             full_prompt += f"\n\nContext from other specialists:\n{context_msg}"

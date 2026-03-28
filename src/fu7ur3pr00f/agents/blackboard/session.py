@@ -5,9 +5,9 @@ findings, conversation history, and active goals across the entire
 conversation thread.
 """
 
-from typing import Any
+from typing import Annotated, Any
 
-from typing_extensions import Annotated, TypedDict
+from typing_extensions import TypedDict
 
 from fu7ur3pr00f.agents.blackboard.blackboard import SpecialistFinding
 

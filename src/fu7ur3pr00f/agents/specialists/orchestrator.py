@@ -1,8 +1,13 @@
 """Orchestrator — routes queries to the right specialist(s) via the blackboard.
 
-All queries run through the blackboard pattern. The orchestrator does
-keyword-based routing (no LLM call, deterministic) to select which
+All queries run through the blackboard pattern. The orchestrator uses
+LLM-based semantic routing (with keyword fallback) to select which
 specialists contribute, then delegates execution to BlackboardExecutor.
+
+Routing strategy:
+- Primary: LLM semantic routing via _route_with_llm() (purpose="summary")
+- Fallback: keyword scoring via _route_with_keywords() (deterministic)
+- Fast paths: factual queries → coach; follow-ups → reuse previous
 
 Usage (from the chat client):
     orchestrator = get_orchestrator()
@@ -64,8 +69,9 @@ _MULTI_SPECIALIST_KEYWORDS: list[str] = [
 class OrchestratorAgent:
     """Routes user queries to specialist agents via the blackboard pattern.
 
-    Routing is keyword-based — no LLM call, deterministic and fast.
-    route() always returns a list[str] of specialist names to involve.
+    Primary routing uses LLM-based semantic understanding; keyword scoring
+    is the deterministic fallback when the LLM is unavailable.
+    route() always returns a list[str] of 1-4 specialist names.
     """
 
     def __init__(self) -> None:

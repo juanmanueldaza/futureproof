@@ -14,13 +14,11 @@ import logging  # noqa: E402
 import re  # noqa: E402
 import time  # noqa: E402
 from pathlib import Path  # noqa: E402
-from typing import Any  # noqa: E402
 
 from prompt_toolkit import PromptSession  # noqa: E402
 from prompt_toolkit.formatted_text import HTML  # noqa: E402
 from prompt_toolkit.history import FileHistory  # noqa: E402
 from prompt_toolkit.styles import Style as PTStyle  # noqa: E402
-from rich.console import Console  # noqa: E402
 from rich.markdown import Markdown  # noqa: E402
 
 from fu7ur3pr00f.agents.blackboard import get_conversation_engine  # noqa: E402

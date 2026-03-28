@@ -4,8 +4,8 @@
 
 FutureProof is a career intelligence agent with two modes:
 
-- **Single Agent (default):** One `career_agent.py` with 41 tools — used for every typed message in the chat loop
-- **Multi-Agent (opt-in):** Orchestrator routes to specialist agents (Coach, Learning, Jobs, Code, Founder) — accessed via `/multi` in chat
+- **Single Agent (default):** One `career_agent.py` with 40 tools — used for every typed message in the chat loop
+- **Multi-Agent (LLM-Routed):** Orchestrator uses LLM-based semantic routing to select 1-4 specialist agents (Coach, Learning, Jobs, Code, Founder)
 
 ## Design Decisions
 
@@ -159,7 +159,7 @@ Two separate stores:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              Single Agent (41 tools) — career_agent.py          │
+│              Single Agent (40 tools) — career_agent.py          │
 │  Middleware stack:                                              │
 │  1. build_dynamic_prompt — injects live profile + KB stats     │
 │  2. ToolCallRepairMiddleware — repairs orphaned tool_calls      │
